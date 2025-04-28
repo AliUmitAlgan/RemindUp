@@ -30,6 +30,8 @@ object ThemeManager {
         _isDarkTheme.value = isDark
     }
 
-    // Flow yerine MutableState nesnesi kullanarak temayı getir
-    fun getDarkThemeStateFlow(context: Context) = isDarkTheme
+    // State nesnesini doğrudan döndür (Flow yerine)
+    fun getDarkThemeState(): Boolean {
+        return _isDarkTheme.value
+    }
 }

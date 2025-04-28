@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,27 +42,9 @@ fun RemindersScreenContent(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-
     var reminders by remember { mutableStateOf<List<Pair<String, Reminder>>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var showAddDialog by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
-    var expandedCardId by remember { mutableStateOf<String?>(null) }
-    var showQuickAddOptions by remember { mutableStateOf(false) }
-
-    // Hatırlatıcıları yükle
-    LaunchedEffect(key1 = true) {
-        loadReminders(
-            onSuccess = { remindersList ->
-                reminders = remindersList
-                isLoading = false
-            },
-            onError = { error ->
-                showToast(context, "Hatırlatıcılar yüklenemedi: $error")
-                isLoading = false
-            }
-        )
-    }
 
     Scaffold(
         topBar = {
@@ -73,115 +56,28 @@ fun RemindersScreenContent(
                     }
                 },
                 actions = {
-                    // Arama butonu
-                    IconButton(onClick = { /* Arama özelliği gelecekte eklenecek */ }) {
-                        Icon(Icons.Default.Search, contentDescription = "Ara")
+                    // Ekleme butonu üst kısımda
+                    IconButton(onClick = { showAddDialog = true }) {
+                        Icon(Icons.Default.Add, contentDescription = "Hatırlatıcı Ekle")
                     }
-
-                    // Menü butonu
-                    IconButton(onClick = { /* Ek özellikler menüsü */ }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Menü")
-                    }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             )
-        },
-        floatingActionButton = {
-            Column(horizontalAlignment = Alignment.End) {
-                // Hızlı ekleme seçenekleri
-                AnimatedVisibility(
-                    visible = showQuickAddOptions,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.End,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Su içme hatırlatıcısı
-                        SmallFAB(
-                            icon = Icons.Default.WaterDrop,
-                            label = "Su İçme",
-                            onClick = {
-                                coroutineScope.launch {
-                                    val time = getCurrentTimeString()
-                                    addReminder(
-                                        context = context,
-                                        reminder = Reminder(title = "Su İçme Vakti", time = time),
-                                        onSuccess = { id, newReminder ->
-                                            reminders = reminders + (id to newReminder)
-                                            showToast(context, "Su içme hatırlatıcısı eklendi")
-                                        },
-                                        onError = { error ->
-                                            showToast(context, "Hatırlatıcı eklenemedi: $error")
-                                        }
-                                    )
-                                }
-                                showQuickAddOptions = false
-                            }
-                        )
-
-                        // İlaç hatırlatıcısı
-                        SmallFAB(
-                            icon = Icons.Default.Medication,
-                            label = "İlaç",
-                            onClick = {
-                                coroutineScope.launch {
-                                    val time = getCurrentTimeString()
-                                    addReminder(
-                                        context = context,
-                                        reminder = Reminder(title = "İlaç Vakti", time = time),
-                                        onSuccess = { id, newReminder ->
-                                            reminders = reminders + (id to newReminder)
-                                            showToast(context, "İlaç hatırlatıcısı eklendi")
-                                        },
-                                        onError = { error ->
-                                            showToast(context, "Hatırlatıcı eklenemedi: $error")
-                                        }
-                                    )
-                                }
-                                showQuickAddOptions = false
-                            }
-                        )
-                    }
-                }
-
-                // Ana FAB
-                FloatingActionButton(
-                    onClick = {
-                        if (showQuickAddOptions) {
-                            showQuickAddOptions = false
-                            showAddDialog = true
-                        } else {
-                            showQuickAddOptions = true
-                        }
-                    },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                ) {
-                    if (showQuickAddOptions) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Yeni Hatırlatıcı"
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Yeni Hatırlatıcı"
-                        )
-                    }
-                }
-            }
         }
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(16.dp)
+                .background(MaterialTheme.colorScheme.background)
         ) {
+            // İçerik
             if (isLoading) {
                 CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center)
+                    modifier = Modifier.align(Alignment.Center),
+                    color = MaterialTheme.colorScheme.primary
                 )
             } else if (reminders.isEmpty()) {
                 EmptyRemindersView(
@@ -189,64 +85,230 @@ fun RemindersScreenContent(
                 )
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(reminders) { (id, reminder) ->
-                        AnimationUtils.SlideAnimation(visible = true) {
-                            ModernReminderCard(
-                                reminder = reminder,
-                                isExpanded = expandedCardId == id,
-                                onCardClick = {
-                                    expandedCardId = if (expandedCardId == id) null else id
-                                },
-                                onDelete = {
-                                    coroutineScope.launch {
-                                        deleteReminder(
-                                            context = context,
-                                            reminderId = id,
-                                            onSuccess = {
-                                                reminders = reminders.filter { it.first != id }
-                                                showToast(context, "Hatırlatıcı silindi")
-                                            },
-                                            onError = { error ->
-                                                showToast(context, "Hatırlatıcı silinemedi: $error")
-                                            }
-                                        )
-                                    }
-                                },
-                                onEdit = {
-                                    // TODO: Düzenleme özelliği eklenecek
-                                }
-                            )
-                        }
+                        ModernReminderItem(
+                            reminder = reminder,
+                            onEditClick = { /* Düzenleme */ },
+                            onDeleteClick = { /* Silme */ }
+                        )
                     }
                 }
             }
 
+            // Hatırlatıcı Ekleme Diyaloğu
             if (showAddDialog) {
-                AddReminderDialog(
+                ModernReminderDialog(
                     onDismiss = { showAddDialog = false },
-                    onAddReminder = { title, time ->
-                        coroutineScope.launch {
-                            addReminder(
-                                context = context,
-                                reminder = Reminder(title = title, time = time),
-                                onSuccess = { id, newReminder ->
-                                    reminders = reminders + (id to newReminder)
-                                    showToast(context, "Hatırlatıcı eklendi")
-                                },
-                                onError = { error ->
-                                    showToast(context, "Hatırlatıcı eklenemedi: $error")
-                                }
-                            )
-                        }
+                    onSave = { title, time, category ->
+                        // Hatırlatıcı ekle
                         showAddDialog = false
                     }
                 )
             }
         }
     }
+}
+
+@Composable
+fun ModernReminderItem(
+    reminder: Reminder,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Kategori ikonu
+                val categoryIcon = when {
+                    reminder.title.contains("İş", ignoreCase = true) -> Icons.Default.Work
+                    reminder.title.contains("Ev", ignoreCase = true) -> Icons.Default.Home
+                    else -> Icons.Default.Notifications
+                }
+
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = categoryIcon,
+                        contentDescription = "Kategori",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = reminder.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "Saat: ${reminder.time}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
+
+                Row {
+                    // Düzenleme butonu
+                    IconButton(onClick = onEditClick) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Düzenle",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    // Silme butonu
+                    IconButton(onClick = onDeleteClick) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Sil",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ModernReminderDialog(
+    onDismiss: () -> Unit,
+    onSave: (title: String, time: String, category: String) -> Unit,
+    initialTitle: String = "",
+    initialTime: String = ""
+) {
+    var title by remember { mutableStateOf(initialTitle) }
+    var time by remember { mutableStateOf(initialTime) }
+    var selectedCategory by remember { mutableStateOf("Genel") }
+
+    val categories = listOf("Genel", "İş", "Ev", "Sağlık", "Eğitim", "Sosyal")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Hatırlatıcı Ekle",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        icon = {
+            Icon(Icons.Default.Notifications, contentDescription = null)
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Hatırlatıcı Başlığı") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    leadingIcon = {
+                        Icon(Icons.Default.Title, contentDescription = null)
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Kategori seçimi
+                Text(
+                    text = "Kategori",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Kategori butonları
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(categories) { category ->
+                        FilterChip(
+                            selected = selectedCategory == category,
+                            onClick = { selectedCategory = category },
+                            label = { Text(category) },
+                            leadingIcon = {
+                                val icon = when(category) {
+                                    "İş" -> Icons.Default.Work
+                                    "Ev" -> Icons.Default.Home
+                                    "Sağlık" -> Icons.Default.HealthAndSafety
+                                    "Eğitim" -> Icons.Default.School
+                                    "Sosyal" -> Icons.Default.Group
+                                    else -> Icons.Default.Event
+                                }
+                                Icon(icon, contentDescription = null, Modifier.size(18.dp))
+                            }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedButton(
+                    onClick = { /* Saat seçici göster */ },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.AccessTime, contentDescription = "Saat")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(if (time.isEmpty()) "Saat Seç" else "Saat: $time")
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (title.isNotEmpty() && time.isNotEmpty()) {
+                        onSave(title, time, selectedCategory)
+                    }
+                },
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Kaydet")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("İptal")
+            }
+        },
+        shape = RoundedCornerShape(20.dp)
+    )
 }
 
 @Composable

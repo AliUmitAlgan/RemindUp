@@ -101,12 +101,7 @@ fun HomeScreenContent(
             motivationalMessage = ReminderUtils.getRandomMotivationalMessage()
 
             // Belirli bir süre sonra yükleme durumunu otomatik olarak kapat
-            launch {
-                delay(5000) // 5 saniye
-                if (isLoading) {
-                    isLoading = false
-                }
-            }
+
 
             // Hedefleri yükle
             com.aliumitalgan.remindup.utils.FirebaseUtils.getGoals { goalsList ->

@@ -2,31 +2,39 @@ package com.aliumitalgan.remindup.screens
 
 import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.filled.Title
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.aliumitalgan.remindup.components.GoalCard
+import androidx.compose.ui.unit.sp
 import com.aliumitalgan.remindup.models.Goal
-import com.aliumitalgan.remindup.ui.theme.RemindUpTheme
-import com.aliumitalgan.remindup.utils.AnimationUtils
-import com.aliumitalgan.remindup.utils.FirebaseUtils
 import com.aliumitalgan.remindup.utils.ProgressUtils
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GoalsScreenContent(
@@ -39,6 +47,7 @@ fun GoalsScreenContent(
     var isLoading by remember { mutableStateOf(true) }
     var showAddDialog by remember { mutableStateOf(false) }
     var editingGoal by remember { mutableStateOf<Pair<String, Goal>?>(null) }
+    var showProgressDialog by remember { mutableStateOf<Pair<String, Goal>?>(null) }
 
     // Hedefleri yükle
     LaunchedEffect(key1 = true) {
@@ -62,111 +71,72 @@ fun GoalsScreenContent(
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Geri")
                     }
-                }
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Hedef Ekle"
+                },
+                actions = {
+                    // Ekleme butonu üst kısımda
+                    IconButton(onClick = { showAddDialog = true }) {
+                        Icon(Icons.Default.Add, contentDescription = "Hedef Ekle")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
-            }
+            )
         }
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(16.dp)
+                .background(MaterialTheme.colorScheme.background)
         ) {
+            // İçerik
             if (isLoading) {
                 CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center)
+                    modifier = Modifier.align(Alignment.Center),
+                    color = MaterialTheme.colorScheme.primary
                 )
             } else if (goals.isEmpty()) {
-                Column(
-                    modifier = Modifier.align(Alignment.Center),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Henüz hedef bulunmuyor.",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Eklemek için + butonuna tıklayın.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
+                EmptyGoalsView(
+                    onAddClick = { showAddDialog = true }
+                )
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(goals) { (id, goal) ->
-                        AnimationUtils.SlideAnimation(visible = true) {
-                            GoalItem(
-                                goalId = id,
-                                goal = goal,
-                                onEdit = { editingGoal = id to goal },
-                                onDelete = {
-                                    coroutineScope.launch {
-                                        deleteGoal(
-                                            goalId = id,
-                                            onSuccess = {
-                                                goals = goals.filter { it.first != id }
-                                                showToast(context, "Hedef silindi")
-                                            },
-                                            onError = { error ->
-                                                showToast(context, "Hedef silinemedi: $error")
-                                            }
-                                        )
-                                    }
-                                },
-                                onProgressChange = { newProgress ->
-                                    coroutineScope.launch {
-                                        updateGoalProgress(
-                                            goalId = id,
-                                            newProgress = newProgress,
-                                            onSuccess = {
-                                                // Hedefi güncelle
-                                                goals = goals.map { pair ->
-                                                    if (pair.first == id) {
-                                                        id to pair.second.copy(progress = newProgress)
-                                                    } else {
-                                                        pair
-                                                    }
-                                                }
-
-                                                if (newProgress >= 100) {
-                                                    showToast(context, "Tebrikler! Hedefinizi tamamladınız!")
-                                                } else {
-                                                    showToast(context, "İlerleme güncellendi")
-                                                }
-                                            },
-                                            onError = { error ->
-                                                showToast(context, "İlerleme güncellenemedi: $error")
-                                            }
-                                        )
-                                    }
+                    items(goals.size) { index ->
+                        val (id, goal) = goals[index]
+                        ModernGoalListItem(
+                            goal = goal,
+                            onEditClick = { editingGoal = id to goal },
+                            onDeleteClick = {
+                                coroutineScope.launch {
+                                    deleteGoal(
+                                        goalId = id,
+                                        onSuccess = {
+                                            goals = goals.filter { it.first != id }
+                                            showToast(context, "Hedef silindi")
+                                        },
+                                        onError = { error ->
+                                            showToast(context, "Hedef silinemedi: $error")
+                                        }
+                                    )
                                 }
-                            )
-                        }
+                            },
+                            onProgressUpdate = { showProgressDialog = id to goal }
+                        )
                     }
                 }
             }
 
-            // Hedef ekleme diyaloğu
+            // Hedef Ekleme Diyaloğu
             if (showAddDialog) {
-                GoalDialog(
-                    title = "Hedef Ekle",
-                    initialGoal = Goal("", 0),
+                ModernGoalDialog(
                     onDismiss = { showAddDialog = false },
-                    onConfirm = { title, progress ->
+                    onSave = { title, progress ->
                         coroutineScope.launch {
                             val newGoal = Goal(title = title, progress = progress)
                             addGoal(
@@ -185,15 +155,16 @@ fun GoalsScreenContent(
                 )
             }
 
-            // Hedef düzenleme diyaloğu
+            // Hedef Düzenleme Diyaloğu
             editingGoal?.let { (id, goal) ->
-                GoalDialog(
+                ModernGoalDialog(
                     title = "Hedefi Düzenle",
-                    initialGoal = goal,
+                    initialTitle = goal.title,
+                    initialProgress = goal.progress,
                     onDismiss = { editingGoal = null },
-                    onConfirm = { title, progress ->
+                    onSave = { title, progress ->
                         coroutineScope.launch {
-                            val updatedGoal = Goal(title = title, progress = progress)
+                            val updatedGoal = Goal(title = title, progress = progress, userId = goal.userId)
                             updateGoal(
                                 goalId = id,
                                 goal = updatedGoal,
@@ -216,25 +187,130 @@ fun GoalsScreenContent(
                     }
                 )
             }
+
+            // İlerleme Güncelleme Diyaloğu
+            showProgressDialog?.let { (id, goal) ->
+                ProgressUpdateDialog(
+                    currentProgress = goal.progress,
+                    onDismiss = { showProgressDialog = null },
+                    onConfirm = { newProgress ->
+                        coroutineScope.launch {
+                            updateGoalProgress(
+                                goalId = id,
+                                newProgress = newProgress,
+                                onSuccess = {
+                                    goals = goals.map { pair ->
+                                        if (pair.first == id) {
+                                            id to goal.copy(progress = newProgress)
+                                        } else {
+                                            pair
+                                        }
+                                    }
+
+                                    if (newProgress >= 100) {
+                                        showToast(context, "Tebrikler! Hedefinizi tamamladınız!")
+                                    } else {
+                                        showToast(context, "İlerleme güncellendi")
+                                    }
+                                },
+                                onError = { error ->
+                                    showToast(context, "İlerleme güncellenemedi: $error")
+                                }
+                            )
+                        }
+                        showProgressDialog = null
+                    }
+                )
+            }
         }
     }
 }
 
 @Composable
-fun GoalItem(
-    goalId: String,
-    goal: Goal,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onProgressChange: (Int) -> Unit
+fun EmptyGoalsView(
+    onAddClick: () -> Unit
 ) {
-    var showProgressDialog by remember { mutableStateOf(false) }
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(120.dp)
+                .clip(CircleShape)
+                .background(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                        )
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Flag,
+                contentDescription = "Hedefler",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(64.dp)
+            )
+        }
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        elevation = CardDefaults.cardElevation(4.dp)
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = "Henüz hedef bulunmuyor",
+            color = MaterialTheme.colorScheme.onBackground,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Yeni bir hedef ekleyerek başlayın",
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+            fontSize = 16.sp
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Button(
+            onClick = onAddClick,
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            )
+        ) {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = "Ekle"
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Hedef Ekle")
+        }
+    }
+}
+
+@Composable
+fun ModernGoalListItem(
+    goal: Goal,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit,
+    onProgressUpdate: () -> Unit
+) {
+    val progressColor = when {
+        goal.progress >= 100 -> MaterialTheme.colorScheme.primary
+        goal.progress >= 70 -> MaterialTheme.colorScheme.secondary
+        goal.progress >= 30 -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.error
+    }
+
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
     ) {
         Column(
             modifier = Modifier
@@ -243,35 +319,59 @@ fun GoalItem(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
                     text = goal.title,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
                 )
 
                 Row {
-                    // Düzenle butonu
-                    IconButton(onClick = onEdit) {
-                        Icon(Icons.Default.Edit, contentDescription = "Düzenle")
+                    // Düzenleme butonu
+                    IconButton(onClick = onEditClick) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Düzenle",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                     }
 
-                    // Sil butonu
-                    IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, contentDescription = "Sil")
+                    // Silme butonu
+                    IconButton(onClick = onDeleteClick) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Sil",
+                            tint = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // İlerleme animasyonu
-            AnimationUtils.ProgressAnimation(targetValue = goal.progress / 100f) { animatedProgress ->
-                LinearProgressIndicator(
-                    progress = animatedProgress,
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.primary
+            // İlerleme çubuğu
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(goal.progress / 100f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    progressColor,
+                                    progressColor.copy(alpha = 0.7f)
+                                )
+                            )
+                        )
                 )
             }
 
@@ -288,88 +388,121 @@ fun GoalItem(
                 )
 
                 Button(
-                    onClick = { showProgressDialog = true },
-                    shape = MaterialTheme.shapes.small
+                    onClick = onProgressUpdate,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = progressColor
+                    )
                 ) {
                     Text("İlerleme Güncelle")
                 }
             }
 
-            // Hedef %100 tamamlandıysa kutlama mesajı
+            // Hedef tamamlandı işareti
             if (goal.progress >= 100) {
-                AnimationUtils.GoalCompletedAnimation(isCompleted = true) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        )
-                    ) {
-                        Text(
-                            text = "Tebrikler! Bu hedefi tamamladınız!",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(8.dp)
-                        )
-                    }
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "Tamamlandı",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Text(
+                        text = "Tebrikler! Bu hedefi tamamladınız!",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
         }
     }
-
-    // İlerleme güncelleme diyaloğu
-    if (showProgressDialog) {
-        ProgressUpdateDialog(
-            currentProgress = goal.progress,
-            onDismiss = { showProgressDialog = false },
-            onConfirm = {
-                onProgressChange(it)
-                showProgressDialog = false
-            }
-        )
-    }
 }
 
 @Composable
-fun GoalDialog(
-    title: String,
-    initialGoal: Goal,
+fun ModernGoalDialog(
     onDismiss: () -> Unit,
-    onConfirm: (title: String, progress: Int) -> Unit
+    onSave: (title: String, progress: Int) -> Unit,
+    title: String = "Hedef Ekle",
+    initialTitle: String = "",
+    initialProgress: Int = 0
 ) {
-    var goalTitle by remember { mutableStateOf(initialGoal.title) }
-    var goalProgress by remember { mutableStateOf(initialGoal.progress.toString()) }
+    var goalTitle by remember { mutableStateOf(initialTitle) }
+    var goalProgress by remember { mutableStateOf(initialProgress.toString()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title) },
+        title = {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        icon = {
+            Icon(Icons.Default.Flag, contentDescription = null)
+        },
         text = {
-            Column {
+            Column(
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 OutlinedTextField(
                     value = goalTitle,
                     onValueChange = { goalTitle = it },
                     label = { Text("Hedef Başlığı") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    leadingIcon = {
+                        Icon(Icons.Default.Title, contentDescription = null)
+                    }
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                Text(
+                    text = "İlerleme (%)",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 OutlinedTextField(
                     value = goalProgress,
-                    onValueChange = { input ->
-                        // Sadece sayısal değerleri kabul et
-                        if (input.isEmpty() || input.all { it.isDigit() }) {
-                            val num = input.toIntOrNull() ?: 0
-                            if (num in 0..100) {
-                                goalProgress = input
-                            }
+                    onValueChange = {
+                        if (it.isEmpty() || (it.toIntOrNull() != null && it.toInt() in 0..100)) {
+                            goalProgress = it
                         }
                     },
                     label = { Text("İlerleme (%)") },
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Number
                     ),
+                    leadingIcon = {
+                        Icon(Icons.Default.ShowChart, contentDescription = null)
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // İlerleme slider'ı
+                Slider(
+                    value = goalProgress.toFloatOrNull() ?: 0f,
+                    onValueChange = { goalProgress = it.toInt().toString() },
+                    valueRange = 0f..100f,
+                    steps = 100,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -378,23 +511,27 @@ fun GoalDialog(
             Button(
                 onClick = {
                     if (goalTitle.isNotEmpty()) {
-                        onConfirm(
-                            goalTitle,
-                            goalProgress.toIntOrNull() ?: 0
-                        )
+                        onSave(goalTitle, goalProgress.toIntOrNull() ?: 0)
                     }
-                }
+                },
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Text("Kaydet")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            OutlinedButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(12.dp)
+            ) {
                 Text("İptal")
             }
-        }
+        },
+        shape = RoundedCornerShape(20.dp)
     )
 }
+
+
 
 @Composable
 fun ProgressUpdateDialog(

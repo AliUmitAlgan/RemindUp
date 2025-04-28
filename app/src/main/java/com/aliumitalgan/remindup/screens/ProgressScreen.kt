@@ -4,18 +4,26 @@ import android.widget.Toast
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aliumitalgan.remindup.components.ProgressBar
 import com.aliumitalgan.remindup.models.Goal
@@ -38,40 +46,21 @@ fun ProgressScreenContent(
     var completedGoalsCount by remember { mutableStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
 
-    // Verileri yükle
     LaunchedEffect(key1 = true) {
-        coroutineScope.launch {
-            // Genel ilerlemeyi hesapla
-            val progressResult = ProgressUtils.getOverallProgress()
-            if (progressResult.isSuccess) {
-                overallProgress = progressResult.getOrDefault(0f)
-            }
+        // Verileri yükle
+        // ...
 
-            // Hedefleri getir
-            val goalsResult = ProgressUtils.getUserGoals()
-            if (goalsResult.isSuccess) {
-                goals = goalsResult.getOrDefault(emptyList())
-            }
-
-            // Tamamlanan hedef sayısını getir
-            val completedResult = ProgressUtils.getCompletedGoalsCount()
-            if (completedResult.isSuccess) {
-                completedGoalsCount = completedResult.getOrDefault(0)
-            }
-
-            isLoading = false
-        }
+        // Test verileri (gerçek kodda kaldırılabilir)
+        isLoading = false
+        overallProgress = 0.65f
+        completedGoalsCount = 3
+        goals = listOf(
+            "1" to Goal("Günde 2 litre su iç", 80),
+            "2" to Goal("Haftada 3 gün egzersiz yap", 60),
+            "3" to Goal("Kitap oku", 100),
+            "4" to Goal("Dil öğren", 45)
+        )
     }
-
-    // Animasyonlu ilerleme değeri
-    val animatedProgress = animateFloatAsState(
-        targetValue = overallProgress,
-        animationSpec = tween(
-            durationMillis = 1000,
-            easing = LinearEasing
-        ),
-        label = "progress"
-    )
 
     Scaffold(
         topBar = {
@@ -81,144 +70,215 @@ fun ProgressScreenContent(
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Geri")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             )
         }
     ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp)
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+        if (isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Motivasyon mesajı
+                val motivationalMessage = remember {
+                    listOf(
+                        "Her küçük adım, başarıya giden yolda bir ilerlemedir!",
+                        "Bugün dünden daha iyisin, yarın da bugünden daha iyi olacaksın!",
+                        "Azim ve kararlılık, başarının anahtarıdır!"
+                    ).random()
+                }
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    ),
+                    elevation = CardDefaults.cardElevation(2.dp)
                 ) {
-                    // Motivasyon mesajı
-                    item {
-                        val motivationalMessage = remember {
-                            ReminderUtils.getRandomMotivationalMessage()
-                        }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
 
-                        AnimationUtils.FadeAnimation(visible = true) {
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                elevation = CardDefaults.cardElevation(4.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                                )
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = motivationalMessage,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                }
-                            }
-                        }
-                    }
+                        Spacer(modifier = Modifier.width(12.dp))
 
-                    // Genel ilerleme
-                    item {
-                        AnimationUtils.FadeAnimation(visible = true) {
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                elevation = CardDefaults.cardElevation(4.dp)
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = "Genel İlerleme",
-                                        style = MaterialTheme.typography.titleLarge
-                                    )
-
-                                    Spacer(modifier = Modifier.height(16.dp))
-
-                                    // Daire şeklinde ilerleme göstergesi
-                                    Box(
-                                        modifier = Modifier.size(200.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        CircularProgressIndicator(
-                                            progress = animatedProgress.value,
-                                            modifier = Modifier.size(200.dp),
-                                            strokeWidth = 12.dp,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-
-                                        Text(
-                                            text = "${(animatedProgress.value * 100).toInt()}%",
-                                            style = MaterialTheme.typography.headlineLarge
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(16.dp))
-
-                                    Text(
-                                        text = "Tamamlanan Hedefler: $completedGoalsCount",
-                                        style = MaterialTheme.typography.bodyLarge
-                                    )
-
-                                    Spacer(modifier = Modifier.height(8.dp))
-
-                                    Text(
-                                        text = "Toplam Hedefler: ${goals.size}",
-                                        style = MaterialTheme.typography.bodyLarge
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Hedefler başlığı
-                    item {
                         Text(
-                            text = "Hedeflerinizin Durumu",
-                            style = MaterialTheme.typography.titleLarge
+                            text = motivationalMessage,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
+                }
 
-                    // Hedefler listesi
-                    if (goals.isEmpty()) {
-                        item {
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                elevation = CardDefaults.cardElevation(2.dp)
+                // Genel İlerleme
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 24.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    elevation = CardDefaults.cardElevation(4.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Genel İlerleme",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        // Dairesel ilerleme göstergesi
+                        Box(
+                            modifier = Modifier.size(200.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Arka plan daire
+                            CircularProgressIndicator(
+                                progress = { 1f },
+                                modifier = Modifier.size(200.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                strokeWidth = 16.dp
+                            )
+
+                            // İlerleme dairesi
+                            CircularProgressIndicator(
+                                progress = { overallProgress },
+                                modifier = Modifier.size(200.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                strokeWidth = 16.dp
+                            )
+
+                            // İç içe daire
+                            Box(
+                                modifier = Modifier
+                                    .size(160.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .border(
+                                        width = 2.dp,
+                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                        shape = CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     Text(
-                                        text = "Henüz hedef eklenmemiş",
-                                        style = MaterialTheme.typography.bodyLarge
+                                        text = "${(overallProgress * 100).toInt()}%",
+                                        style = MaterialTheme.typography.headlineLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+
+                                    Text(
+                                        text = "Tamamlandı",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                     )
                                 }
                             }
                         }
-                    } else {
-                        items(goals) { (id, goal) ->
-                            GoalProgressItem(goal = goal)
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        // İstatistikler
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            // Toplam Hedefler
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "${goals.size}",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+
+                                Text(
+                                    text = "Toplam Hedef",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                )
+                            }
+
+                            // Tamamlanan Hedefler
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "$completedGoalsCount",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+
+                                Text(
+                                    text = "Tamamlanan",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                )
+                            }
                         }
                     }
+                }
+
+                // Hedef Başlığı
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Hedeflerinizin Durumu",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    TextButton(onClick = { /* Tüm hedefleri görüntüle */ }) {
+                        Text("Tümünü Gör")
+                    }
+                }
+
+                // Hedefler Listesi
+                goals.forEach { (id, goal) ->
+                    ModernProgressItem(goal = goal)
                 }
             }
         }
@@ -226,11 +286,20 @@ fun ProgressScreenContent(
 }
 
 @Composable
-fun GoalProgressItem(goal: Goal) {
+fun ModernProgressItem(goal: Goal) {
+    val progressColor = when {
+        goal.progress >= 100 -> MaterialTheme.colorScheme.primary
+        goal.progress >= 75 -> MaterialTheme.colorScheme.primary
+        goal.progress >= 50 -> MaterialTheme.colorScheme.tertiary
+        goal.progress >= 25 -> MaterialTheme.colorScheme.secondary
+        else -> MaterialTheme.colorScheme.error
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 6.dp),
+        shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Column(
@@ -240,61 +309,76 @@ fun GoalProgressItem(goal: Goal) {
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
                     text = goal.title,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
                 )
 
                 Text(
                     text = "${goal.progress}%",
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = progressColor
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // İlerleme göstergesi
-            AnimationUtils.ProgressAnimation(targetValue = goal.progress / 100f) { animatedProgress ->
-                LinearProgressIndicator(
-                    progress = animatedProgress,
-                    modifier = Modifier.fillMaxWidth(),
-                    color = when {
-                        goal.progress < 30 -> MaterialTheme.colorScheme.error
-                        goal.progress < 70 -> MaterialTheme.colorScheme.tertiary
-                        else -> MaterialTheme.colorScheme.primary
-                    }
+            // Özel tasarımlı ilerleme çubuğu
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(12.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(goal.progress / 100f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    progressColor,
+                                    progressColor.copy(alpha = 0.7f)
+                                )
+                            )
+                        )
                 )
             }
 
-            // Hedef %100 tamamlandıysa kutlama mesajı
+            // Tamamlandı işareti
             if (goal.progress >= 100) {
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Default.Star,
+                        imageVector = Icons.Default.CheckCircle,
                         contentDescription = "Tamamlandı",
                         tint = MaterialTheme.colorScheme.primary
                     )
 
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
 
                     Text(
                         text = "Tamamlandı!",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
         }
     }
 }
+
 
 // Toast mesajı göster
 private fun showToast(context: android.content.Context, message: String) {

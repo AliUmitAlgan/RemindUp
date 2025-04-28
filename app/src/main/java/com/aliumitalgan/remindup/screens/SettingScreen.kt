@@ -1,26 +1,27 @@
 package com.aliumitalgan.remindup.screens
 
-import android.Manifest
-import android.content.Intent
-import android.net.Uri
-import android.os.Build
-import android.provider.Settings
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -30,56 +31,42 @@ import com.aliumitalgan.remindup.utils.NotificationUtils
 import com.aliumitalgan.remindup.utils.ThemeManager
 import com.google.firebase.auth.FirebaseAuth
 
-import kotlinx.coroutines.launch
-
+@SuppressLint("StateFlowValueCalledInComposition")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreenContent(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
     val currentUser = FirebaseAuth.getInstance().currentUser
 
+    var userName by remember { mutableStateOf(currentUser?.displayName ?: "Kullanıcı") }
+    var showEditNameDialog by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
-    var showPermissionDialog by remember { mutableStateOf(false) }
 
-    // Bildirim durumunu al
-    val notificationsEnabled by NotificationUtils.getNotificationStateFlow(context)
-        .collectAsState(initial = true)
+    // Tema durumu
+    val isDarkTheme by ThemeManager.isDarkTheme
 
-    // Tema durumunu al
-    val isDarkMode by ThemeManager.isDarkTheme
-
-    // Bildirim izni kontrolü
-    val hasNotificationPermission = remember { mutableStateOf(NotificationUtils.checkNotificationPermission(context)) }
-
-    // Bildirim izni launcher'ı
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        hasNotificationPermission.value = isGranted
-        if (isGranted) {
-            // İzin verildiğinde bildirimleri aç
-            coroutineScope.launch {
-                NotificationUtils.saveNotificationState(context, true)
-            }
-        } else {
-            // İzin reddedildiğinde bildirimleri kapat
-            coroutineScope.launch {
-                NotificationUtils.saveNotificationState(context, false)
-            }
-            showPermissionDialog = true
-        }
-    }
+    // Bildirim durumu
+    val notificationsEnabled = NotificationUtils.notificationsEnabled.value
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Profil ve Ayarlar") },
+                title = {
+                    Text(
+                        "Ayarlar",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Geri")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Geri",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -95,360 +82,310 @@ fun SettingsScreenContent(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Kullanıcı profil bölümü
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                elevation = CardDefaults.cardElevation(4.dp)
+            // Profil Kartı
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(animationSpec = tween(1000)) +
+                        slideInHorizontally(
+                            animationSpec = tween(1000),
+                            initialOffsetX = { -it }
+                        )
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Profil fotoğrafı (baş harfler)
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = currentUser?.displayName?.firstOrNull()?.toString()
-                                ?: currentUser?.email?.firstOrNull()?.toString()
-                                ?: "U",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Kullanıcı adı
-                    Text(
-                        text = currentUser?.displayName ?: "Kullanıcı",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    // E-posta
-                    Text(
-                        text = currentUser?.email ?: "",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Profil düzenle butonu
-                    OutlinedButton(
-                        onClick = { /* Profil düzenleme işlemleri */ },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Düzenle"
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Profili Düzenle")
-                    }
-                }
+                ProfileSection(
+                    userName = userName,
+                    userEmail = currentUser?.email ?: "",
+                    onEditProfile = { showEditNameDialog = true }
+                )
             }
 
-            // Ayarlar Bölümü
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                elevation = CardDefaults.cardElevation(4.dp)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Ayarlar Bölümleri
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(animationSpec = tween(1200, delayMillis = 300))
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text(
-                        text = "Ayarlar",
-                        modifier = Modifier.padding(16.dp),
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    // Bildirimler Ayarı
-                    ListItem(
-                        headlineContent = { Text("Bildirimler") },
-                        leadingContent = {
-                            Icon(
-                                imageVector = Icons.Default.Notifications,
-                                contentDescription = "Bildirimler"
-                            )
-                        },
+                    // Bildirim Ayarları
+                    SettingsSection(
+                        title = "Bildirimler",
+                        icon = Icons.Default.Notifications,
                         trailingContent = {
                             Switch(
                                 checked = notificationsEnabled,
-                                onCheckedChange = { isEnabled ->
-                                    if (isEnabled && !hasNotificationPermission.value && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                        // İzin istenmesi gerekiyor
-                                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                    } else {
-                                        // İzin zaten var veya gerekmiyor, durumu kaydet
-                                        coroutineScope.launch {
-                                            NotificationUtils.saveNotificationState(context, isEnabled)
-                                        }
-
-                                        Toast.makeText(
-                                            context,
-                                            if (isEnabled) "Bildirimler açıldı" else "Bildirimler kapatıldı",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
-                                }
+                                onCheckedChange = {
+                                    NotificationUtils.saveNotificationState(context, it)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                                )
                             )
                         }
                     )
 
-                    Divider()
-
-                    // Karanlık Mod Ayarı
-                    ListItem(
-                        headlineContent = { Text("Karanlık Mod") },
-                        leadingContent = {
-                            Icon(
-                                imageVector = Icons.Default.DarkMode,
-                                contentDescription = "Karanlık Mod"
-                            )
-                        },
+                    // Tema Ayarları
+                    SettingsSection(
+                        title = "Karanlık Mod",
+                        icon = Icons.Default.DarkMode,
                         trailingContent = {
                             Switch(
-                                checked = isDarkMode,
-                                onCheckedChange = { isEnabled ->
-                                    coroutineScope.launch {
-                                        ThemeManager.saveDarkThemeState(context, isEnabled)
-                                    }
-                                    Toast.makeText(
-                                        context,
-                                        if (isEnabled) "Karanlık mod açıldı" else "Karanlık mod kapatıldı",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
+                                checked = isDarkTheme,
+                                onCheckedChange = {
+                                    ThemeManager.saveDarkThemeState(context, it)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                                )
                             )
                         }
                     )
 
-                    Divider()
-
-                    // Dil Ayarı
-                    ListItem(
-                        headlineContent = { Text("Dil") },
-                        leadingContent = {
-                            Icon(
-                                imageVector = Icons.Default.Language,
-                                contentDescription = "Dil"
-                            )
-                        },
+                    // Dil Ayarları
+                    SettingsSection(
+                        title = "Dil",
+                        icon = Icons.Default.Language,
                         trailingContent = {
-                            Text("Türkçe")
-                        },
-                        modifier = Modifier.clickable {
-                            // Dil seçim işlemleri
-                            Toast.makeText(
-                                context,
-                                "Bu özellik yakında eklenecek",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "Türkçe",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                )
+                                Icon(
+                                    Icons.Default.ArrowForward,
+                                    contentDescription = "Dil Seç",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    )
+
+                    // Hesap Yönetimi
+                    SettingsSection(
+                        title = "Çıkış Yap",
+                        icon = Icons.Default.Logout,
+                        onClick = { showLogoutDialog = true },
+                        trailingContent = {
+                            Icon(
+                                Icons.Default.ArrowForward,
+                                contentDescription = "Çıkış",
+                                tint = MaterialTheme.colorScheme.error
+                            )
                         }
                     )
                 }
             }
+        }
+    }
 
-            // Hakkında ve Destek Kartı
-            Card(
+    // İsim Düzenleme Dialog
+    if (showEditNameDialog) {
+        var newName by remember { mutableStateOf(userName) }
+
+        AlertDialog(
+            onDismissRequest = { showEditNameDialog = false },
+            title = { Text("Profil Bilgilerini Düzenle") },
+            text = {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text("İsim") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newName.isNotEmpty()) {
+                            userName = newName
+                            // Firestore'da isim güncelleme işlemi burada yapılabilir
+                        }
+                        showEditNameDialog = false
+                    }
+                ) {
+                    Text("Kaydet")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditNameDialog = false }) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
+
+    // Çıkış Dialog
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text("Çıkış Yap") },
+            text = { Text("Hesabınızdan çıkış yapmak istediğinize emin misiniz?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        AuthUtils.logout()
+                        showLogoutDialog = false
+                        onNavigateBack()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Evet, Çıkış Yap")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun ProfileSection(
+    userName: String,
+    userEmail: String,
+    onEditProfile: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary,
+                            MaterialTheme.colorScheme.secondary
+                        )
+                    )
+                )
+        ) {
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                elevation = CardDefaults.cardElevation(4.dp)
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(
+                // Profil Fotoğrafı
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp)
+                        .size(100.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.2f))
+                        .border(
+                            width = 3.dp,
+                            color = MaterialTheme.colorScheme.surface,
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Hakkında ve Destek",
-                        modifier = Modifier.padding(16.dp),
-                        fontSize = 18.sp,
+                        text = userName.firstOrNull()?.toString()?.uppercase() ?: "?",
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = MaterialTheme.colorScheme.surface,
                         fontWeight = FontWeight.Bold
                     )
-
-                    // Destek Merkezi
-                    ListItem(
-                        headlineContent = { Text("Destek Merkezi") },
-                        leadingContent = {
-                            Icon(
-                                imageVector = Icons.Default.SupportAgent,
-                                contentDescription = "Destek"
-                            )
-                        },
-                        modifier = Modifier.clickable {
-                            // Destek merkezine yönlendirme
-                            Toast.makeText(
-                                context,
-                                "Destek merkezine yönlendiriliyorsunuz",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    )
-
-                    Divider()
-
-                    // Uygulama Hakkında
-                    ListItem(
-                        headlineContent = { Text("Uygulama Hakkında") },
-                        leadingContent = {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = "Hakkında"
-                            )
-                        },
-                        modifier = Modifier.clickable {
-                            // Uygulama hakkında bilgi ekranına yönlendirme
-                            Toast.makeText(
-                                context,
-                                "RemindUp v1.0 - 2025",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    )
-
-                    Divider()
-
-                    // Gizlilik Politikası
-                    ListItem(
-                        headlineContent = { Text("Gizlilik Politikası") },
-                        leadingContent = {
-                            Icon(
-                                imageVector = Icons.Default.Security,
-                                contentDescription = "Gizlilik"
-                            )
-                        },
-                        modifier = Modifier.clickable {
-                            // Gizlilik politikasına yönlendirme
-                            try {
-                                val intent = Intent(Intent.ACTION_VIEW).apply {
-                                    data = Uri.parse("https://www.remindup.com/privacy")
-                                }
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                Toast.makeText(
-                                    context,
-                                    "Gizlilik politikası sayfası bulunamadı",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        }
-                    )
                 }
-            }
 
-            // Çıkış Butonu
-            Button(
-                onClick = { showLogoutDialog = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error
-                ),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Logout,
-                    contentDescription = "Çıkış Yap"
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = userName,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.surface,
+                    fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Çıkış Yap")
+
+                Text(
+                    text = userEmail,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = onEditProfile,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Profili Düzenle"
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Profili Düzenle")
+                }
             }
         }
+    }
+}
 
-        // Çıkış Yap Dialog
-        if (showLogoutDialog) {
-            AlertDialog(
-                onDismissRequest = { showLogoutDialog = false },
-                title = { Text("Çıkış Yap") },
-                text = { Text("Hesabınızdan çıkış yapmak istediğinize emin misiniz?") },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            coroutineScope.launch {
-                                AuthUtils.logout()
-                                showLogoutDialog = false
-                                // Login ekranına yönlendirme
-                                onNavigateBack()
-                            }
-                        }
-                    ) {
-                        Text("Evet, Çıkış Yap")
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = { showLogoutDialog = false }
-                    ) {
-                        Text("İptal")
-                    }
+@Composable
+fun SettingsSection(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    trailingContent: @Composable () -> Unit = {},
+    onClick: () -> Unit = {}
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = title,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
-            )
-        }
 
-        // Bildirim İzni Dialog
-        if (showPermissionDialog) {
-            AlertDialog(
-                onDismissRequest = { showPermissionDialog = false },
-                title = { Text("Bildirim İzni") },
-                text = {
-                    Text("Bildirimlerin düzgün çalışması için izin vermeniz gerekiyor. Uygulama ayarlarına gidip bildirimlere izin vermek ister misiniz?")
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            // Uygulama ayarlarına yönlendir
-                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = Uri.fromParts("package", context.packageName, null)
-                            }
-                            context.startActivity(intent)
-                            showPermissionDialog = false
-                        }
-                    ) {
-                        Text("Ayarlara Git")
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = { showPermissionDialog = false }
-                    ) {
-                        Text("İptal")
-                    }
-                }
-            )
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            trailingContent()
         }
     }
 }
