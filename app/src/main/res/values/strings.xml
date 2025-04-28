@@ -1,5 +1,66 @@
 <resources>
     <string name="app_name">RemindUp</string>
-    <string name="web_client_id">YOUR_WEB_CLIENT_ID_HERE</string>
 
+    <!-- Google Sign-In -->
+    <string name="web_client_id">117825801795-d70srog7cr7m6hjengcjrl411har5u63.apps.googleusercontent.com</string>
+
+    <!-- Auth Strings -->
+    <string name="login_success">Giriş başarılı</string>
+    <string name="login_fail">Giriş başarısız</string>
+    <string name="register_success">Kayıt başarılı</string>
+    <string name="register_fail">Kayıt başarısız</string>
+    <string name="logout_success">Çıkış yapıldı</string>
+
+    <!-- Reminder Strings -->
+    <string name="reminder_add_success">Hatırlatıcı başarıyla eklendi</string>
+    <string name="reminder_add_fail">Hatırlatıcı eklenemedi</string>
+    <string name="reminder_delete_success">Hatırlatıcı silindi</string>
+    <string name="reminder_delete_fail">Hatırlatıcı silinemedi</string>
+    <string name="reminder_update_success">Hatırlatıcı güncellendi</string>
+    <string name="reminder_update_fail">Hatırlatıcı güncellenemedi</string>
+
+    <!-- Goal Strings -->
+    <string name="goal_add_success">Hedef başarıyla eklendi</string>
+    <string name="goal_add_fail">Hedef eklenemedi</string>
+    <string name="goal_delete_success">Hedef silindi</string>
+    <string name="goal_delete_fail">Hedef silinemedi</string>
+    <string name="goal_update_success">Hedef güncellendi</string>
+    <string name="goal_update_fail">Hedef güncellenemedi</string>
+    <string name="goal_complete">Tebrikler! Hedefinizi tamamladınız!</string>
+
+    <!-- Settings Strings -->
+    <string name="theme_changed">Tema değiştirildi</string>
+    <string name="notifications_enabled">Bildirimler açıldı</string>
+    <string name="notifications_disabled">Bildirimler kapatıldı</string>
+    <string name="language_changed">Dil değiştirildi</string>
+
+    <!-- Error Messages -->
+    <string name="error_empty_fields">Lütfen tüm alanları doldurun</string>
+    <string name="error_invalid_email">Geçersiz e-posta adresi</string>
+    <string name="error_short_password">Şifre en az 6 karakter olmalıdır</string>
+    <string name="error_passwords_match">Şifreler eşleşmiyor</string>
+    <string name="error_connection">İnternet bağlantısı problemi</string>
+    <string name="error_unknown">Bilinmeyen bir hata oluştu</string>
+
+    <!-- Notification Channel -->
+    <string name="notification_channel_name">RemindUp Bildirimleri</string>
+    <string name="notification_channel_description">RemindUp uygulaması için bildirimler</string>
+
+    <!-- Notification Content -->
+    <string name="notification_title">RemindUp Hatırlatıcı</string>
+    <string name="notification_content">Planladığınız bir aktivite için hatırlatma vakti</string>
+
+    <!-- Motivational Messages (Random Selection) -->
+    <string-array name="motivational_messages">
+        <item>Harika gidiyorsun, devam et!</item>
+        <item>Her küçük adım, başarıya giden yolda bir ilerlemedir!</item>
+        <item>Bugün dünden daha iyisin, yarın da bugünden daha iyi olacaksın!</item>
+        <item>Azim ve kararlılık, başarının anahtarıdır!</item>
+        <item>Zorluklar seni güçlendirir!</item>
+        <item>Sen yapabilirsin!</item>
+        <item>Her gün bir öncekinden daha iyi olmak için bir fırsattır!</item>
+        <item>Hedeflerine ulaşmak için her gün bir adım at!</item>
+        <item>Küçük adımlar büyük değişimler yaratır!</item>
+        <item>Gelişim bir yolculuktur, anın tadını çıkar!</item>
+    </string-array>
 </resources>

@@ -2,6 +2,10 @@ package com.aliumitalgan.remindup.screens
 
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,11 +15,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.automirrored.filled.ShowChart
+import androidx.compose.material.icons.automirrored.outlined.ShowChart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -23,17 +32,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import com.aliumitalgan.remindup.components.BottomNavigationBar
 import com.aliumitalgan.remindup.components.GoalCard
+import com.aliumitalgan.remindup.components.ModernCard
 import com.aliumitalgan.remindup.components.MotivationalMessage
 import com.aliumitalgan.remindup.models.Goal
 import com.aliumitalgan.remindup.models.Reminder
-import com.aliumitalgan.remindup.ui.theme.BluePrimary
-import com.aliumitalgan.remindup.ui.theme.GreenSecondary
+import com.aliumitalgan.remindup.ui.theme.*
 import com.aliumitalgan.remindup.utils.AnimationUtils
-import com.aliumitalgan.remindup.utils.FirebaseUtils
 import com.aliumitalgan.remindup.utils.ReminderUtils
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 data class BottomNavItem(
     val title: String,
@@ -52,41 +64,66 @@ fun HomeScreenContent(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-
+    val isConnected = remember { mutableStateOf(true) }
     var goals by remember { mutableStateOf<List<Goal>>(emptyList()) }
     var reminders by remember { mutableStateOf<List<Reminder>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var motivationalMessage by remember { mutableStateOf("") }
+
+    // Current time and date
+    val currentTime = remember { mutableStateOf(System.currentTimeMillis()) }
+    val dateFormat = remember { SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()) }
+
+    // Update time every minute
+    LaunchedEffect(Unit) {
+        while(true) {
+            currentTime.value = System.currentTimeMillis()
+            delay(60000) // Update every minute
+        }
+    }
 
     // Bottom Navigation Items
     val bottomNavItems = listOf(
         BottomNavItem("Ana Sayfa", Icons.Filled.Home, Icons.Outlined.Home, "home"),
         BottomNavItem("Hedefler", Icons.Filled.CheckCircle, Icons.Outlined.CheckCircle, "goals"),
         BottomNavItem("Hatırlatıcılar", Icons.Filled.Notifications, Icons.Outlined.Notifications, "reminders"),
-        BottomNavItem("İlerleme", Icons.Filled.ShowChart, Icons.Outlined.ShowChart, "progress"),
+        BottomNavItem("İlerleme", Icons.AutoMirrored.Filled.ShowChart, Icons.AutoMirrored.Outlined.ShowChart, "progress"),
         BottomNavItem("Profil", Icons.Filled.Person, Icons.Outlined.Person, "profile")
     )
-
     var selectedNavItem by remember { mutableStateOf(bottomNavItems[0].route) }
-
-    // Kullanıcı bilgilerini al
     val currentUser = FirebaseAuth.getInstance().currentUser
+    val displayName = currentUser?.displayName ?: currentUser?.email?.substringBefore('@') ?: "Misafir"
 
     // Verileri yükle
     LaunchedEffect(key1 = true) {
-        // Motivasyonel mesaj
-        motivationalMessage = ReminderUtils.getRandomMotivationalMessage()
+        try {
+            // Motivasyonel mesaj
+            motivationalMessage = ReminderUtils.getRandomMotivationalMessage()
 
-        // Hedefleri yükle
-        FirebaseUtils.getGoals { goalsList ->
-            goals = goalsList
+            // Belirli bir süre sonra yükleme durumunu otomatik olarak kapat
+            launch {
+                delay(5000) // 5 saniye
+                if (isLoading) {
+                    isLoading = false
+                }
+            }
+
+            // Hedefleri yükle
+            com.aliumitalgan.remindup.utils.FirebaseUtils.getGoals { goalsList ->
+                goals = goalsList
+                isLoading = false
+            }
+
+            // Hatırlatıcıları yükle
+            val remindersResult = ReminderUtils.getUserReminders()
+            if (remindersResult.isSuccess) {
+                reminders = remindersResult.getOrDefault(emptyList()).map { it.second }
+            }
+        } catch (e: Exception) {
+            // Hata durumunda yüklemeyi durdurun
             isLoading = false
-        }
-
-        // Hatırlatıcıları yükle
-        val remindersResult = ReminderUtils.getUserReminders()
-        if (remindersResult.isSuccess) {
-            reminders = remindersResult.getOrDefault(emptyList()).map { it.second }
+            // Hata mesajını göster
+            Toast.makeText(context, "Veri yüklenirken bir hata oluştu: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -97,10 +134,15 @@ fun HomeScreenContent(
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // App Icon
+                        // App Icon with animation
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
+                                .shadow(
+                                    elevation = 4.dp,
+                                    shape = RoundedCornerShape(10.dp),
+                                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                )
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(
                                     brush = Brush.horizontalGradient(
@@ -122,18 +164,28 @@ fun HomeScreenContent(
 
                         Spacer(modifier = Modifier.width(12.dp))
 
-                        Text(
-                            text = "RemindUp",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Column {
+                            Text(
+                                text = "RemindUp",
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+
+                            Text(
+                                text = dateFormat.format(Date(currentTime.value)),
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
                     }
                 },
                 actions = {
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(
                             imageVector = Icons.Default.Settings,
-                            contentDescription = "Ayarlar"
+                            contentDescription = "Ayarlar",
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 },
@@ -144,38 +196,23 @@ fun HomeScreenContent(
             )
         },
         bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp
-            ) {
-                bottomNavItems.forEach { item ->
-                    NavigationBarItem(
-                        icon = {
-                            Icon(
-                                imageVector = if (selectedNavItem == item.route) item.selectedIcon else item.unselectedIcon,
-                                contentDescription = item.title
-                            )
-                        },
-                        label = { Text(item.title, fontSize = 12.sp) },
-                        selected = selectedNavItem == item.route,
-                        onClick = {
-                            selectedNavItem = item.route
-                            when (item.route) {
-                                "home" -> {}  // Zaten home sayfası
-                                "goals" -> onNavigateToGoals()
-                                "reminders" -> onNavigateToReminders()
-                                "progress" -> onNavigateToProgress()
-                                "profile" -> onNavigateToSettings()
-                            }
-                        },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
-                        )
-                    )
+            BottomNavigationBar(
+                items = bottomNavItems,
+                currentRoute = selectedNavItem,
+                onItemSelected = { route ->
+                    // Şu anki route ile aynı route'a tıklanırsa bir şey yapma
+                    if (route != selectedNavItem) {
+                        selectedNavItem = route
+                        when (route) {
+                            "home" -> {}  // Zaten ana sayfadayız
+                            "goals" -> onNavigateToGoals()
+                            "reminders" -> onNavigateToReminders()
+                            "progress" -> onNavigateToProgress()
+                            "profile" -> onNavigateToSettings()
+                        }
+                    }
                 }
-            }
+            )
         }
     ) { innerPadding ->
         Box(
@@ -187,82 +224,183 @@ fun HomeScreenContent(
                 )
         ) {
             if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center),
-                    color = MaterialTheme.colorScheme.primary,
-                    strokeWidth = 3.dp
-                )
+                LoadingIndicator()
             } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                HomeContent(
+                    displayName = displayName,
+                    motivationalMessage = motivationalMessage,
+                    goals = goals,
+                    reminders = reminders,
+                    onNavigateToGoals = onNavigateToGoals,
+                    onNavigateToReminders = onNavigateToReminders
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun LoadingIndicator() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        val infiniteTransition = rememberInfiniteTransition(label = "loading")
+        val scale by infiniteTransition.animateFloat(
+            initialValue = 0.8f,
+            targetValue = 1.2f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1000),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "pulse"
+        )
+
+        Box(
+            modifier = Modifier
+                .size(60.dp * scale)
+                .clip(CircleShape)
+                .background(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary,
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                        )
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(30.dp),
+                color = Color.White,
+                strokeWidth = 3.dp
+            )
+        }
+    }
+}
+
+@Composable
+fun HomeContent(
+    displayName: String,
+    motivationalMessage: String,
+    goals: List<Goal>,
+    reminders: List<Reminder>,
+    onNavigateToGoals: () -> Unit,
+    onNavigateToReminders: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Kullanıcı karşılama mesajı
+        item {
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(animationSpec = tween(1000)) +
+                        slideInHorizontally(
+                            animationSpec = tween(1000),
+                            initialOffsetX = { -it }
+                        )
+            ) {
+                WelcomeCard(displayName)
+            }
+        }
+
+        // Motivasyon mesajı
+        item {
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(animationSpec = tween(1200, delayMillis = 300))
+            ) {
+                MotivationalMessage(message = motivationalMessage)
+            }
+        }
+
+        // Hedefler Başlık
+        item {
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(animationSpec = tween(1000, delayMillis = 600))
+            ) {
+                SectionTitle("Hedefleriniz", "Tümünü Gör") {
+                    onNavigateToGoals()
+                }
+            }
+        }
+
+        // Hedefler
+        if (goals.isEmpty()) {
+            item {
+                AnimatedVisibility(
+                    visible = true,
+                    enter = fadeIn(animationSpec = tween(1000, delayMillis = 900))
                 ) {
-                    // Kullanıcı karşılama mesajı
-                    item {
-                        AnimationUtils.FadeAnimation(visible = true) {
-                            WelcomeCard(currentUser?.displayName ?: "Kullanıcı")
-                        }
-                    }
-
-                    // Motivasyon mesajı
-                    item {
-                        AnimationUtils.FadeAnimation(visible = true) {
-                            MotivationalMessage(message = motivationalMessage)
-                        }
-                    }
-
-                    // Hedefler Başlık
-                    item {
-                        SectionTitle("Hedefleriniz", "Tümünü Gör") {
-                            onNavigateToGoals()
-                        }
-                    }
-
-                    // Hedefler
-                    if (goals.isEmpty()) {
-                        item {
-                            EmptyStateCard(
-                                title = "Henüz hedef eklenmemiş",
-                                description = "İlk hedefini ekleyerek başla",
-                                buttonText = "Hedef Ekle",
-                                onClick = onNavigateToGoals
+                    EmptyStateCard(
+                        title = "Henüz hedef eklenmemiş",
+                        description = "İlk hedefini ekleyerek başla",
+                        buttonText = "Hedef Ekle",
+                        onClick = onNavigateToGoals
+                    )
+                }
+            }
+        } else {
+            items(goals.take(3)) { goal ->
+                AnimatedVisibility(
+                    visible = true,
+                    enter = fadeIn(animationSpec = tween(1000, delayMillis = 900)) +
+                            slideInHorizontally(
+                                animationSpec = tween(1000, delayMillis = 900),
+                                initialOffsetX = { it }
                             )
-                        }
-                    } else {
-                        items(goals.take(3)) { goal ->
-                            AnimationUtils.SlideAnimation(visible = true) {
-                                GoalCard(
-                                    goalTitle = goal.title,
-                                    goalProgress = goal.progress
-                                )
-                            }
-                        }
-                    }
+                ) {
+                    GoalCard(
+                        goalTitle = goal.title,
+                        goalProgress = goal.progress
+                    )
+                }
+            }
+        }
 
-                    // Yaklaşan Hatırlatıcılar Başlık
-                    item {
-                        SectionTitle("Yaklaşan Hatırlatıcılar", "Tümünü Gör") {
-                            onNavigateToReminders()
-                        }
-                    }
+        // Yaklaşan Hatırlatıcılar Başlık
+        item {
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(animationSpec = tween(1000, delayMillis = 1200))
+            ) {
+                SectionTitle("Yaklaşan Hatırlatıcılar", "Tümünü Gör") {
+                    onNavigateToReminders()
+                }
+            }
+        }
 
-                    // Yaklaşan Hatırlatıcılar
-                    if (reminders.isEmpty()) {
-                        item {
-                            EmptyStateCard(
-                                title = "Henüz hatırlatıcı eklenmemiş",
-                                description = "İlk hatırlatıcını ekleyerek başla",
-                                buttonText = "Hatırlatıcı Ekle",
-                                onClick = onNavigateToReminders
+        // Yaklaşan Hatırlatıcılar
+        if (reminders.isEmpty()) {
+            item {
+                AnimatedVisibility(
+                    visible = true,
+                    enter = fadeIn(animationSpec = tween(1000, delayMillis = 1500))
+                ) {
+                    EmptyStateCard(
+                        title = "Henüz hatırlatıcı eklenmemiş",
+                        description = "İlk hatırlatıcını ekleyerek başla",
+                        buttonText = "Hatırlatıcı Ekle",
+                        onClick = onNavigateToReminders
+                    )
+                }
+            }
+        } else {
+            items(reminders.take(3)) { reminder ->
+                AnimatedVisibility(
+                    visible = true,
+                    enter = fadeIn(animationSpec = tween(1000, delayMillis = 1500)) +
+                            slideInHorizontally(
+                                animationSpec = tween(1000, delayMillis = 1500),
+                                initialOffsetX = { it }
                             )
-                        }
-                    } else {
-                        items(reminders.take(3)) { reminder ->
-                            ReminderListItem(reminder)
-                        }
-                    }
+                ) {
+                    ReminderListItem(reminder)
                 }
             }
         }
@@ -271,30 +409,48 @@ fun HomeScreenContent(
 
 @Composable
 fun WelcomeCard(userName: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-        )
+    ModernCard(
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                            MaterialTheme.colorScheme.surface
+                        )
+                    )
+                )
                 .padding(20.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Avatar
                 Box(
                     modifier = Modifier
                         .size(50.dp)
+                        .shadow(
+                            elevation = 4.dp,
+                            shape = CircleShape,
+                            spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                        )
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)
+                                )
+                            )
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = userName.first().toString(),
+                        // Boş string kontrolü yapın
+                        text = if (userName.isNotEmpty()) userName.first().toString().uppercase() else "?",
                         color = MaterialTheme.colorScheme.primary,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold
@@ -310,21 +466,22 @@ fun WelcomeCard(userName: String) {
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
                     )
                     Text(
-                        text = userName,
+                        // Boş userName durumunda varsayılan değer kullanın
+                        text = if (userName.isNotEmpty()) userName else "Misafir",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "Bugün hedeflerine bir adım daha yaklaşmaya hazır mısın?",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                    )
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "Bugün hedeflerine bir adım daha yaklaşmaya hazır mısın?",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-            )
         }
     }
 }
@@ -353,120 +510,116 @@ fun SectionTitle(title: String, actionText: String, onAction: () -> Unit) {
     }
 }
 
-                    @Composable
-                            fun EmptyStateCard(
-                                title: String,
-                                description: String,
-                                buttonText: String,
-                                onClick: () -> Unit
-                            ) {
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp),
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.surface
-                                    ),
-                                    elevation = CardDefaults.cardElevation(4.dp)
-                                ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(20.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Text(
-                                            text = title,
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
+@Composable
+fun EmptyStateCard(
+    title: String,
+    description: String,
+    buttonText: String,
+    onClick: () -> Unit
+) {
+    ModernCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
 
-                                        Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-                                        Text(
-                                            text = description,
-                                            fontSize = 14.sp,
-                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                        )
+            Text(
+                text = description,
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            )
 
-                                        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-                                        Button(
-                                            onClick = onClick,
-                                            shape = RoundedCornerShape(8.dp),
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = MaterialTheme.colorScheme.primary
-                                            )
-                                        ) {
-                                            Text(buttonText)
-                                        }
-                                    }
-                                }
-                            }
+            Button(
+                onClick = onClick,
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                ),
+                elevation = ButtonDefaults.buttonElevation(4.dp)
+            ) {
+                Text(buttonText)
+            }
+        }
+    }
+}
 
-                    @Composable
-                    fun ReminderListItem(reminder: Reminder) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface
-                            ),
-                            elevation = CardDefaults.cardElevation(2.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // Saat ikonu
-                                Box(
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(
-                                            brush = Brush.linearGradient(
-                                                colors = listOf(
-                                                    BluePrimary.copy(alpha = 0.2f),
-                                                    GreenSecondary.copy(alpha = 0.2f)
-                                                )
-                                            )
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.AccessTime,
-                                        contentDescription = "Saat",
-                                        tint = BluePrimary,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                }
+@Composable
+fun ReminderListItem(reminder: Reminder) {
+    ModernCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Saat ikonu
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .shadow(
+                        elevation = 4.dp,
+                        shape = RoundedCornerShape(12.dp),
+                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                    )
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                BluePrimary.copy(alpha = 0.2f),
+                                GreenSecondary.copy(alpha = 0.2f)
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AccessTime,
+                    contentDescription = "Saat",
+                    tint = BluePrimary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
 
-                                Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(16.dp))
 
-                                Column(
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text(
-                                        text = reminder.title,
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = reminder.title,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
 
-                                    Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
-                                    Text(
-                                        text = "Saat: ${reminder.time}",
-                                        fontSize = 14.sp,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                    )
-                                }
-                            }
-                        }
-                    }
+                Text(
+                    text = "Saat: ${reminder.time}",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+            }
+        }
+    }
+}

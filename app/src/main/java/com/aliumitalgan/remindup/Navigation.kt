@@ -75,7 +75,10 @@ fun AppNavigation(
         // Yeni eklenen Settings ekranı
         composable(Screen.Settings.route) {
             SettingsScreenContent(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = {
+                    // Geri gitme işlemini kesin bir şekilde tanımlayın
+                    navController.popBackStack(Screen.Home.route, false)
+                }
             )
         }
     }

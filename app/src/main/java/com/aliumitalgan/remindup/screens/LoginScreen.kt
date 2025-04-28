@@ -4,6 +4,10 @@ import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -11,16 +15,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import com.aliumitalgan.remindup.ui.theme.BluePrimary
+import com.aliumitalgan.remindup.ui.theme.GreenSecondary
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -34,10 +37,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aliumitalgan.remindup.R
-import com.aliumitalgan.remindup.ui.theme.BluePrimary
-import com.aliumitalgan.remindup.ui.theme.GreenSecondary
 import com.aliumitalgan.remindup.utils.AnimationUtils
 import com.aliumitalgan.remindup.utils.AuthUtils
+import com.aliumitalgan.remindup.utils.GoogleAuthHelper
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.launch
@@ -55,12 +57,14 @@ fun LoginScreenContent(
     var password by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showError by remember { mutableStateOf(false) }
 
     // Google SignIn Client
     val googleSignInClient = remember {
-        AuthUtils.getGoogleSignInClient(
+        GoogleAuthHelper.getGoogleSignInClient(
             context,
-            context.getString(R.string.web_client_id) // R.string.web_client_id değerini strings.xml'e ekleyin
+            context.getString(R.string.web_client_id)
         )
     }
 
@@ -72,19 +76,30 @@ fun LoginScreenContent(
             val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
             coroutineScope.launch {
                 isLoading = true
-                val authResult = AuthUtils.handleGoogleSignInResult(task)
+                val authResult = GoogleAuthHelper.handleSignInResult(task)
                 isLoading = false
 
                 if (authResult.isSuccess) {
                     showToast(context, "Google ile giriş başarılı")
                     onLoginSuccess()
                 } else {
-                    showToast(context, "Google ile giriş başarısız: ${authResult.exceptionOrNull()?.message ?: "Bilinmeyen hata"}")
+                    errorMessage = authResult.exceptionOrNull()?.message ?: "Google ile giriş başarısız"
+                    showError = true
                 }
             }
         } catch (e: ApiException) {
             isLoading = false
-            showToast(context, "Google ile giriş hatası: ${e.message}")
+            errorMessage = "Google ile giriş hatası: ${e.message}"
+            showError = true
+        }
+    }
+
+    // Hata mesajı gösterimi için LaunchedEffect
+    LaunchedEffect(showError) {
+        if (showError) {
+            // 3 saniye sonra hata mesajını temizle
+            kotlinx.coroutines.delay(3000)
+            showError = false
         }
     }
 
@@ -153,6 +168,36 @@ fun LoginScreenContent(
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center
                 )
+            }
+
+            // Hata mesajı
+            AnimatedVisibility(
+                visible = showError && errorMessage != null,
+                enter = fadeIn(animationSpec = tween(300)),
+                exit = fadeOut(animationSpec = tween(300))
+            ) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Error,
+                            contentDescription = "Hata",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = errorMessage ?: "",
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
             }
 
             // Giriş Formu
@@ -252,11 +297,13 @@ fun LoginScreenContent(
                                         showToast(context, "Giriş başarılı")
                                         onLoginSuccess()
                                     } else {
-                                        showToast(context, "Giriş başarısız: ${result.exceptionOrNull()?.message ?: "Bilinmeyen hata"}")
+                                        errorMessage = result.exceptionOrNull()?.message ?: "Giriş başarısız"
+                                        showError = true
                                     }
                                 }
                             } else {
-                                showToast(context, "Lütfen geçerli bir email ve şifre girin")
+                                errorMessage = "Lütfen geçerli bir email ve şifre girin"
+                                showError = true
                             }
                         },
                         enabled = !isLoading,
@@ -305,7 +352,7 @@ fun LoginScreenContent(
             // Google Sign in Button
             Button(
                 onClick = {
-                    AuthUtils.signInWithGoogle(googleSignInClient, googleSignInLauncher)
+                    GoogleAuthHelper.signIn(googleSignInLauncher, googleSignInClient)
                 },
                 enabled = !isLoading,
                 modifier = Modifier

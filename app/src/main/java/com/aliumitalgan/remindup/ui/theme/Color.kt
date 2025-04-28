@@ -2,13 +2,19 @@ package com.aliumitalgan.remindup.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// İkon renkleri baz alınarak oluşturulmuş renk paleti
+// Modern ve uygulamanın ikonuna uygun renkler
 val BluePrimary = Color(0xFF00A2E8)
+val BluePrimaryDark = Color(0xFF0077B6)
 val GreenSecondary = Color(0xFF2ED9A0)
-val DarkBlueBackground = Color(0xFF0E3042)
-val LightBlueBackground = Color(0xFFE5F6FF)
-val WhiteUI = Color(0xFFFFFFFF)
-val LightGreenAccent = Color(0xFF9FFFCE)
-val MidnightBlue = Color(0xFF0A2432)
-val TextPrimary = Color(0xFF202020)
-val TextSecondary = Color(0xFF757575)
+val GreenSecondaryDark = Color(0xFF00B088)
+val SuccessGreen = Color(0xFF4CAF50)
+val WarningOrange = Color(0xFFFFA726)
+val BluePrimaryLight = Color(0xFF00A2E8)
+val GreenSecondaryLight = Color(0xFF2ED9A0)
+val ErrorRed = Color(0xFFEF5350)
+val BackgroundLight = Color(0xFFF8FBFF)
+val BackgroundDark = Color(0xFF0A1929)
+val SurfaceLight = Color(0xFFFFFFFF)
+val SurfaceDark = Color(0xFF102A43)
+val OnSurfaceLight = Color(0xFF212121)
+val OnSurfaceDark = Color(0xFFF5F5F5)

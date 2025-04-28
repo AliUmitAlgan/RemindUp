@@ -27,18 +27,26 @@ object FirebaseUtils {
 
     // Hedefleri çekme
     fun getGoals(onSuccess: (List<Goal>) -> Unit) {
-        db.collection("goals")
-            .get()
-            .addOnSuccessListener { result ->
-                val goals = mutableListOf<Goal>()
-                for (document in result) {
-                    val goal = document.toObject(Goal::class.java)
-                    goals.add(goal)
+        try {
+            db.collection("goals")
+                .get()
+                .addOnSuccessListener { result ->
+                    val goals = mutableListOf<Goal>()
+                    for (document in result) {
+                        val goal = document.toObject(Goal::class.java)
+                        goals.add(goal)
+                    }
+                    onSuccess(goals)
                 }
-                onSuccess(goals)
-            }
-            .addOnFailureListener { e ->
-                println("Error getting documents: $e")
-            }
+                .addOnFailureListener { e ->
+                    println("Error getting documents: $e")
+                    // Başarısız olsa bile callback'i çağırın!
+                    onSuccess(emptyList())
+                }
+        } catch (e: Exception) {
+            println("Exception in getGoals: $e")
+            // Hata durumunda yine callback'i çağırın
+            onSuccess(emptyList())
+        }
     }
 }

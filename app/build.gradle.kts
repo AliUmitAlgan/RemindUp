@@ -43,6 +43,11 @@ android {
 
 dependencies {
     // Material Icons
+    implementation(libs.androidx.datastore.preferences)
+
+    // Coroutines (DataStore akışını kullanmak için)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("androidx.datastore:datastore-preferences:1.1.5")
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
     implementation ("androidx.compose.material:material:1.5.0")
     // Google Auth

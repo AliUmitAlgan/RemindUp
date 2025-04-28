@@ -1,6 +1,14 @@
 package com.aliumitalgan.remindup.screens
 
+import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,7 +26,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aliumitalgan.remindup.utils.AuthUtils
+import com.aliumitalgan.remindup.utils.NotificationUtils
+import com.aliumitalgan.remindup.utils.ThemeManager
 import com.google.firebase.auth.FirebaseAuth
+
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,8 +42,36 @@ fun SettingsScreenContent(
     val currentUser = FirebaseAuth.getInstance().currentUser
 
     var showLogoutDialog by remember { mutableStateOf(false) }
-    var notificationsEnabled by remember { mutableStateOf(true) }
-    var darkModeEnabled by remember { mutableStateOf(false) }
+    var showPermissionDialog by remember { mutableStateOf(false) }
+
+    // Bildirim durumunu al
+    val notificationsEnabled by NotificationUtils.getNotificationStateFlow(context)
+        .collectAsState(initial = true)
+
+    // Tema durumunu al
+    val isDarkMode by ThemeManager.isDarkTheme
+
+    // Bildirim izni kontrolü
+    val hasNotificationPermission = remember { mutableStateOf(NotificationUtils.checkNotificationPermission(context)) }
+
+    // Bildirim izni launcher'ı
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasNotificationPermission.value = isGranted
+        if (isGranted) {
+            // İzin verildiğinde bildirimleri aç
+            coroutineScope.launch {
+                NotificationUtils.saveNotificationState(context, true)
+            }
+        } else {
+            // İzin reddedildiğinde bildirimleri kapat
+            coroutineScope.launch {
+                NotificationUtils.saveNotificationState(context, false)
+            }
+            showPermissionDialog = true
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -82,7 +121,9 @@ fun SettingsScreenContent(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = currentUser?.displayName?.first()?.toString() ?: currentUser?.email?.first()?.toString() ?: "U",
+                            text = currentUser?.displayName?.firstOrNull()?.toString()
+                                ?: currentUser?.email?.firstOrNull()?.toString()
+                                ?: "U",
                             color = MaterialTheme.colorScheme.primary,
                             fontSize = 32.sp,
                             fontWeight = FontWeight.Bold
@@ -160,13 +201,22 @@ fun SettingsScreenContent(
                         trailingContent = {
                             Switch(
                                 checked = notificationsEnabled,
-                                onCheckedChange = {
-                                    notificationsEnabled = it
-                                    Toast.makeText(
-                                        context,
-                                        if (it) "Bildirimler açıldı" else "Bildirimler kapatıldı",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+                                onCheckedChange = { isEnabled ->
+                                    if (isEnabled && !hasNotificationPermission.value && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                        // İzin istenmesi gerekiyor
+                                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    } else {
+                                        // İzin zaten var veya gerekmiyor, durumu kaydet
+                                        coroutineScope.launch {
+                                            NotificationUtils.saveNotificationState(context, isEnabled)
+                                        }
+
+                                        Toast.makeText(
+                                            context,
+                                            if (isEnabled) "Bildirimler açıldı" else "Bildirimler kapatıldı",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
                                 }
                             )
                         }
@@ -185,12 +235,14 @@ fun SettingsScreenContent(
                         },
                         trailingContent = {
                             Switch(
-                                checked = darkModeEnabled,
-                                onCheckedChange = {
-                                    darkModeEnabled = it
+                                checked = isDarkMode,
+                                onCheckedChange = { isEnabled ->
+                                    coroutineScope.launch {
+                                        ThemeManager.saveDarkThemeState(context, isEnabled)
+                                    }
                                     Toast.makeText(
                                         context,
-                                        if (it) "Karanlık mod açıldı" else "Karanlık mod kapatıldı",
+                                        if (isEnabled) "Karanlık mod açıldı" else "Karanlık mod kapatıldı",
                                         Toast.LENGTH_SHORT
                                     ).show()
                                 }
@@ -214,6 +266,11 @@ fun SettingsScreenContent(
                         },
                         modifier = Modifier.clickable {
                             // Dil seçim işlemleri
+                            Toast.makeText(
+                                context,
+                                "Bu özellik yakında eklenecek",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                     )
                 }
@@ -253,6 +310,11 @@ fun SettingsScreenContent(
                         },
                         modifier = Modifier.clickable {
                             // Destek merkezine yönlendirme
+                            Toast.makeText(
+                                context,
+                                "Destek merkezine yönlendiriliyorsunuz",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                     )
 
@@ -269,6 +331,11 @@ fun SettingsScreenContent(
                         },
                         modifier = Modifier.clickable {
                             // Uygulama hakkında bilgi ekranına yönlendirme
+                            Toast.makeText(
+                                context,
+                                "RemindUp v1.0 - 2025",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                     )
 
@@ -285,6 +352,18 @@ fun SettingsScreenContent(
                         },
                         modifier = Modifier.clickable {
                             // Gizlilik politikasına yönlendirme
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                    data = Uri.parse("https://www.remindup.com/privacy")
+                                }
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(
+                                    context,
+                                    "Gizlilik politikası sayfası bulunamadı",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         }
                     )
                 }
@@ -333,6 +412,38 @@ fun SettingsScreenContent(
                 dismissButton = {
                     TextButton(
                         onClick = { showLogoutDialog = false }
+                    ) {
+                        Text("İptal")
+                    }
+                }
+            )
+        }
+
+        // Bildirim İzni Dialog
+        if (showPermissionDialog) {
+            AlertDialog(
+                onDismissRequest = { showPermissionDialog = false },
+                title = { Text("Bildirim İzni") },
+                text = {
+                    Text("Bildirimlerin düzgün çalışması için izin vermeniz gerekiyor. Uygulama ayarlarına gidip bildirimlere izin vermek ister misiniz?")
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            // Uygulama ayarlarına yönlendir
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", context.packageName, null)
+                            }
+                            context.startActivity(intent)
+                            showPermissionDialog = false
+                        }
+                    ) {
+                        Text("Ayarlara Git")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showPermissionDialog = false }
                     ) {
                         Text("İptal")
                     }
