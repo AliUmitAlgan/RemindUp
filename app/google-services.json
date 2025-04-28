@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "117825801795",
+    "project_id": "remindup-3f28a",
+    "storage_bucket": "remindup-3f28a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:117825801795:android:050b4cdfd9bbcdd3938ef6",
+        "android_client_info": {
+          "package_name": "com.aliumitalgan.remindup"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "117825801795-d70srog7cr7m6hjengcjrl411har5u63.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAj2O3t4EuGyqWG83PD-6h65UUA47VgXmw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "117825801795-d70srog7cr7m6hjengcjrl411har5u63.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
