@@ -2,11 +2,13 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("com.google.gms.google-services")
 }
 
 android {
     namespace = "com.aliumitalgan.remindup"
     compileSdk = 35
+    ndkVersion="27.2.12479018"
 
     defaultConfig {
         applicationId = "com.aliumitalgan.remindup"
@@ -40,15 +42,37 @@ android {
 }
 
 dependencies {
+    // Material Icons
+    implementation("androidx.compose.material:material-icons-extended:1.7.8")
+    implementation ("androidx.compose.material:material:1.5.0")
+    // Google Auth
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
 
+    // Firebase
+    implementation(platform("com.google.firebase:firebase-bom:33.13.0"))
+    implementation("com.google.firebase:firebase-analytics-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("com.google.firebase:firebase-auth-ktx")
+
+    // Navigation
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+
+    // AppCompat
+    implementation("androidx.appcompat:appcompat:1.6.1")
+
+    // Core Android dependencies
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
+
+    // Compose
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+
+    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
