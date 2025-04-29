@@ -1,16 +1,15 @@
 package com.aliumitalgan.remindup.screens
 
 import android.widget.Toast
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,12 +24,18 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aliumitalgan.remindup.components.BottomNavigationBar
+import com.aliumitalgan.remindup.components.NestedGoalCard
 import com.aliumitalgan.remindup.models.Goal
 import com.aliumitalgan.remindup.screens.BottomNavItem
 import com.aliumitalgan.remindup.utils.ProgressUtils
+import com.aliumitalgan.remindup.utils.SubGoal
+import com.aliumitalgan.remindup.utils.SubGoalUtils
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,7 +53,9 @@ fun GoalsScreenContent(
     var isLoading by remember { mutableStateOf(true) }
     var showAddDialog by remember { mutableStateOf(false) }
     var editingGoal by remember { mutableStateOf<Pair<String, Goal>?>(null) }
-    var showProgressDialog by remember { mutableStateOf<Pair<String, Goal>?>(null) }
+
+    // Alt hedefleri saklayacak Map (GoalId -> List<SubGoal>)
+    var subGoalsMap by remember { mutableStateOf<Map<String, List<Pair<String, SubGoal>>>>(emptyMap()) }
 
     // Bottom Navigation Items
     val bottomNavItems = listOf(
@@ -60,12 +67,29 @@ fun GoalsScreenContent(
     )
     var selectedNavItem by remember { mutableStateOf(bottomNavItems[1].route) }
 
-    // Hedefleri yükle
+    // Tüm hedefleri ve alt hedefleri yükle
+    // Tüm hedefleri ve alt hedefleri yükle
     LaunchedEffect(key1 = true) {
         loadGoals(
             onSuccess = { goalsList ->
                 goals = goalsList
-                isLoading = false
+
+                // Her hedef için alt hedefleri yükle
+                val subGoalsMapTemp = mutableMapOf<String, List<Pair<String, SubGoal>>>()
+                coroutineScope.launch {
+                    goalsList.forEach { (goalId, _) ->
+                        try {
+                            val subGoalsResult = SubGoalUtils.getSubGoalsForParent(goalId)
+                            if (subGoalsResult.isSuccess) {
+                                subGoalsMapTemp[goalId] = subGoalsResult.getOrDefault(emptyList())
+                            }
+                        } catch (e: Exception) {
+                            // Alt hedefler yüklenemedi, boş liste ile devam et
+                        }
+                    }
+                    subGoalsMap = subGoalsMapTemp
+                    isLoading = false
+                }
             },
             onError = { error ->
                 showToast(context, "Hedefler yüklenemedi: $error")
@@ -136,28 +160,15 @@ fun GoalsScreenContent(
                 ) {
                     items(goals.size) { index ->
                         val (id, goal) = goals[index]
-                        ModernGoalListItem(
-                            goal = goal,
-                            onEditClick = { editingGoal = id to goal },
-                            onDeleteClick = {
-                                coroutineScope.launch {
-                                    deleteGoal(
-                                        goalId = id,
-                                        onSuccess = {
-                                            goals = goals.filter { it.first != id }
-                                            showToast(context, "Hedef silindi")
-                                        },
-                                        onError = { error ->
-                                            showToast(context, "Hedef silinemedi: $error")
-                                        }
-                                    )
-                                }
-                            },
-                            onProgressUpdate = {
-                                // Otomatik ilerleme için tıklandığında mevcut ilerlemeyi artır
-                                val currentProgress = goal.progress
-                                val newProgress = if (currentProgress >= 100) 100 else currentProgress + 10
 
+                        // Alt hedefler yoksa boş liste, varsa alt hedef listesini getir
+                        val subGoals = subGoalsMap[id]?.map { it.second } ?: emptyList()
+
+                        NestedGoalCard(
+                            goalTitle = goal.title,
+                            goalProgress = goal.progress,
+                            subGoals = subGoals,
+                            onProgressUpdate = { newProgress ->
                                 coroutineScope.launch {
                                     updateGoalProgress(
                                         goalId = id,
@@ -182,6 +193,86 @@ fun GoalsScreenContent(
                                         }
                                     )
                                 }
+                            },
+                            onAddSubGoal = { subGoalTitle ->
+                                coroutineScope.launch {
+                                    try {
+                                        // Yeni alt hedef oluştur
+                                        val newSubGoal = SubGoal(
+                                            title = subGoalTitle,
+                                            parentGoalId = id
+                                        )
+
+                                        val result = SubGoalUtils.addSubGoal(newSubGoal)
+                                        if (result.isSuccess) {
+                                            val subGoalId = result.getOrDefault("")
+
+                                            // Alt hedef listesini güncelle
+                                            val currentSubGoals = subGoalsMap[id]?.toMutableList() ?: mutableListOf()
+                                            currentSubGoals.add(subGoalId to newSubGoal.copy(id = subGoalId))
+
+                                            subGoalsMap = subGoalsMap.toMutableMap().apply {
+                                                put(id, currentSubGoals)
+                                            }
+
+                                            showToast(context, "Alt hedef eklendi")
+                                        } else {
+                                            showToast(context, "Alt hedef eklenemedi")
+                                        }
+                                    } catch (e: Exception) {
+                                        showToast(context, "Hata: ${e.message}")
+                                    }
+                                }
+                            },
+                            onToggleSubGoal = { subGoal, isCompleted ->
+                                coroutineScope.launch {
+                                    try {
+                                        // Alt hedefin durumunu güncelle
+                                        val result = SubGoalUtils.updateSubGoalStatus(subGoal.id, isCompleted)
+                                        if (result.isSuccess) {
+                                            // Alt hedefler listesini güncelle
+                                            val updatedSubGoals = subGoalsMap[id]?.map { (subId, sub) ->
+                                                if (subId == subGoal.id) {
+                                                    subId to sub.copy(completed = isCompleted)
+                                                } else {
+                                                    subId to sub
+                                                }
+                                            } ?: emptyList()
+
+                                            subGoalsMap = subGoalsMap.toMutableMap().apply {
+                                                put(id, updatedSubGoals)
+                                            }
+
+                                            // Alt hedeflerin tamamlanma durumuna göre ana hedefin ilerlemesini güncelle
+                                            val completedPercentage = SubGoalUtils.calculateProgressFromSubGoals(
+                                                updatedSubGoals.map { it.second }
+                                            )
+
+                                            if (completedPercentage > 0) {
+                                                updateGoalProgress(
+                                                    goalId = id,
+                                                    newProgress = completedPercentage,
+                                                    onSuccess = {
+                                                        goals = goals.map { pair ->
+                                                            if (pair.first == id) {
+                                                                id to goal.copy(progress = completedPercentage)
+                                                            } else {
+                                                                pair
+                                                            }
+                                                        }
+
+                                                        showToast(context, "Hedefiniz %$completedPercentage tamamlandı")
+                                                    },
+                                                    onError = { error ->
+                                                        showToast(context, "Hedef ilerleme güncellenemedi: $error")
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        showToast(context, "Hata: ${e.message}")
+                                    }
+                                }
                             }
                         )
                     }
@@ -199,6 +290,10 @@ fun GoalsScreenContent(
                                 goal = newGoal,
                                 onSuccess = { id ->
                                     goals = goals + (id to newGoal)
+                                    // Yeni hedef için boş alt hedef listesi oluştur
+                                    subGoalsMap = subGoalsMap.toMutableMap().apply {
+                                        put(id, emptyList())
+                                    }
                                     showToast(context, "Hedef eklendi")
                                 },
                                 onError = { error ->
@@ -243,43 +338,60 @@ fun GoalsScreenContent(
                     }
                 )
             }
-
-            // İlerleme Güncelleme Diyaloğu
-            showProgressDialog?.let { (id, goal) ->
-                ProgressUpdateDialog(
-                    currentProgress = goal.progress,
-                    onDismiss = { showProgressDialog = null },
-                    onConfirm = { newProgress ->
-                        coroutineScope.launch {
-                            updateGoalProgress(
-                                goalId = id,
-                                newProgress = newProgress,
-                                onSuccess = {
-                                    goals = goals.map { pair ->
-                                        if (pair.first == id) {
-                                            id to goal.copy(progress = newProgress)
-                                        } else {
-                                            pair
-                                        }
-                                    }
-
-                                    if (newProgress >= 100) {
-                                        showToast(context, "Tebrikler! Hedefinizi tamamladınız!")
-                                    } else {
-                                        showToast(context, "İlerleme güncellendi")
-                                    }
-                                },
-                                onError = { error ->
-                                    showToast(context, "İlerleme güncellenemedi: $error")
-                                }
-                            )
-                        }
-                        showProgressDialog = null
-                    }
-                )
-            }
         }
     }
+}
+@Composable
+fun ModernGoalDialog(
+    onDismiss: () -> Unit,
+    onSave: (title: String, progress: Int) -> Unit,
+    title: String = "Hedef Ekle",
+    initialTitle: String = "",
+    initialProgress: Int = 0
+) {
+    var goalTitle by remember { mutableStateOf(initialTitle) }
+    var goalProgress by remember { mutableStateOf(initialProgress.toString()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                TextField(
+                    value = goalTitle,
+                    onValueChange = { goalTitle = it },
+                    label = { Text("Hedef Başlığı") }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                TextField(
+                    value = goalProgress,
+                    onValueChange = {
+                        if (it.isEmpty() || (it.toIntOrNull() != null && it.toInt() in 0..100)) {
+                            goalProgress = it
+                        }
+                    },
+                    label = { Text("İlerleme (%)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (goalTitle.isNotEmpty()) {
+                        onSave(goalTitle, goalProgress.toIntOrNull() ?: 0)
+                    }
+                }
+            ) {
+                Text("Kaydet")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("İptal")
+            }
+        }
+    )
 }
 
 @Composable
@@ -349,303 +461,6 @@ fun EmptyGoalsView(
     }
 }
 
-@Composable
-fun ModernGoalListItem(
-    goal: Goal,
-    onEditClick: () -> Unit,
-    onDeleteClick: () -> Unit,
-    onProgressUpdate: () -> Unit
-) {
-    val progressColor = when {
-        goal.progress >= 100 -> MaterialTheme.colorScheme.primary
-        goal.progress >= 70 -> MaterialTheme.colorScheme.secondary
-        goal.progress >= 30 -> MaterialTheme.colorScheme.tertiary
-        else -> MaterialTheme.colorScheme.error
-    }
-
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = goal.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Row {
-                    // Düzenleme butonu
-                    IconButton(onClick = onEditClick) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Düzenle",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
-                    // Silme butonu
-                    IconButton(onClick = onDeleteClick) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Sil",
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // İlerleme çubuğu
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(goal.progress / 100f)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(
-                                    progressColor,
-                                    progressColor.copy(alpha = 0.7f)
-                                )
-                            )
-                        )
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "${goal.progress}% Tamamlandı",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-
-                Button(
-                    onClick = onProgressUpdate,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = progressColor
-                    )
-                ) {
-                    // Buton adı değiştirildi
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "İlerleme"
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(if (goal.progress < 100) "İlerle" else "Tamamlandı")
-                }
-            }
-
-            // Hedef tamamlandı işareti
-            if (goal.progress >= 100) {
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Tamamlandı",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Text(
-                        text = "Tebrikler! Bu hedefi tamamladınız!",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ModernGoalDialog(
-    onDismiss: () -> Unit,
-    onSave: (title: String, progress: Int) -> Unit,
-    title: String = "Hedef Ekle",
-    initialTitle: String = "",
-    initialProgress: Int = 0
-) {
-    var goalTitle by remember { mutableStateOf(initialTitle) }
-    var goalProgress by remember { mutableStateOf(initialProgress.toString()) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        icon = {
-            Icon(Icons.Default.Flag, contentDescription = null)
-        },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                OutlinedTextField(
-                    value = goalTitle,
-                    onValueChange = { goalTitle = it },
-                    label = { Text("Hedef Başlığı") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    leadingIcon = {
-                        Icon(Icons.Default.Title, contentDescription = null)
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "İlerleme (%)",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedTextField(
-                    value = goalProgress,
-                    onValueChange = {
-                        if (it.isEmpty() || (it.toIntOrNull() != null && it.toInt() in 0..100)) {
-                            goalProgress = it
-                        }
-                    },
-                    label = { Text("İlerleme (%)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Number
-                    ),
-                    leadingIcon = {
-                        Icon(Icons.Default.ShowChart, contentDescription = null)
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // İlerleme slider'ı
-                Slider(
-                    value = goalProgress.toFloatOrNull() ?: 0f,
-                    onValueChange = { goalProgress = it.toInt().toString() },
-                    valueRange = 0f..100f,
-                    steps = 100,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (goalTitle.isNotEmpty()) {
-                        onSave(goalTitle, goalProgress.toIntOrNull() ?: 0)
-                    }
-                },
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("Kaydet")
-            }
-        },
-        dismissButton = {
-            OutlinedButton(
-                onClick = onDismiss,
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("İptal")
-            }
-        },
-        shape = RoundedCornerShape(20.dp)
-    )
-}
-
-@Composable
-fun ProgressUpdateDialog(
-    currentProgress: Int,
-    onDismiss: () -> Unit,
-    onConfirm: (Int) -> Unit
-) {
-    var progress by remember { mutableStateOf(currentProgress.toString()) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("İlerleme Güncelle") },
-        text = {
-            Column {
-                Text("Mevcut ilerleme: $currentProgress%")
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = progress,
-                    onValueChange = { input ->
-                        // Sadece sayısal değerleri kabul et
-                        if (input.isEmpty() || input.all { it.isDigit() }) {
-                            val num = input.toIntOrNull() ?: 0
-                            if (num in 0..100) {
-                                progress = input
-                            }
-                        }
-                    },
-                    label = { Text("Yeni İlerleme (%)") },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Number
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    onConfirm(progress.toIntOrNull() ?: currentProgress)
-                }
-            ) {
-                Text("Güncelle")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("İptal")
-            }
-        }
-    )
-}
-
 // Hedefleri yükle
 private suspend fun loadGoals(
     onSuccess: (List<Pair<String, Goal>>) -> Unit,
@@ -701,25 +516,6 @@ private suspend fun updateGoal(
     }
 }
 
-// Hedef sil
-private suspend fun deleteGoal(
-    goalId: String,
-    onSuccess: () -> Unit,
-    onError: (String) -> Unit
-) {
-    try {
-        com.google.firebase.firestore.FirebaseFirestore.getInstance()
-            .collection("goals")
-            .document(goalId)
-            .delete()
-            .await()
-
-        onSuccess()
-    } catch (e: Exception) {
-        onError(e.message ?: "Bilinmeyen hata")
-    }
-}
-
 // İlerleme güncelle
 private suspend fun updateGoalProgress(
     goalId: String,
@@ -735,6 +531,7 @@ private suspend fun updateGoalProgress(
     }
 }
 
+// Toast mesajı göster
 // Toast mesajı göster
 private fun showToast(context: android.content.Context, message: String) {
     Toast.makeText(context, message, Toast.LENGTH_SHORT).show()

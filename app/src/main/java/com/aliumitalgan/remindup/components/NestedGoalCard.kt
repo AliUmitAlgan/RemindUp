@@ -1,42 +1,47 @@
 package com.aliumitalgan.remindup.components
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.*
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.aliumitalgan.remindup.ui.theme.*
+import com.aliumitalgan.remindup.utils.SubGoal
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GoalCard(
+fun NestedGoalCard(
     goalTitle: String,
     goalProgress: Int,
-    onProgressUpdate: ((Int) -> Unit)? = null
+    onProgressUpdate: ((Int) -> Unit)? = null,
+    subGoals: List<SubGoal> = emptyList(),
+    onAddSubGoal: ((String) -> Unit)? = null,
+    onToggleSubGoal: ((SubGoal, Boolean) -> Unit)? = null
 ) {
     val animatedProgress = animateFloatAsState(
         targetValue = goalProgress / 100f,
@@ -46,6 +51,8 @@ fun GoalCard(
 
     val isCompleted = goalProgress >= 100
     var showUpdateDialog by remember { mutableStateOf(false) }
+    var showSubGoalsDialog by remember { mutableStateOf(false) }
+    var expandSubGoals by remember { mutableStateOf(false) }
 
     // Dinamik renk ayarlamaları
     val progressColor = when {
@@ -85,6 +92,7 @@ fun GoalCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .animateContentSize()
                 .padding(20.dp),
         ) {
             Row(
@@ -117,7 +125,7 @@ fun GoalCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = if (isCompleted) Icons.Rounded.CheckCircle else Icons.Rounded.Flag,
+                            imageVector = if (isCompleted) Icons.Filled.CheckCircle else Icons.Filled.Flag,
                             contentDescription = "Hedef",
                             tint = progressColor,
                             modifier = Modifier.size(28.dp)
@@ -225,60 +233,149 @@ fun GoalCard(
                 )
             }
 
-            // İlerleme butonları
-            if (onProgressUpdate != null) {
-                Spacer(modifier = Modifier.height(16.dp))
+            // Alt hedefler kısmı
+            if (subGoals.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
 
+                // Alt hedefleri genişletme/daraltma butonu
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { expandSubGoals = !expandSubGoals }
+                        .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Tamamlandı bilgisi
-                    if (isCompleted) {
-                        Text(
-                            text = "Tebrikler!",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = progressColor,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.weight(1f)
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
+                    Text(
+                        text = "Alt Hedefler (${subGoals.count { it.completed }}/${subGoals.size})",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                    )
 
-                    // Güncelleme butonu
-                    Button(
-                        onClick = { showUpdateDialog = true },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = progressColor.copy(alpha = 0.15f),
-                            contentColor = progressColor
-                        ),
-                        elevation = ButtonDefaults.buttonElevation(
-                            defaultElevation = 0.dp,
-                            pressedElevation = 2.dp
-                        ),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    Icon(
+                        imageVector = if (expandSubGoals) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        contentDescription = if (expandSubGoals) "Daralt" else "Genişlet",
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+
+                // Alt hedefleri göster/gizle
+                AnimatedVisibility(
+                    visible = expandSubGoals,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Edit,
-                            contentDescription = "İlerleme güncelle",
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (isCompleted) "Düzenle" else "Güncelle",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        subGoals.forEach { subGoal ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = subGoal.completed,
+                                    onCheckedChange = { isChecked ->
+                                        onToggleSubGoal?.invoke(subGoal, isChecked)
+                                    },
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = progressColor,
+                                        uncheckedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    )
+                                )
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                Text(
+                                    text = subGoal.title,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color =                 if (subGoal.completed)
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    else
+                                        MaterialTheme.colorScheme.onSurface,
+                                    textDecoration = if (subGoal.completed)
+                                        TextDecoration.LineThrough
+                                    else
+                                        TextDecoration.None
+                                )
+                            }
+                        }
                     }
+                }
+            }
+
+            // Butonlar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                // Alt Hedefler butonu
+                OutlinedButton(
+                    onClick = { showSubGoalsDialog = true },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ),
+                    border = BorderStroke(
+                        width = 1.5.dp,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                    ),                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.List,
+                        contentDescription = "Alt Hedefler",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Alt Hedefler", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // İlerle butonu
+                Button(
+                    onClick = { showUpdateDialog = true },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = progressColor
+                    ),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isCompleted) Icons.Filled.Edit else Icons.Filled.Add,
+                        contentDescription = if (isCompleted) "Düzenle" else "İlerle",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (isCompleted) "Düzenle" else "İlerle",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
         }
     }
 
-    // İlerleme güncelleme diyaloğu - iyileştirilmiş versiyon
+    // Alt Hedefler Diyaloğu
+    if (showSubGoalsDialog) {
+        SubGoalsDialog(
+            onDismiss = { showSubGoalsDialog = false },
+            subGoals = subGoals,
+            onAddSubGoal = onAddSubGoal,
+            onToggleSubGoal = onToggleSubGoal
+        )
+    }
+
+    // İlerleme güncelleme diyaloğu
     if (showUpdateDialog && onProgressUpdate != null) {
         var updatedProgress by remember { mutableStateOf(goalProgress.toString()) }
 
@@ -438,10 +535,196 @@ fun GoalCard(
     }
 }
 
-@Preview(showBackground = true)
 @Composable
-fun GoalCardPreview() {
-    RemindUpTheme {
-        GoalCard(goalTitle = "Günde 2 litre su iç", goalProgress = 75)
+fun SubGoalsDialog(
+    onDismiss: () -> Unit,
+    subGoals: List<SubGoal>,
+    onAddSubGoal: ((String) -> Unit)? = null,
+    onToggleSubGoal: ((SubGoal, Boolean) -> Unit)? = null
+) {
+    var newSubGoalTitle by remember { mutableStateOf("") }
+
+    Dialog(
+        onDismissRequest = onDismiss
+    ) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = CardDefaults.cardElevation(
+                defaultElevation = 8.dp
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Başlık
+                Text(
+                    text = "Alt Hedefler",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Divider(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                // Alt hedefler listesi
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 300.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (subGoals.isEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Henüz alt hedef eklenmemiş",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                )
+                            }
+                        }
+                    } else {
+                        items(subGoals) { subGoal ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (subGoal.completed)
+                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                        else
+                                            Color.Transparent
+                                    )
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = subGoal.completed,
+                                    onCheckedChange = { isChecked ->
+                                        onToggleSubGoal?.invoke(subGoal, isChecked)
+                                    },
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = MaterialTheme.colorScheme.primary,
+                                        uncheckedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    )
+                                )
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                Text(
+                                    text = subGoal.title,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (subGoal.completed)
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    else
+                                        MaterialTheme.colorScheme.onSurface,
+                                    textDecoration = if (subGoal.completed)
+                                        androidx.compose.ui.text.style.TextDecoration.LineThrough
+                                    else
+                                        androidx.compose.ui.text.style.TextDecoration.None
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Yeni alt hedef ekleme
+                if (onAddSubGoal != null) {
+                    Divider(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+
+                    Text(
+                        text = "Yeni Alt Hedef Ekle",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = newSubGoalTitle,
+                            onValueChange = { newSubGoalTitle = it },
+                            placeholder = { Text("Örn: OOP kavramlarını öğren") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            shape = RoundedCornerShape(16.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                cursorColor = MaterialTheme.colorScheme.primary
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        IconButton(
+                            onClick = {
+                                if (newSubGoalTitle.isNotEmpty()) {
+                                    onAddSubGoal(newSubGoalTitle)
+                                    newSubGoalTitle = ""
+                                }
+                            },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Add,
+                                contentDescription = "Ekle",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Kapat butonu
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Button(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        ),
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+                    ) {
+                        Text(
+                            text = "Tamam",
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 16.sp
+                        )
+                    }
+                }
+            }
+        }
     }
 }
