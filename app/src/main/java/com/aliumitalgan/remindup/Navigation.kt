@@ -56,19 +56,28 @@ fun AppNavigation(
 
         composable(Screen.Goals.route) {
             GoalsScreenContent(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToHome = { navController.navigate(Screen.Home.route) },
+                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
+                onNavigateToReminders = { navController.navigate(Screen.Reminders.route) },
+
             )
         }
 
         composable(Screen.Progress.route) {
             ProgressScreenContent(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+
             )
         }
 
         composable(Screen.Reminders.route) {
             RemindersScreenContent(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToHome = { navController.navigate(Screen.Home.route) },
+                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
+                onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
+                onNavigateToProgress = { navController.navigate(Screen.Progress.route) },
             )
         }
 
@@ -85,10 +94,11 @@ fun AppNavigation(
                         popUpTo(navController.graph.startDestinationId) { inclusive = true }
                     }
                 },
-                onNavigateToHome = { /* ... */ },
-                onNavigateToGoals = { /* ... */ },
-                onNavigateToReminders = { /* ... */ },
-                onNavigateToProgress = { /* ... */ }
+                onNavigateToHome = { navController.navigate(Screen.Home.route) },
+                onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
+                onNavigateToReminders = { navController.navigate(Screen.Reminders.route) },
+                onNavigateToProgress = { navController.navigate(Screen.Progress.route) },
+
             )
         }
 
