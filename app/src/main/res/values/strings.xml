@@ -1,66 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">RemindUp</string>
 
-    <!-- Google Sign-In -->
+    <!-- Google Sign-In için Web Client ID (Firebase Console'dan alınmalı) -->
+    <!-- Bu ID'yi Firebase Console -> Authentication -> Sign-in method -> Google -> Web SDK configuration'dan almalısınız -->
     <string name="web_client_id">117825801795-d70srog7cr7m6hjengcjrl411har5u63.apps.googleusercontent.com</string>
 
-    <!-- Auth Strings -->
-    <string name="login_success">Giriş başarılı</string>
-    <string name="login_fail">Giriş başarısız</string>
-    <string name="register_success">Kayıt başarılı</string>
-    <string name="register_fail">Kayıt başarısız</string>
-    <string name="logout_success">Çıkış yapıldı</string>
 
-    <!-- Reminder Strings -->
-    <string name="reminder_add_success">Hatırlatıcı başarıyla eklendi</string>
-    <string name="reminder_add_fail">Hatırlatıcı eklenemedi</string>
-    <string name="reminder_delete_success">Hatırlatıcı silindi</string>
-    <string name="reminder_delete_fail">Hatırlatıcı silinemedi</string>
-    <string name="reminder_update_success">Hatırlatıcı güncellendi</string>
-    <string name="reminder_update_fail">Hatırlatıcı güncellenemedi</string>
 
-    <!-- Goal Strings -->
-    <string name="goal_add_success">Hedef başarıyla eklendi</string>
-    <string name="goal_add_fail">Hedef eklenemedi</string>
-    <string name="goal_delete_success">Hedef silindi</string>
-    <string name="goal_delete_fail">Hedef silinemedi</string>
-    <string name="goal_update_success">Hedef güncellendi</string>
-    <string name="goal_update_fail">Hedef güncellenemedi</string>
-    <string name="goal_complete">Tebrikler! Hedefinizi tamamladınız!</string>
+    <!-- Uygulama tanıtımları -->
+    <string name="welcome_title">RemindUp\'a Hoş Geldiniz</string>
+    <string name="welcome_subtitle">Hedeflerinizi Takip Edin, Hatırlatıcılarınızı Yönetin</string>
 
-    <!-- Settings Strings -->
-    <string name="theme_changed">Tema değiştirildi</string>
-    <string name="notifications_enabled">Bildirimler açıldı</string>
-    <string name="notifications_disabled">Bildirimler kapatıldı</string>
-    <string name="language_changed">Dil değiştirildi</string>
+    <!-- Giriş/Kayıt ekranı -->
+    <string name="login">Giriş Yap</string>
+    <string name="register">Kayıt Ol</string>
+    <string name="email">E-posta</string>
+    <string name="password">Şifre</string>
+    <string name="confirm_password">Şifre Tekrar</string>
+    <string name="name">Ad Soyad</string>
+    <string name="forgot_password">Şifremi Unuttum</string>
+    <string name="login_with_google">Google ile Giriş Yap</string>
+    <string name="no_account">Hesabınız yok mu?</string>
+    <string name="have_account">Zaten hesabınız var mı?</string>
+    <string name="register_now">Şimdi Kayıt Olun</string>
+    <string name="login_now">Şimdi Giriş Yapın</string>
 
-    <!-- Error Messages -->
-    <string name="error_empty_fields">Lütfen tüm alanları doldurun</string>
-    <string name="error_invalid_email">Geçersiz e-posta adresi</string>
-    <string name="error_short_password">Şifre en az 6 karakter olmalıdır</string>
-    <string name="error_passwords_match">Şifreler eşleşmiyor</string>
-    <string name="error_connection">İnternet bağlantısı problemi</string>
-    <string name="error_unknown">Bilinmeyen bir hata oluştu</string>
+    <!-- Ana ekran -->
+    <string name="home">Ana Sayfa</string>
+    <string name="goals">Hedefler</string>
+    <string name="reminders">Hatırlatıcılar</string>
+    <string name="progress">İlerleme</string>
+    <string name="settings">Ayarlar</string>
 
-    <!-- Notification Channel -->
-    <string name="notification_channel_name">RemindUp Bildirimleri</string>
-    <string name="notification_channel_description">RemindUp uygulaması için bildirimler</string>
+    <!-- Hedefler ekranı -->
+    <string name="my_goals">Hedeflerim</string>
+    <string name="add_goal">Hedef Ekle</string>
+    <string name="edit_goal">Hedef Düzenle</string>
+    <string name="goal_title">Hedef Başlığı</string>
+    <string name="goal_progress">İlerleme (%)</string>
+    <string name="completed">Tamamlandı</string>
+    <string name="no_goals">Henüz hedef bulunmuyor</string>
+    <string name="add_first_goal">İlk hedefini ekleyerek başla</string>
 
-    <!-- Notification Content -->
-    <string name="notification_title">RemindUp Hatırlatıcı</string>
-    <string name="notification_content">Planladığınız bir aktivite için hatırlatma vakti</string>
+    <!-- Hatırlatıcılar ekranı -->
+    <string name="my_reminders">Hatırlatıcılarım</string>
+    <string name="add_reminder">Hatırlatıcı Ekle</string>
+    <string name="edit_reminder">Hatırlatıcı Düzenle</string>
+    <string name="reminder_title">Hatırlatıcı Başlığı</string>
+    <string name="reminder_time">Saat</string>
+    <string name="no_reminders">Henüz hatırlatıcı bulunmuyor</string>
+    <string name="add_first_reminder">İlk hatırlatıcını ekleyerek başla</string>
 
-    <!-- Motivational Messages (Random Selection) -->
-    <string-array name="motivational_messages">
-        <item>Harika gidiyorsun, devam et!</item>
-        <item>Her küçük adım, başarıya giden yolda bir ilerlemedir!</item>
-        <item>Bugün dünden daha iyisin, yarın da bugünden daha iyi olacaksın!</item>
-        <item>Azim ve kararlılık, başarının anahtarıdır!</item>
-        <item>Zorluklar seni güçlendirir!</item>
-        <item>Sen yapabilirsin!</item>
-        <item>Her gün bir öncekinden daha iyi olmak için bir fırsattır!</item>
-        <item>Hedeflerine ulaşmak için her gün bir adım at!</item>
-        <item>Küçük adımlar büyük değişimler yaratır!</item>
-        <item>Gelişim bir yolculuktur, anın tadını çıkar!</item>
-    </string-array>
+    <!-- İlerleme ekranı -->
+    <string name="overall_progress">Genel İlerleme</string>
+    <string name="goals_status">Hedeflerinizin Durumu</string>
+
+    <!-- Ayarlar ekranı -->
+    <string name="notifications">Bildirimler</string>
+    <string name="dark_mode">Karanlık Mod</string>
+    <string name="language">Dil</string>
+    <string name="logout">Çıkış Yap</string>
+    <string name="edit_profile">Profili Düzenle</string>
+
+    <!-- Genel -->
+    <string name="save">Kaydet</string>
+    <string name="cancel">İptal</string>
+    <string name="delete">Sil</string>
+    <string name="update">Güncelle</string>
+    <string name="confirm">Onayla</string>
+    <string name="error">Hata</string>
+    <string name="success">Başarılı</string>
+    <string name="or">ya da</string>
+
+    <!-- Hata mesajları -->
+    <string name="error_login">Giriş yapılamadı. Bilgilerinizi kontrol edin.</string>
+    <string name="error_register">Kayıt yapılamadı. Bilgilerinizi kontrol edin.</string>
+    <string name="error_google_sign_in">Google ile giriş yapılamadı.</string>
+    <string name="error_empty_fields">Lütfen tüm alanları doldurun.</string>
+    <string name="error_password_mismatch">Şifreler eşleşmiyor.</string>
+    <string name="error_password_length">Şifre en az 6 karakter olmalıdır.</string>
+    <string name="error_invalid_email">Geçersiz e-posta adresi.</string>
 </resources>

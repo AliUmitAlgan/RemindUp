@@ -72,14 +72,25 @@ fun AppNavigation(
             )
         }
 
-        // Yeni eklenen Settings ekranı
         composable(Screen.Settings.route) {
             SettingsScreenContent(
                 onNavigateBack = {
-                    // Geri gitme işlemini kesin bir şekilde tanımlayın
+                    // geri ok tuşuna basınca Home’a dönsün:
                     navController.popBackStack(Screen.Home.route, false)
-                }
+                },
+                onLogout = {
+                    // çıkış yapınca Login ekranına git ve geçmişi temizle
+                    navController.navigate(Screen.Login.route) {
+                        // uygulamanın back stack'ini tamamen temizleyelim:
+                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                    }
+                },
+                onNavigateToHome = { /* ... */ },
+                onNavigateToGoals = { /* ... */ },
+                onNavigateToReminders = { /* ... */ },
+                onNavigateToProgress = { /* ... */ }
             )
         }
+
     }
 }

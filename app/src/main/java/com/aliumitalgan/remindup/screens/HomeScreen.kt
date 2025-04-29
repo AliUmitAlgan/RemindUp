@@ -15,10 +15,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.automirrored.filled.ShowChart
-import androidx.compose.material.icons.automirrored.outlined.ShowChart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -64,7 +60,6 @@ fun HomeScreenContent(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val isConnected = remember { mutableStateOf(true) }
     var goals by remember { mutableStateOf<List<Goal>>(emptyList()) }
     var reminders by remember { mutableStateOf<List<Reminder>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -87,7 +82,7 @@ fun HomeScreenContent(
         BottomNavItem("Ana Sayfa", Icons.Filled.Home, Icons.Outlined.Home, "home"),
         BottomNavItem("Hedefler", Icons.Filled.CheckCircle, Icons.Outlined.CheckCircle, "goals"),
         BottomNavItem("Hatırlatıcılar", Icons.Filled.Notifications, Icons.Outlined.Notifications, "reminders"),
-        BottomNavItem("İlerleme", Icons.AutoMirrored.Filled.ShowChart, Icons.AutoMirrored.Outlined.ShowChart, "progress"),
+        BottomNavItem("İlerleme", Icons.Filled.ShowChart, Icons.Outlined.ShowChart, "progress"),
         BottomNavItem("Profil", Icons.Filled.Person, Icons.Outlined.Person, "profile")
     )
     var selectedNavItem by remember { mutableStateOf(bottomNavItems[0].route) }
@@ -99,9 +94,6 @@ fun HomeScreenContent(
         try {
             // Motivasyonel mesaj
             motivationalMessage = ReminderUtils.getRandomMotivationalMessage()
-
-            // Belirli bir süre sonra yükleme durumunu otomatik olarak kapat
-
 
             // Hedefleri yükle
             com.aliumitalgan.remindup.utils.FirebaseUtils.getGoals { goalsList ->
@@ -173,15 +165,6 @@ fun HomeScreenContent(
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                             )
                         }
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Ayarlar",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -444,7 +427,7 @@ fun WelcomeCard(userName: String) {
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        // Boş string kontrolü yapın
+                        // Boş string kontrolü
                         text = if (userName.isNotEmpty()) userName.first().toString().uppercase() else "?",
                         color = MaterialTheme.colorScheme.primary,
                         fontSize = 22.sp,
@@ -461,7 +444,7 @@ fun WelcomeCard(userName: String) {
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
                     )
                     Text(
-                        // Boş userName durumunda varsayılan değer kullanın
+                        // Boş userName durumunda varsayılan değer
                         text = if (userName.isNotEmpty()) userName else "Misafir",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,

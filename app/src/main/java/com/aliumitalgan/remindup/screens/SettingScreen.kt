@@ -26,6 +26,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aliumitalgan.remindup.components.BottomNavigationBar
+import com.aliumitalgan.remindup.screens.BottomNavItem
 import com.aliumitalgan.remindup.utils.AuthUtils
 import com.aliumitalgan.remindup.utils.NotificationUtils
 import com.aliumitalgan.remindup.utils.ThemeManager
@@ -35,7 +37,13 @@ import com.google.firebase.auth.FirebaseAuth
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreenContent(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToHome: () -> Unit = {},
+    onNavigateToGoals: () -> Unit = {},
+    onNavigateToReminders: () -> Unit = {},
+    onNavigateToProgress: () -> Unit = {},
+    onLogout:       () -> Unit
+
 ) {
     val context = LocalContext.current
     val currentUser = FirebaseAuth.getInstance().currentUser
@@ -49,6 +57,16 @@ fun SettingsScreenContent(
 
     // Bildirim durumu
     val notificationsEnabled = NotificationUtils.notificationsEnabled.value
+
+    // Bottom Navigation Items
+    val bottomNavItems = listOf(
+        BottomNavItem("Ana Sayfa", Icons.Filled.Home, Icons.Filled.Home, "home"),
+        BottomNavItem("Hedefler", Icons.Filled.CheckCircle, Icons.Filled.CheckCircle, "goals"),
+        BottomNavItem("Hatırlatıcılar", Icons.Filled.Notifications, Icons.Filled.Notifications, "reminders"),
+        BottomNavItem("İlerleme", Icons.Filled.ShowChart, Icons.Filled.ShowChart, "progress"),
+        BottomNavItem("Profil", Icons.Filled.Person, Icons.Filled.Person, "profile")
+    )
+    var selectedNavItem by remember { mutableStateOf(bottomNavItems[4].route) }
 
     Scaffold(
         topBar = {
@@ -72,6 +90,22 @@ fun SettingsScreenContent(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
+            )
+        },
+        bottomBar = {
+            BottomNavigationBar(
+                items = bottomNavItems,
+                currentRoute = selectedNavItem,
+                onItemSelected = { route ->
+                    selectedNavItem = route
+                    when (route) {
+                        "home" -> onNavigateToHome()
+                        "goals" -> onNavigateToGoals()
+                        "reminders" -> onNavigateToReminders()
+                        "progress" -> onNavigateToProgress()
+                        "profile" -> {} // Zaten profil ekranındayız
+                    }
+                }
             )
         }
     ) { innerPadding ->
@@ -186,36 +220,25 @@ fun SettingsScreenContent(
     }
 
     // İsim Düzenleme Dialog
-    if (showEditNameDialog) {
-        var newName by remember { mutableStateOf(userName) }
-
+    if (showLogoutDialog) {
         AlertDialog(
-            onDismissRequest = { showEditNameDialog = false },
-            title = { Text("Profil Bilgilerini Düzenle") },
-            text = {
-                OutlinedTextField(
-                    value = newName,
-                    onValueChange = { newName = it },
-                    label = { Text("İsim") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-            },
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text("Çıkış Yap") },
+            text  = { Text("Hesabınızdan çıkış yapmak istediğinize emin misiniz?") },
             confirmButton = {
                 Button(
                     onClick = {
-                        if (newName.isNotEmpty()) {
-                            userName = newName
-                            // Firestore'da isim güncelleme işlemi burada yapılabilir
-                        }
-                        showEditNameDialog = false
-                    }
+                        showLogoutDialog = false
+                        AuthUtils.logout()   // önce oturumu kapat
+                        onLogout()           // sonra dışarıya bildir
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Kaydet")
+                    Text("Evet, Çıkış Yap")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showEditNameDialog = false }) {
+                TextButton(onClick = { showLogoutDialog = false }) {
                     Text("İptal")
                 }
             }

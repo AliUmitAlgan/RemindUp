@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "117825801795-7t248etbh928udavn3g48839ga2an4pf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aliumitalgan.remindup",
+            "certificate_hash": "b737738b87bb4ccf09da8d782284ef883fdc1dd5"
+          }
+        },
+        {
           "client_id": "117825801795-d70srog7cr7m6hjengcjrl411har5u63.apps.googleusercontent.com",
           "client_type": 3
         }

@@ -11,34 +11,35 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ShowChart
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Flag
-import androidx.compose.material.icons.filled.ShowChart
-import androidx.compose.material.icons.filled.Title
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aliumitalgan.remindup.components.BottomNavigationBar
 import com.aliumitalgan.remindup.models.Goal
+import com.aliumitalgan.remindup.screens.BottomNavItem
 import com.aliumitalgan.remindup.utils.ProgressUtils
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GoalsScreenContent(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToHome: () -> Unit = {},
+    onNavigateToReminders: () -> Unit = {},
+    onNavigateToProgress: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -48,6 +49,16 @@ fun GoalsScreenContent(
     var showAddDialog by remember { mutableStateOf(false) }
     var editingGoal by remember { mutableStateOf<Pair<String, Goal>?>(null) }
     var showProgressDialog by remember { mutableStateOf<Pair<String, Goal>?>(null) }
+
+    // Bottom Navigation Items
+    val bottomNavItems = listOf(
+        BottomNavItem("Ana Sayfa", Icons.Filled.Home, Icons.Filled.Home, "home"),
+        BottomNavItem("Hedefler", Icons.Filled.CheckCircle, Icons.Filled.CheckCircle, "goals"),
+        BottomNavItem("Hatırlatıcılar", Icons.Filled.Notifications, Icons.Filled.Notifications, "reminders"),
+        BottomNavItem("İlerleme", Icons.Filled.ShowChart, Icons.Filled.ShowChart, "progress"),
+        BottomNavItem("Profil", Icons.Filled.Person, Icons.Filled.Person, "profile")
+    )
+    var selectedNavItem by remember { mutableStateOf(bottomNavItems[1].route) }
 
     // Hedefleri yükle
     LaunchedEffect(key1 = true) {
@@ -81,6 +92,22 @@ fun GoalsScreenContent(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
+            )
+        },
+        bottomBar = {
+            BottomNavigationBar(
+                items = bottomNavItems,
+                currentRoute = selectedNavItem,
+                onItemSelected = { route ->
+                    selectedNavItem = route
+                    when (route) {
+                        "home" -> onNavigateToHome()
+                        "goals" -> {} // Zaten hedefler ekranındayız
+                        "reminders" -> onNavigateToReminders()
+                        "progress" -> onNavigateToProgress()
+                        "profile" -> onNavigateToSettings()
+                    }
+                }
             )
         }
     ) { innerPadding ->
@@ -126,7 +153,36 @@ fun GoalsScreenContent(
                                     )
                                 }
                             },
-                            onProgressUpdate = { showProgressDialog = id to goal }
+                            onProgressUpdate = {
+                                // Otomatik ilerleme için tıklandığında mevcut ilerlemeyi artır
+                                val currentProgress = goal.progress
+                                val newProgress = if (currentProgress >= 100) 100 else currentProgress + 10
+
+                                coroutineScope.launch {
+                                    updateGoalProgress(
+                                        goalId = id,
+                                        newProgress = newProgress,
+                                        onSuccess = {
+                                            goals = goals.map { pair ->
+                                                if (pair.first == id) {
+                                                    id to goal.copy(progress = newProgress)
+                                                } else {
+                                                    pair
+                                                }
+                                            }
+
+                                            if (newProgress >= 100) {
+                                                showToast(context, "Tebrikler! Hedefiniz tamamlandı!")
+                                            } else {
+                                                showToast(context, "İlerleme güncellendi (%$newProgress)")
+                                            }
+                                        },
+                                        onError = { error ->
+                                            showToast(context, "İlerleme güncellenemedi: $error")
+                                        }
+                                    )
+                                }
+                            }
                         )
                     }
                 }
@@ -394,7 +450,13 @@ fun ModernGoalListItem(
                         containerColor = progressColor
                     )
                 ) {
-                    Text("İlerleme Güncelle")
+                    // Buton adı değiştirildi
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "İlerleme"
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(if (goal.progress < 100) "İlerle" else "Tamamlandı")
                 }
             }
 
@@ -531,8 +593,6 @@ fun ModernGoalDialog(
     )
 }
 
-
-
 @Composable
 fun ProgressUpdateDialog(
     currentProgress: Int,
@@ -562,7 +622,7 @@ fun ProgressUpdateDialog(
                         }
                     },
                     label = { Text("Yeni İlerleme (%)") },
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Number
                     ),
                     modifier = Modifier.fillMaxWidth()
