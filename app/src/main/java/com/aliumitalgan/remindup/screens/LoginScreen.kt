@@ -45,6 +45,7 @@ import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import android.util.Log
+import androidx.compose.ui.res.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -256,7 +257,7 @@ fun LoginScreenContent(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text(
-                            text = "Giriş Yap",
+                            stringResource(R.string.login),
                             fontSize = 20.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary
@@ -268,7 +269,7 @@ fun LoginScreenContent(
                         OutlinedTextField(
                             value = email,
                             onValueChange = { email = it },
-                            label = { Text("E-posta") },
+                            label = { Text(stringResource(R.string.email)) },
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Default.Email,
@@ -292,7 +293,7 @@ fun LoginScreenContent(
                         OutlinedTextField(
                             value = password,
                             onValueChange = { password = it },
-                            label = { Text("Şifre") },
+                            label = { Text(stringResource(R.string.password)) },
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Default.Lock,
@@ -446,7 +447,7 @@ fun LoginScreenContent(
                                 modifier = Modifier.size(24.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Google ile Giriş Yap", fontSize = 16.sp)
+                            Text(stringResource(R.string.login_with_google), fontSize = 16.sp)
                         }
                     }
                 }
@@ -458,12 +459,12 @@ fun LoginScreenContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "Hesabınız yok mu?",
+                        stringResource(R.string.no_account),
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     TextButton(onClick = onNavigateToRegister) {
                         Text(
-                            "Kayıt Olun",
+                            stringResource(R.string.register),
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold
                         )

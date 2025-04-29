@@ -4,10 +4,8 @@ import android.app.TimePickerDialog
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -22,21 +20,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aliumitalgan.remindup.components.BottomNavigationBar
-import com.aliumitalgan.remindup.components.ModernCard
+import com.aliumitalgan.remindup.R
 import com.aliumitalgan.remindup.models.Reminder
 import com.aliumitalgan.remindup.models.ReminderCategory
 import com.aliumitalgan.remindup.models.ReminderType
-import com.aliumitalgan.remindup.screens.BottomNavItem
-import com.aliumitalgan.remindup.ui.theme.BluePrimary
-import com.aliumitalgan.remindup.ui.theme.GreenSecondary
-import com.aliumitalgan.remindup.utils.AnimationUtils
 import com.aliumitalgan.remindup.utils.ReminderUtils
 import kotlinx.coroutines.launch
 import java.util.*
@@ -91,7 +85,7 @@ fun RemindersScreenContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Hatırlatıcılar") },
+                title = { Text(stringResource(R.string.reminders)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Geri")
@@ -100,7 +94,7 @@ fun RemindersScreenContent(
                 actions = {
                     // Ekleme butonu üst kısımda
                     IconButton(onClick = { showAddDialog = true }) {
-                        Icon(Icons.Default.Add, contentDescription = "Hatırlatıcı Ekle")
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_reminder))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -561,7 +555,7 @@ fun EmptyRemindersView(
         ) {
             Icon(
                 imageVector = Icons.Default.Notifications,
-                contentDescription = "Hatırlatıcılar",
+                stringResource(R.string.reminders),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(64.dp)
             )
@@ -570,7 +564,7 @@ fun EmptyRemindersView(
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "Henüz hatırlatıcı bulunmuyor",
+            stringResource(R.string.no_reminders),
             color = MaterialTheme.colorScheme.onBackground,
             fontSize = 20.sp,
             fontWeight = FontWeight.SemiBold
@@ -598,7 +592,7 @@ fun EmptyRemindersView(
                 contentDescription = "Ekle"
             )
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Hatırlatıcı Ekle")
+            Text(stringResource(R.string.add_reminder))
         }
     }
 }

@@ -8,12 +8,15 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.aliumitalgan.remindup.utils.LanguageManager
+import com.aliumitalgan.remindup.utils.LocaleWrapper
 import com.aliumitalgan.remindup.utils.ThemeManager
 
 // Typography'yi düzeltin
@@ -93,12 +96,20 @@ fun RemindUpTheme(
         }
     }
 
-    val colorScheme = if (useDarkTheme) DarkColors else LightColors
+    // Dil durumunu al
+    val languageState by LanguageManager.currentLanguage
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        shapes = Shapes,
-        content = content
-    )
+    // UI tutarlılığı için gecikmeli recomposition engelleme
+    val colorScheme = if (useDarkTheme) DarkColors else LightColors
+    val rememberedColorScheme = remember(colorScheme, useDarkTheme) { colorScheme }
+
+    // Dil değişikliğinde LocaleWrapper ile komut verme
+    LocaleWrapper.ProvideLocale(languageCode = languageState) {
+        MaterialTheme(
+            colorScheme = rememberedColorScheme,
+            typography = Typography,
+            shapes = Shapes,
+            content = content
+        )
+    }
 }

@@ -19,18 +19,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aliumitalgan.remindup.ui.theme.*
+import com.aliumitalgan.remindup.R
 
 @Composable
 fun GoalCard(
@@ -140,7 +140,7 @@ fun GoalCard(
                             exit = fadeOut()
                         ) {
                             Text(
-                                text = "Devam ediyor",
+                                text = stringResource(R.string.in_progress),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                 fontSize = 13.sp
@@ -165,7 +165,7 @@ fun GoalCard(
                                 Spacer(modifier = Modifier.width(4.dp))
 
                                 Text(
-                                    text = "Tamamlandı!",
+                                    text = stringResource(R.string.completed),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = SuccessGreen,
                                     fontWeight = FontWeight.Bold,
@@ -268,7 +268,7 @@ fun GoalCard(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (isCompleted) "Düzenle" else "Güncelle",
+                            text = if (isCompleted) stringResource(R.string.edit) else stringResource(R.string.advance),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -295,7 +295,7 @@ fun GoalCard(
                         tint = progressColor
                     )
                     Text(
-                        text = "İlerleme Güncelle",
+                        stringResource(R.string.edit_progress),
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -305,7 +305,7 @@ fun GoalCard(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
-                        text = "Mevcut ilerleme: $goalProgress%",
+                        stringResource(R.string.current_progress, goalProgress),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
                     )
@@ -322,7 +322,7 @@ fun GoalCard(
                                 }
                             }
                         },
-                        label = { Text("Yeni İlerleme (%)") },
+                        label = { stringResource(R.string.new_progress) },
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Number
                         ),
@@ -344,7 +344,7 @@ fun GoalCard(
 
                     // İlerleme slider'ı
                     Text(
-                        text = "Kaydırarak ayarla:",
+                        stringResource(R.string.slide_to_adjust),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -385,7 +385,7 @@ fun GoalCard(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                "Hedefinizi tamamlıyorsunuz!",
+                                stringResource(R.string.completing_goal),
                                 color = SuccessGreen,
                                 fontWeight = FontWeight.Medium
                             )
@@ -407,7 +407,7 @@ fun GoalCard(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Check,
-                        contentDescription = "Güncelle",
+                        stringResource(R.string.update),
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -424,7 +424,7 @@ fun GoalCard(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Close,
-                        contentDescription = "İptal",
+                        stringResource(R.string.cancel),
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))

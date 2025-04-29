@@ -8,7 +8,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -54,6 +54,6 @@ fun MotivationalMessage(message: String) {
 @Composable
 fun MotivationalMessagePreview() {
     RemindUpTheme {
-        MotivationalMessage(message = "Her gün bir adım, hedefine bir adım daha yaklaşmak demektir!")
+        MotivationalMessage(message = "Merhaba")
     }
 }

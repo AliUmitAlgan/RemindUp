@@ -1,14 +1,9 @@
 package com.aliumitalgan.remindup.screens
 
 import android.widget.Toast
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,17 +16,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.aliumitalgan.remindup.components.ProgressBar
+import com.aliumitalgan.remindup.R
 import com.aliumitalgan.remindup.models.Goal
-import com.aliumitalgan.remindup.ui.theme.RemindUpTheme
-import com.aliumitalgan.remindup.utils.AnimationUtils
-import com.aliumitalgan.remindup.utils.ProgressUtils
-import com.aliumitalgan.remindup.utils.ReminderUtils
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,7 +55,7 @@ fun ProgressScreenContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("İlerleme Durumu") },
+                title = { Text(stringResource(R.string.progress)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Geri")
@@ -151,7 +141,7 @@ fun ProgressScreenContent(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "Genel İlerleme",
+                            stringResource(R.string.overall_progress),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
@@ -203,7 +193,7 @@ fun ProgressScreenContent(
                                     )
 
                                     Text(
-                                        text = "Tamamlandı",
+                                        stringResource(R.string.completed_label),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                     )
@@ -230,7 +220,7 @@ fun ProgressScreenContent(
                                 )
 
                                 Text(
-                                    text = "Toplam Hedef",
+                                    stringResource(R.string.total_goals),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                 )
@@ -248,7 +238,7 @@ fun ProgressScreenContent(
                                 )
 
                                 Text(
-                                    text = "Tamamlanan",
+                                    stringResource(R.string.completed_goals),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                 )
@@ -266,13 +256,13 @@ fun ProgressScreenContent(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Hedeflerinizin Durumu",
+                        stringResource(R.string.goals_status),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
 
                     TextButton(onClick = { /* Tüm hedefleri görüntüle */ }) {
-                        Text("Tümünü Gör")
+                        Text( stringResource(R.string.see_all))
                     }
                 }
 

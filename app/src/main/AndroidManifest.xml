@@ -41,6 +41,7 @@
 
         <!-- Hatırlatıcı Alıcı -->
         <receiver android:name=".receiver.ReminderReceiver"
+            android:enabled="true"
             android:exported="false" />
 
         <!-- Cihaz Başlangıç Alıcı -->

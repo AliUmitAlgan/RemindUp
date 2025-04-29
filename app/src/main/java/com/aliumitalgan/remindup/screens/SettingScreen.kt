@@ -1,8 +1,7 @@
 package com.aliumitalgan.remindup.screens
 
 import android.annotation.SuppressLint
-import android.content.Context
-import android.util.Log
+import androidx.compose.ui.res.stringResource
 import android.widget.Toast
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
@@ -13,6 +12,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.ui.res.stringResource
+import com.aliumitalgan.remindup.R
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -36,6 +37,25 @@ import com.aliumitalgan.remindup.utils.ThemeManager
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Dispatchers
 
+import android.content.Context
+import android.util.Log
+import androidx.compose.ui.res.stringResource
+
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.res.stringResource
+
+import com.aliumitalgan.remindup.components.LanguageSelectionDialog
+import com.aliumitalgan.remindup.utils.LanguageManager
+import com.aliumitalgan.remindup.utils.StringResourcesProvider
+
 @SuppressLint("StateFlowValueCalledInComposition")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,10 +75,12 @@ fun SettingsScreenContent(
     var userName by remember { mutableStateOf(currentUser?.displayName ?: "Kullanıcı") }
     var showEditNameDialog by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
-
+    var showLanguageDialog by remember { mutableStateOf(false) }
     // Tema durumu
     val isDarkTheme by ThemeManager.isDarkTheme
     val coroutineScope = rememberCoroutineScope()
+    val currentLanguage by LanguageManager.currentLanguage
+
     // Bildirim durumu
     var notificationsEnabled by remember {
         mutableStateOf(NotificationUtils.loadNotificationState(context))
@@ -79,7 +101,7 @@ fun SettingsScreenContent(
             TopAppBar(
                 title = {
                     Text(
-                        "Ayarlar",
+                        text = stringResource(R.string.settings_title),
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -115,6 +137,35 @@ fun SettingsScreenContent(
             )
         }
     ) { innerPadding ->
+
+        // Dil Seçim Dialog
+
+        // Dil Seçim Dialog
+        if (showLanguageDialog) {
+            LanguageSelectionDialog(
+                onDismiss = {
+                    Log.d("SettingsScreen", "Dialog dismissed")
+                    showLanguageDialog = false
+                },
+                onLanguageSelected = { languageCode ->
+                    Log.d("SettingsScreen", "Language selected: $languageCode")
+                    try {
+                        // Toast mesajı, dil değişmeden önce göster
+                        val message = if (languageCode == LanguageManager.LANGUAGE_TURKISH)
+                            "Dil Türkçe olarak değiştirildi"
+                        else
+                            "Language changed to English"
+                        showToast(context, message)
+
+                        // Dili değiştir - bu işlem aktiviteyi yeniden başlatır
+                        LanguageManager.setLanguage(context, languageCode)
+                    } catch (e: Exception) {
+                        Log.e("SettingsScreen", "Dil değiştirme hatası", e)
+                        showToast(context, "Dil değiştirme sırasında hata oluştu: ${e.message}")
+                    }
+                }
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -151,7 +202,7 @@ fun SettingsScreenContent(
                 ) {
                     // Bildirim Ayarları
                     SettingsSection(
-                        title = "Bildirimler",
+                        stringResource(R.string.notifications),
                         icon = Icons.Default.Notifications,
                         trailingContent = {
                             if (isProcessing) {
@@ -202,7 +253,7 @@ fun SettingsScreenContent(
 
                     // Tema Ayarları
                     SettingsSection(
-                        title = "Karanlık Mod",
+                        stringResource(R.string.dark_mode),
                         icon = Icons.Default.DarkMode,
                         trailingContent = {
                             Switch(
@@ -218,23 +269,33 @@ fun SettingsScreenContent(
                         }
                     )
 
+
+                    // Dil Ayarları
                     // Dil Ayarları
                     SettingsSection(
-                        title = "Dil",
+                        title = StringResourcesProvider.string(R.string.language),
                         icon = Icons.Default.Language,
+                        onClick = {
+                            Log.d("SettingsScreen", "Language section clicked")
+                            showLanguageDialog = true
+                        },
                         trailingContent = {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    "Türkçe",
+                                    LanguageManager.getLanguageName(),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                 )
+
+                                Spacer(modifier = Modifier.width(4.dp))
+
                                 Icon(
                                     Icons.Default.ArrowForward,
-                                    contentDescription = "Dil Seç",
-                                    tint = MaterialTheme.colorScheme.primary
+                                    contentDescription = StringResourcesProvider.string(R.string.language),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                         }
@@ -242,7 +303,7 @@ fun SettingsScreenContent(
 
                     // Hesap Yönetimi
                     SettingsSection(
-                        title = "Çıkış Yap",
+                        stringResource(R.string.logout),
                         icon = Icons.Default.Logout,
                         onClick = { showLogoutDialog = true },
                         trailingContent = {
@@ -262,8 +323,8 @@ fun SettingsScreenContent(
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
-            title = { Text("Çıkış Yap") },
-            text  = { Text("Hesabınızdan çıkış yapmak istediğinize emin misiniz?") },
+            title = { Text(stringResource(R.string.logout)) },
+            text  = { Text(stringResource(R.string.logout_confirm)) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -273,22 +334,23 @@ fun SettingsScreenContent(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Evet, Çıkış Yap")
+                    Text(stringResource(R.string.yes_logout))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showLogoutDialog = false }) {
-                    Text("İptal")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
     }
 
     // Çıkış Dialog
+    // Çıkış Dialog
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
-            title = { Text("Çıkış Yap") },
+            title = { Text(stringResource(id = R.string.logout)) },
             text = { Text("Hesabınızdan çıkış yapmak istediğinize emin misiniz?") },
             confirmButton = {
                 Button(
@@ -301,12 +363,12 @@ fun SettingsScreenContent(
                         containerColor = MaterialTheme.colorScheme.error
                     )
                 ) {
-                    Text("Evet, Çıkış Yap")
+                    Text( stringResource(R.string.yes_logout))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showLogoutDialog = false }) {
-                    Text("İptal")
+                    Text(stringResource(id = R.string.cancel))
                 }
             }
         )
@@ -393,7 +455,7 @@ fun ProfileSection(
                         contentDescription = "Profili Düzenle"
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Profili Düzenle")
+                    Text(stringResource(R.string.edit_profile))
                 }
             }
         }
@@ -407,12 +469,15 @@ fun SettingsSection(
     trailingContent: @Composable () -> Unit = {},
     onClick: () -> Unit = {}
 ) {
-    Card(
+    Log.d("SettingsSection", "Rendering section: $title")
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(2.dp)
+            .clickable {
+                Log.d("SettingsSection", "Section clicked: $title")
+                onClick()
+            },
+        shape = RoundedCornerShape(16.dp)
     ) {
         Row(
             modifier = Modifier

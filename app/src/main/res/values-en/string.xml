@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App name -->
+    <string name="app_name">RemindUp</string>
+
+    <!-- Main Navigation -->
+    <string name="home">Home</string>
+    <string name="goals">Goals</string>
+    <string name="reminders">Reminders</string>
+    <string name="progress">Progress</string>
+    <string name="profile">Profile</string>
+
+    <!-- Settings Screen -->
+    <string name="settings">Settings</string>
+    <string name="settings_title">Settings</string>
+    <string name="edit_profile">Edit Profile</string>
+    <string name="notifications">Notifications</string>
+    <string name="dark_mode">Dark Mode</string>
+    <string name="language">Language</string>
+    <string name="language_select">Select Language</string>
+    <string name="language_changed">Language changed</string>
+    <string name="language_changed_to_turkish">Language changed to Turkish</string>
+    <string name="language_changed_to_english">Language changed to English</string>
+    <string name="logout">Log Out</string>
+    <string name="cancel">Cancel</string>
+    <string name="yes_logout">Yes, Log Out</string>
+    <string name="logout_confirm">Are you sure you want to log out of your account?</string>
+
+    <!-- Login/Registration Screens -->
+    <string name="login">Log In</string>
+    <string name="register">Sign Up</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="confirm_password">Confirm Password</string>
+    <string name="name">Full Name</string>
+    <string name="forgot_password">Forgot Password</string>
+    <string name="login_with_google">Sign in with Google</string>
+    <string name="no_account">Don\'t have an account?</string>
+    <string name="have_account">Already have an account?</string>
+    <string name="register_now">Register Now</string>
+    <string name="login_now">Log In Now</string>
+    <string name="login_success">Login successful</string>
+    <string name="login_failed">Login failed</string>
+    <string name="register_success">Registration successful</string>
+    <string name="register_failed">Registration failed</string>
+    <string name="google_login_fail">Google sign-in failed</string>
+
+    <!-- Goals Screen -->
+    <string name="my_goals">My Goals</string>
+    <string name="add_goal">Add Goal</string>
+    <string name="edit_goal">Edit Goal</string>
+    <string name="goal_title">Goal Title</string>
+    <string name="goal_progress">Progress (%)</string>
+    <string name="in_progress">In progress</string>
+    <string name="completed">Completed!</string>
+    <string name="no_goals">No goals yet</string>
+    <string name="add_first_goal">Start by adding your first goal</string>
+    <string name="update">Update</string>
+    <string name="edit">Edit</string>
+    <string name="advance">Advance</string>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+    <string name="sub_goals">Sub-Goals</string>
+    <string name="add_sub_goal">Add Sub-Goal</string>
+    <string name="sub_goal_hint">E.g.: Learn OOP concepts</string>
+    <string name="ok">OK</string>
+    <string name="no_sub_goals">No sub-goals added yet</string>
+    <string name="goal_added">Goal added</string>
+    <string name="goal_updated">Goal updated</string>
+    <string name="goal_deleted">Goal deleted</string>
+    <string name="progress_updated">Progress updated</string>
+    <string name="goal_completed">Congratulations! Your goal is completed!</string>
+    <string name="slide_to_adjust">Slide to adjust:</string>
+    <string name="current_progress">Current progress: %1$d%%</string>
+    <string name="new_progress">New Progress (%)</string>
+    <string name="completing_goal">You are completing your goal!</string>
+    <string name="edit_progress">Update Progress</string>
+
+    <!-- Sub-Goals -->
+    <string name="sub_goals_count">Sub-Goals (%1$d/%2$d)</string>
+    <string name="expand">Expand</string>
+    <string name="collapse">Collapse</string>
+    <string name="sub_goal_added">Sub-goal added</string>
+    <string name="sub_goal_completed">Sub-goal completed</string>
+    <string name="sub_goal_deleted">Sub-goal deleted</string>
+
+    <!-- Reminders Screen -->
+    <string name="my_reminders">My Reminders</string>
+    <string name="add_reminder">Add Reminder</string>
+    <string name="edit_reminder">Edit Reminder</string>
+    <string name="reminder_title">Reminder Title</string>
+    <string name="reminder_time">Time</string>
+    <string name="time">Time: %1$s</string>
+    <string name="reminder_description">Description (Optional)</string>
+    <string name="reminder_category">Category</string>
+    <string name="reminder_type">Repeat Type</string>
+    <string name="reminder_active">Reminder Active</string>
+    <string name="select_time">Select Time</string>
+    <string name="no_reminders">No reminders yet</string>
+    <string name="add_first_reminder">Start by adding your first reminder</string>
+    <string name="reminder_enabled">Reminder Enabled</string>
+    <string name="reminder_added">Reminder added</string>
+    <string name="reminder_updated">Reminder updated</string>
+    <string name="reminder_deleted">Reminder deleted</string>
+    <string name="reminder_scheduled">Reminder scheduled</string>
+    <string name="reminder_canceled">Reminder canceled</string>
+    <string name="select_category">Select Category</string>
+    <string name="select_repeat">Select Repeat Type</string>
+
+    <!-- Reminder Categories -->
+    <string name="category_general">General</string>
+    <string name="category_work">Work</string>
+    <string name="category_health">Health</string>
+    <string name="category_personal">Personal</string>
+    <string name="category_study">Study</string>
+    <string name="category_fitness">Fitness</string>
+
+    <!-- Reminder Types -->
+    <string name="type_single">One-time</string>
+    <string name="type_daily">Daily</string>
+    <string name="type_weekly">Weekly</string>
+    <string name="type_monthly">Monthly</string>
+
+    <!-- Progress Screen -->
+    <string name="overall_progress">Overall Progress</string>
+    <string name="goals_status">Your Goals Status</string>
+    <string name="total_goals">Total Goals</string>
+    <string name="completed_goals">Completed</string>
+    <string name="percent_completed">%1$d%%</string>
+    <string name="completed_label">Completed</string>
+    <string name="see_all">See All</string>
+    <string name="congratulations">Congratulations!</string>
+
+    <!-- Welcome Messages -->
+    <string name="welcome_title">Welcome to RemindUp</string>
+    <string name="welcome_subtitle">Track your goals, manage your reminders</string>
+    <string name="welcome_user">Welcome,</string>
+    <string name="user_greeting">Are you ready to get one step closer to your goals today?</string>
+    <string name="upcoming_reminders">Upcoming Reminders</string>
+
+    <!-- Motivational Messages -->
+    <string name="motivational_message1">You\'re doing great, keep it up!</string>
+    <string name="motivational_message2">Every small step is progress on the path to success!</string>
+    <string name="motivational_message3">You\'re better today than yesterday, and tomorrow will be even better!</string>
+    <string name="motivational_message4">Persistence and determination are the keys to success!</string>
+    <string name="motivational_message5">Challenges make you stronger!</string>
+    <string name="motivational_message6">You can do it!</string>
+    <string name="motivational_message7">Every day is an opportunity to be better than the day before!</string>
+    <string name="motivational_message8">Take a step towards your goals every day!</string>
+    <string name="motivational_message9">Small steps lead to big changes!</string>
+    <string name="motivational_message10">Growth is a journey, enjoy the moment!</string>
+    <string name="web_client_id">117825801795-d70srog7cr7m6hjengcjrl411har5u63.apps.googleusercontent.com</string>
+    <!-- General -->
+    <string name="loading">Loading...</string>
+    <string name="error">Error</string>
+    <string name="success">Success</string>
+    <string name="confirm">Confirm</string>
+    <string name="or">or</string>
+    <string name="info">Info</string>
+    <string name="warning">Warning</string>
+    <string name="next">Next</string>
+    <string name="back">Back</string>
+
+    <!-- Error Messages -->
+    <string name="error_login">Login failed. Please check your credentials.</string>
+    <string name="error_register">Registration failed. Please check your details.</string>
+    <string name="error_google_sign_in">Google sign-in failed.</string>
+    <string name="error_empty_fields">Please fill in all fields.</string>
+    <string name="error_password_mismatch">Passwords do not match.</string>
+    <string name="error_password_length">Password must be at least 6 characters long.</string>
+    <string name="error_invalid_email">Invalid email address.</string>
+    <string name="error_network">Network error. Please check your internet connection.</string>
+    <string name="error_server">Server error. Please try again later.</string>
+    <string name="error_unknown">An unknown error occurred.</string>
+    <string name="error_permission">Permission denied.</string>
+    <string name="error_notification_permission">Could not enable notification permissions.</string>
+
+    <!-- Notifications -->
+    <string name="notification_title">RemindUp Reminder</string>
+    <string name="notification_channel_name">RemindUp Notifications</string>
+    <string name="notification_channel_description">Notifications for RemindUp app</string>
+    <string name="notification_reminder">It\'s time for your reminder!</string>
+    <string name="notifications_enabled">Notifications enabled</string>
+    <string name="notifications_disabled">Notifications disabled</string>
+
+    <!-- Date/Time Formats -->
+    <string name="date_format">EEEE, MMMM d</string>
+    <string name="time_format">HH:mm</string>
+    <string name="date_time_format">MMMM d, HH:mm</string>
+
+    <!-- Permissions -->
+    <string name="permission_required">Permission Required</string>
+    <string name="notification_permission_message">Notification permission is needed to receive reminders.</string>
+    <string name="grant_permission">Grant Permission</string>
+    <string name="permission_denied">Permission Denied</string>
+    <string name="open_settings">Open Settings</string>
+</resources>

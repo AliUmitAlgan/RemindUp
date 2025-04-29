@@ -9,6 +9,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import com.aliumitalgan.remindup.R
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +26,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -302,7 +304,7 @@ fun HomeContent(
                 visible = true,
                 enter = fadeIn(animationSpec = tween(1000, delayMillis = 600))
             ) {
-                SectionTitle("Hedefleriniz", "Tümünü Gör") {
+                SectionTitle(stringResource(R.string.goals), stringResource(R.string.see_all)) {
                     onNavigateToGoals()
                 }
             }
@@ -316,9 +318,9 @@ fun HomeContent(
                     enter = fadeIn(animationSpec = tween(1000, delayMillis = 900))
                 ) {
                     EmptyStateCard(
-                        title = "Henüz hedef eklenmemiş",
-                        description = "İlk hedefini ekleyerek başla",
-                        buttonText = "Hedef Ekle",
+                        stringResource(R.string.no_goals),
+                        stringResource(R.string.add_first_goal),
+                        stringResource(R.string.add_goal),
                         onClick = onNavigateToGoals
                     )
                 }
@@ -347,7 +349,7 @@ fun HomeContent(
                 visible = true,
                 enter = fadeIn(animationSpec = tween(1000, delayMillis = 1200))
             ) {
-                SectionTitle("Yaklaşan Hatırlatıcılar", "Tümünü Gör") {
+                SectionTitle(stringResource(R.string.upcoming_reminders), stringResource(R.string.see_all)) {
                     onNavigateToReminders()
                 }
             }
@@ -439,7 +441,7 @@ fun WelcomeCard(userName: String) {
 
                 Column {
                     Text(
-                        text = "Hoş Geldin,",
+                        stringResource(R.string.welcome_user),
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
                     )
@@ -454,7 +456,7 @@ fun WelcomeCard(userName: String) {
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = "Bugün hedeflerine bir adım daha yaklaşmaya hazır mısın?",
+                        stringResource(R.string.user_greeting),
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
                     )

@@ -1,42 +1,32 @@
 package com.aliumitalgan.remindup.screens
 
 import android.widget.Toast
-import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import com.aliumitalgan.remindup.R
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.aliumitalgan.remindup.components.BottomNavigationBar
 import com.aliumitalgan.remindup.components.NestedGoalCard
 import com.aliumitalgan.remindup.models.Goal
-import com.aliumitalgan.remindup.screens.BottomNavItem
-import com.aliumitalgan.remindup.ui.theme.BluePrimary
-import com.aliumitalgan.remindup.ui.theme.GreenSecondary
 import com.aliumitalgan.remindup.utils.ProgressUtils
 import com.aliumitalgan.remindup.utils.SubGoal
 import com.aliumitalgan.remindup.utils.SubGoalUtils
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
@@ -107,7 +97,7 @@ fun GoalsScreenContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Hedeflerim") },
+                title = { Text(stringResource(R.string.my_goals)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Geri")
@@ -168,7 +158,7 @@ fun GoalsScreenContent(
                     if (activeGoals.isNotEmpty()) {
                         item {
                             Text(
-                                text = "Devam Eden Hedefler",
+                                stringResource(R.string.in_progress),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(vertical = 10.dp)
@@ -225,7 +215,7 @@ fun GoalsScreenContent(
                     if (completedGoals.isNotEmpty()) {
                         item {
                             Text(
-                                text = "Tamamlanan Hedefler",
+                                stringResource(R.string.completed_goals),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(vertical = 8.dp)

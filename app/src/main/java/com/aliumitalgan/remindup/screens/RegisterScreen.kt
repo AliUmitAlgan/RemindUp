@@ -9,11 +9,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import com.aliumitalgan.remindup.ui.theme.RemindUpTheme
+import com.aliumitalgan.remindup.R
 import com.aliumitalgan.remindup.utils.AnimationUtils
 import com.aliumitalgan.remindup.utils.AuthUtils
 import kotlinx.coroutines.launch
@@ -41,7 +42,7 @@ fun RegisterScreenContent(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "Kayıt Ol",
+                stringResource(R.string.register),
                 style = MaterialTheme.typography.headlineLarge,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -51,7 +52,7 @@ fun RegisterScreenContent(
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("Ad Soyad") },
+                label = { Text(stringResource(R.string.name)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(
@@ -79,7 +80,7 @@ fun RegisterScreenContent(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Şifre") },
+                label = { stringResource(R.string.password)},
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
@@ -94,7 +95,7 @@ fun RegisterScreenContent(
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
-                label = { Text("Şifre Tekrar") },
+                label = { Text(stringResource(R.string.confirm_password)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
@@ -147,7 +148,7 @@ fun RegisterScreenContent(
                 onClick = onNavigateToLogin
             ) {
                 Text(
-                    text = "Zaten hesabınız var mı? Giriş yapın",
+                    stringResource(R.string.have_account),
                     color = MaterialTheme.colorScheme.primary
                 )
             }
