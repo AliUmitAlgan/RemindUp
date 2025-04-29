@@ -1,11 +1,16 @@
 package com.aliumitalgan.remindup.screens
 
 import android.annotation.SuppressLint
+import android.content.Context
+import android.util.Log
+import android.widget.Toast
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,17 +26,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.aliumitalgan.remindup.components.BottomNavigationBar
-import com.aliumitalgan.remindup.screens.BottomNavItem
 import com.aliumitalgan.remindup.utils.AuthUtils
 import com.aliumitalgan.remindup.utils.NotificationUtils
 import com.aliumitalgan.remindup.utils.ThemeManager
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.Dispatchers
 
 @SuppressLint("StateFlowValueCalledInComposition")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,6 +50,7 @@ fun SettingsScreenContent(
 ) {
     val context = LocalContext.current
     val currentUser = FirebaseAuth.getInstance().currentUser
+    var isProcessing by remember { mutableStateOf(false) }
 
     var userName by remember { mutableStateOf(currentUser?.displayName ?: "Kullanıcı") }
     var showEditNameDialog by remember { mutableStateOf(false) }
@@ -54,9 +58,11 @@ fun SettingsScreenContent(
 
     // Tema durumu
     val isDarkTheme by ThemeManager.isDarkTheme
-
+    val coroutineScope = rememberCoroutineScope()
     // Bildirim durumu
-    val notificationsEnabled = NotificationUtils.notificationsEnabled.value
+    var notificationsEnabled by remember {
+        mutableStateOf(NotificationUtils.loadNotificationState(context))
+    }
 
     // Bottom Navigation Items
     val bottomNavItems = listOf(
@@ -148,16 +154,49 @@ fun SettingsScreenContent(
                         title = "Bildirimler",
                         icon = Icons.Default.Notifications,
                         trailingContent = {
-                            Switch(
-                                checked = notificationsEnabled,
-                                onCheckedChange = {
-                                    NotificationUtils.saveNotificationState(context, it)
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = MaterialTheme.colorScheme.primary,
-                                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                            if (isProcessing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = MaterialTheme.colorScheme.primary
                                 )
-                            )
+                            } else {
+                                Switch(
+                                    checked = notificationsEnabled,
+                                    onCheckedChange = { newState ->
+                                        // İşlem devam ederken kullanıcının başka bir işlem yapmasını engelle
+                                        isProcessing = true
+
+                                        coroutineScope.launch {
+                                            try {
+                                                // NotificationUtils'in saveNotificationState metodunu çağır
+                                                NotificationUtils.saveNotificationState(context, newState)
+
+                                                // UI thread'inde state'i güncelle
+                                                withContext(Dispatchers.Main) {
+                                                    notificationsEnabled = newState
+                                                    showToast(
+                                                        context,
+                                                        if (newState) "Bildirimler açıldı" else "Bildirimler kapatıldı"
+                                                    )
+                                                }
+                                            } catch (e: Exception) {
+                                                // Hata durumunda kullanıcıya bilgi ver
+                                                showToast(context, "İşlem sırasında hata oluştu: ${e.message}")
+                                                Log.e("SettingsScreen", "Bildirim durumu güncelleme hatası", e)
+                                            } finally {
+                                                // İşlem bittiğinde işlemi sonlandır
+                                                isProcessing = false
+                                            }
+                                        }
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                        checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                                    ),
+                                    // İşlem devam ederken switch'i devre dışı bırak
+                                    enabled = !isProcessing
+                                )
+                            }
                         }
                     )
 
@@ -411,4 +450,7 @@ fun SettingsSection(
             trailingContent()
         }
     }
+}
+private fun showToast(context: Context, message: String) {
+    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
 }

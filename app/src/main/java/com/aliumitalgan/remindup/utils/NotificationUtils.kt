@@ -24,10 +24,14 @@ import java.util.*
 import android.Manifest
 import android.util.Log
 import com.aliumitalgan.remindup.models.ReminderType
-
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 object NotificationUtils {
-
+    private const val NOTIFICATION_PREFS = "notification_prefs"
+    private const val NOTIFICATIONS_ENABLED_KEY = "notifications_enabled"
     private const val CHANNEL_ID = "remindup_channel"
     private const val CHANNEL_NAME = "RemindUp Notifications"
     private const val CHANNEL_DESCRIPTION = "Notifications for RemindUp app"
@@ -68,17 +72,80 @@ object NotificationUtils {
 
     // Bildirim tercihini ayarlar (SharedPreferences kullanarak çözüm)
     fun saveNotificationState(context: Context, enabled: Boolean) {
-        val sharedPrefs = context.getSharedPreferences("notification_prefs", Context.MODE_PRIVATE)
-        sharedPrefs.edit().putBoolean("notifications_enabled", enabled).apply()
+        // Hemen state'i güncelle
         _notificationsEnabled.value = enabled
-        Log.d("NotificationUtils", "Bildirim durumu güncellendi: $enabled")
+
+        // SharedPreferences'a kaydet
+        val sharedPrefs = context.getSharedPreferences(NOTIFICATION_PREFS, Context.MODE_PRIVATE)
+        sharedPrefs.edit().putBoolean(NOTIFICATIONS_ENABLED_KEY, enabled).apply()
+
+        // Hatırlatıcıları güncellemeyi arka planda yap
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val remindersResult = ReminderUtils.getUserReminders()
+                if (remindersResult.isSuccess) {
+                    val reminders = remindersResult.getOrDefault(emptyList())
+
+                    withContext(Dispatchers.Main) {
+                        if (enabled) {
+                            // Bildirimler açıldıysa tüm hatırlatıcıları yeniden zamanla
+                            reminders.forEach { (id, reminder) ->
+                                scheduleReminder(
+                                    context,
+                                    reminder,
+                                    id.hashCode()
+                                )
+                            }
+                        } else {
+                            // Bildirimler kapatıldıysa tüm hatırlatıcıları iptal et
+                            reminders.forEach { (id, _) ->
+                                cancelReminder(context, id.hashCode())
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("NotificationUtils", "Hatırlatıcıları güncelleme hatası", e)
+            }
+        }
+    }
+
+    // Tüm hatırlatıcıları güncelle
+    private fun updateAllReminders(context: Context, enabled: Boolean) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val remindersResult = ReminderUtils.getUserReminders()
+                if (remindersResult.isSuccess) {
+                    val reminders = remindersResult.getOrDefault(emptyList())
+
+                    withContext(Dispatchers.Main) {
+                        if (enabled) {
+                            // Bildirimler açıldıysa tüm hatırlatıcıları yeniden zamanla
+                            for ((id, reminder) in reminders) {
+                                scheduleReminder(
+                                    context,
+                                    reminder,
+                                    id.hashCode()
+                                )
+                            }
+                        } else {
+                            // Bildirimler kapatıldıysa tüm hatırlatıcıları iptal et
+                            for ((id, reminder) in reminders) {
+                                cancelReminder(context, id.hashCode())
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("NotificationUtils", "Hatırlatıcıları güncelleme hatası", e)
+            }
+        }
     }
 
     // Bildirim tercihini yükle
-    fun loadNotificationState(context: Context) {
-        val sharedPrefs = context.getSharedPreferences("notification_prefs", Context.MODE_PRIVATE)
-        _notificationsEnabled.value = sharedPrefs.getBoolean("notifications_enabled", true)
-        Log.d("NotificationUtils", "Bildirim durumu yüklendi: ${_notificationsEnabled.value}")
+    fun loadNotificationState(context: Context): Boolean {
+        val sharedPrefs = context.getSharedPreferences(NOTIFICATION_PREFS, Context.MODE_PRIVATE)
+        return sharedPrefs.getBoolean(NOTIFICATIONS_ENABLED_KEY, true) // Varsayılan olarak açık
     }
 
     // Bildirim tercihi flow'u
@@ -87,13 +154,11 @@ object NotificationUtils {
     // Anında bildirim göster
     fun showNotification(context: Context, title: String, message: String, notificationId: Int) {
         if (!_notificationsEnabled.value) {
-            // Bildirimler kapalıysa bir şey gösterme
             Log.d("NotificationUtils", "Bildirimler kapalı, gösterilmiyor")
             return
         }
 
         if (!checkNotificationPermission(context)) {
-            // İzin yoksa bildirim gösterme
             Log.d("NotificationUtils", "Bildirim izni yok")
             return
         }
@@ -137,8 +202,9 @@ object NotificationUtils {
 
     // Zamanlanmış hatırlatıcı ayarla
     fun scheduleReminder(context: Context, reminder: Reminder, notificationId: Int) {
-        if (!_notificationsEnabled.value) {
-            Log.d("NotificationUtils", "Bildirimler kapalı, zamanlama yapılmıyor")
+        // Bildirimler kapalıysa veya hatırlatıcı aktif değilse çalışma
+        if (!_notificationsEnabled.value || !reminder.isEnabled) {
+            Log.d("NotificationUtils", "Bildirimler kapalı veya hatırlatıcı pasif, zamanlama yapılmıyor")
             return
         }
 
@@ -148,6 +214,7 @@ object NotificationUtils {
             putExtra("NOTIFICATION_ID", notificationId)
             putExtra("REMINDER_TIME", reminder.time)
             putExtra("REMINDER_TYPE", reminder.type.name)
+            putExtra("REMINDER_DESCRIPTION", reminder.description)
         }
 
         val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
@@ -202,7 +269,7 @@ object NotificationUtils {
                 )
             }
             ReminderType.MONTHLY -> {
-                // Aylık tekrar - biraz daha karmaşık, Manuel hesaplama gerekebilir
+                // Aylık tekrar
                 val monthlyCalendar = Calendar.getInstance().apply {
                     timeInMillis = calendar.timeInMillis
                     add(Calendar.MONTH, 1)
@@ -224,53 +291,16 @@ object NotificationUtils {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, ReminderReceiver::class.java)
         val pendingIntent = PendingIntent.getBroadcast(
-            context, notificationId, intent,
+            context,
+            notificationId,
+            intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE
         )
 
-        if (pendingIntent != null) {
-            alarmManager.cancel(pendingIntent)
-            pendingIntent.cancel()
+        pendingIntent?.let {
+            alarmManager.cancel(it)
+            it.cancel()
             Log.d("NotificationUtils", "Hatırlatıcı iptal edildi: $notificationId")
         }
-    }
-
-    // Günlük tekrarlanan bir hatırlatıcı ayarla
-    fun scheduleRepeatingReminder(context: Context, reminder: Reminder, notificationId: Int) {
-        if (!_notificationsEnabled.value) {
-            Log.d("NotificationUtils", "Bildirimler kapalı, tekrarlayan zamanlama yapılmıyor")
-            return
-        }
-
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(context, ReminderReceiver::class.java).apply {
-            putExtra("REMINDER_TITLE", reminder.title)
-            putExtra("NOTIFICATION_ID", notificationId)
-            putExtra("IS_REPEATING", true)
-        }
-
-        // Time format: HH:mm
-        val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-        val date = timeFormat.parse(reminder.time)
-        val calendar = Calendar.getInstance().apply {
-            time = date ?: Date()
-            if (before(Calendar.getInstance())) {
-                add(Calendar.DAY_OF_MONTH, 1) // Eğer zaman geçtiyse, ertesi güne ayarla
-            }
-        }
-
-        val pendingIntent = PendingIntent.getBroadcast(
-            context, notificationId, intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
-        // Günlük tekrarlanan alarm
-        alarmManager.setRepeating(
-            AlarmManager.RTC_WAKEUP,
-            calendar.timeInMillis,
-            AlarmManager.INTERVAL_DAY,
-            pendingIntent
-        )
-        Log.d("NotificationUtils", "Tekrarlayan hatırlatıcı ayarlandı: ${reminder.title}")
     }
 }
