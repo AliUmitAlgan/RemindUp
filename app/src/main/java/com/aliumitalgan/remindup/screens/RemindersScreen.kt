@@ -6,6 +6,7 @@ import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,11 +25,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aliumitalgan.remindup.components.BottomNavigationBar
 import com.aliumitalgan.remindup.components.ModernCard
 import com.aliumitalgan.remindup.models.Reminder
+import com.aliumitalgan.remindup.models.ReminderCategory
+import com.aliumitalgan.remindup.models.ReminderType
 import com.aliumitalgan.remindup.screens.BottomNavItem
 import com.aliumitalgan.remindup.ui.theme.BluePrimary
 import com.aliumitalgan.remindup.ui.theme.GreenSecondary
@@ -51,6 +55,7 @@ fun RemindersScreenContent(
     var reminders by remember { mutableStateOf<List<Pair<String, Reminder>>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingReminder by remember { mutableStateOf<Pair<String, Reminder>?>(null) }
 
     // Bottom Navigation Items
     val bottomNavItems = listOf(
@@ -153,9 +158,27 @@ fun RemindersScreenContent(
                     items(reminders) { (id, reminder) ->
                         ModernReminderItem(
                             reminder = reminder,
+                            onToggleEnabled = { isEnabled ->
+                                // Hatırlatıcının aktiflik durumunu güncelle
+                                coroutineScope.launch {
+                                    val updatedReminder = reminder.copy(isEnabled = isEnabled)
+                                    val result = ReminderUtils.updateReminder(id, updatedReminder, context)
+                                    if (result.isSuccess) {
+                                        // Listeyi güncelle
+                                        reminders = reminders.map {
+                                            if (it.first == id) id to updatedReminder
+                                            else it
+                                        }
+                                        showToast(context, "Hatırlatıcı durumu güncellendi")
+                                    } else {
+                                        showToast(context, "Hatırlatıcı güncellenemedi")
+                                    }
+                                }
+                            },
                             onEditClick = {
-                                // TODO: Düzenleme işlevselliği
-                                showToast(context, "Düzenleme özelliği yakında eklenecek")
+                                // Düzenleme için mevcut hatırlatıcıyı ayarla
+                                editingReminder = id to reminder
+                                showAddDialog = true
                             },
                             onDeleteClick = {
                                 // Hatırlatıcıyı sil
@@ -174,29 +197,43 @@ fun RemindersScreenContent(
                 }
             }
 
-            // Hatırlatıcı Ekleme Diyaloğu
+            // Hatırlatıcı Ekleme/Düzenleme Diyaloğu
             if (showAddDialog) {
                 ModernReminderDialog(
-                    onDismiss = { showAddDialog = false },
-                    onSave = { title, time, category ->
-                        // Hatırlatıcı ekle
+                    onDismiss = {
+                        showAddDialog = false
+                        editingReminder = null
+                    },
+                    onSave = { newReminder ->
                         coroutineScope.launch {
-                            val reminder = Reminder(
-                                title = "${category}: $title",
-                                time = time
-                            )
-
-                            val result = ReminderUtils.addReminder(reminder, context)
-                            if (result.isSuccess) {
-                                val newId = result.getOrDefault("")
-                                reminders = reminders + (newId to reminder)
-                                showToast(context, "Hatırlatıcı eklendi")
+                            if (editingReminder != null) {
+                                // Düzenleme
+                                val result = ReminderUtils.updateReminder(editingReminder!!.first, newReminder, context)
+                                if (result.isSuccess) {
+                                    reminders = reminders.map {
+                                        if (it.first == editingReminder!!.first) editingReminder!!.first to newReminder
+                                        else it
+                                    }
+                                    showToast(context, "Hatırlatıcı güncellendi")
+                                } else {
+                                    showToast(context, "Hatırlatıcı güncellenemedi")
+                                }
                             } else {
-                                showToast(context, "Hatırlatıcı eklenemedi: ${result.exceptionOrNull()?.message ?: "Bilinmeyen hata"}")
+                                // Ekleme
+                                val result = ReminderUtils.addReminder(newReminder, context)
+                                if (result.isSuccess) {
+                                    val newId = result.getOrDefault("")
+                                    reminders = reminders + (newId to newReminder)
+                                    showToast(context, "Hatırlatıcı eklendi")
+                                } else {
+                                    showToast(context, "Hatırlatıcı eklenemedi")
+                                }
                             }
                         }
                         showAddDialog = false
-                    }
+                        editingReminder = null
+                    },
+                    initialReminder = editingReminder?.second
                 )
             }
         }
@@ -206,70 +243,113 @@ fun RemindersScreenContent(
 @Composable
 fun ModernReminderItem(
     reminder: Reminder,
+    onToggleEnabled: (Boolean) -> Unit,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
+    val categoryIcon = when(reminder.category) {
+        ReminderCategory.WORK -> Icons.Default.Work
+        ReminderCategory.HEALTH -> Icons.Default.LocalHospital
+        ReminderCategory.PERSONAL -> Icons.Default.Person
+        ReminderCategory.STUDY -> Icons.Default.School
+        ReminderCategory.FITNESS -> Icons.Default.FitnessCenter
+        else -> Icons.Default.Notifications
+    }
+
+    val typeIcon = when(reminder.type) {
+        ReminderType.DAILY -> Icons.Default.Repeat
+        ReminderType.WEEKLY -> Icons.Default.CalendarToday
+        ReminderType.MONTHLY -> Icons.Default.CalendarMonth
+        else -> Icons.Default.NotificationImportant
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(4.dp)
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+            // Kategori İkonu
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
             ) {
-                // Kategori ikonu
-                val categoryIcon = when {
-                    reminder.title.contains("İş", ignoreCase = true) -> Icons.Default.Work
-                    reminder.title.contains("Ev", ignoreCase = true) -> Icons.Default.Home
-                    reminder.title.contains("Sağlık", ignoreCase = true) -> Icons.Default.HealthAndSafety
-                    reminder.title.contains("Eğitim", ignoreCase = true) -> Icons.Default.School
-                    reminder.title.contains("Sosyal", ignoreCase = true) -> Icons.Default.Group
-                    else -> Icons.Default.Notifications
-                }
+                Icon(
+                    imageVector = categoryIcon,
+                    contentDescription = reminder.category.name,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
 
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = categoryIcon,
-                        contentDescription = "Kategori",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+            Spacer(modifier = Modifier.width(16.dp))
 
-                Spacer(modifier = Modifier.width(16.dp))
-
-                Column(
-                    modifier = Modifier.weight(1f)
+            // Hatırlatıcı Detayları
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = reminder.title,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Text(
-                        text = "Saat: ${reminder.time}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    // Tekrar tipi ikonu
+                    Icon(
+                        imageVector = typeIcon,
+                        contentDescription = reminder.type.name,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                 }
 
+                Text(
+                    text = "Saat: ${reminder.time}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+
+                if (reminder.description.isNotBlank()) {
+                    Text(
+                        text = reminder.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            // Düzenleme ve Silme Aksiyonları
+            Column(
+                horizontalAlignment = Alignment.End
+            ) {
+                // Aktif/Pasif Anahtarı
+                Switch(
+                    checked = reminder.isEnabled,
+                    onCheckedChange = { onToggleEnabled(it) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = MaterialTheme.colorScheme.primary,
+                        checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 Row {
-                    // Düzenleme butonu
                     IconButton(onClick = onEditClick) {
                         Icon(
                             imageVector = Icons.Default.Edit,
@@ -278,7 +358,6 @@ fun ModernReminderItem(
                         )
                     }
 
-                    // Silme butonu
                     IconButton(onClick = onDeleteClick) {
                         Icon(
                             imageVector = Icons.Default.Delete,
@@ -291,123 +370,169 @@ fun ModernReminderItem(
         }
     }
 }
-
 @Composable
 fun ModernReminderDialog(
     onDismiss: () -> Unit,
-    onSave: (title: String, time: String, category: String) -> Unit,
-    initialTitle: String = "",
-    initialTime: String = ""
+    onSave: (Reminder) -> Unit,
+    initialReminder: Reminder? = null
 ) {
-    var title by remember { mutableStateOf(initialTitle) }
-    var time by remember { mutableStateOf(initialTime) }
-    var selectedCategory by remember { mutableStateOf("Genel") }
-    val context = LocalContext.current
+    var title by remember { mutableStateOf(initialReminder?.title ?: "") }
+    var time by remember { mutableStateOf(initialReminder?.time ?: "") }
+    var description by remember { mutableStateOf(initialReminder?.description ?: "") }
+    var category by remember { mutableStateOf(initialReminder?.category ?: ReminderCategory.GENERAL) }
+    var type by remember { mutableStateOf(initialReminder?.type ?: ReminderType.SINGLE) }
+    var isEnabled by remember { mutableStateOf(initialReminder?.isEnabled ?: true) }
 
-    val categories = listOf("Genel", "İş", "Ev", "Sağlık", "Eğitim", "Sosyal")
+    val context = LocalContext.current
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = "Hatırlatıcı Ekle",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        icon = {
-            Icon(Icons.Default.Notifications, contentDescription = null)
-        },
+        title = { Text("Hatırlatıcı ${if (initialReminder == null) "Ekle" else "Düzenle"}") },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth()
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // Başlık
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
                     label = { Text("Hatırlatıcı Başlığı") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    leadingIcon = {
-                        Icon(Icons.Default.Title, contentDescription = null)
-                    }
+                    singleLine = true
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Kategori seçimi
-                Text(
-                    text = "Kategori",
-                    style = MaterialTheme.typography.bodyLarge
+                // Açıklama
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Açıklama (İsteğe Bağlı)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 3
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                // Saat Seçimi
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.AccessTime, contentDescription = "Saat")
 
-                // Kategori butonları
+                    Text(
+                        text = time.ifEmpty { "Saat Seç" },
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                showTimePicker(context) { selectedTime ->
+                                    time = selectedTime
+                                }
+                            }
+                            .padding(8.dp)
+                    )
+                }
+
+                // Kategori Seçimi
+                Text("Kategori", style = MaterialTheme.typography.bodyMedium)
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(categories) { category ->
+                    items(ReminderCategory.values()) { reminderCategory ->
                         FilterChip(
-                            selected = selectedCategory == category,
-                            onClick = { selectedCategory = category },
-                            label = { Text(category) },
+                            selected = category == reminderCategory,
+                            onClick = { category = reminderCategory },
+                            label = { Text(reminderCategory.name) },
                             leadingIcon = {
-                                val icon = when(category) {
-                                    "İş" -> Icons.Default.Work
-                                    "Ev" -> Icons.Default.Home
-                                    "Sağlık" -> Icons.Default.HealthAndSafety
-                                    "Eğitim" -> Icons.Default.School
-                                    "Sosyal" -> Icons.Default.Group
-                                    else -> Icons.Default.Event
-                                }
-                                Icon(icon, contentDescription = null, Modifier.size(18.dp))
+                                Icon(
+                                    imageVector = when(reminderCategory) {
+                                        ReminderCategory.WORK -> Icons.Default.Work
+                                        ReminderCategory.HEALTH -> Icons.Default.LocalHospital
+                                        ReminderCategory.PERSONAL -> Icons.Default.Person
+                                        ReminderCategory.STUDY -> Icons.Default.School
+                                        ReminderCategory.FITNESS -> Icons.Default.FitnessCenter
+                                        else -> Icons.Default.Notifications
+                                    },
+                                    contentDescription = null
+                                )
                             }
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedButton(
-                    onClick = {
-                        // Saat seçici göster
-                        showTimePicker(context) { selectedTime ->
-                            time = selectedTime
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                // Tekrar Türü Seçimi
+                Text("Tekrar Türü", style = MaterialTheme.typography.bodyMedium)
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Default.AccessTime, contentDescription = "Saat")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(if (time.isEmpty()) "Saat Seç" else "Saat: $time")
+                    items(ReminderType.values()) { reminderType ->
+                        FilterChip(
+                            selected = type == reminderType,
+                            onClick = { type = reminderType },
+                            label = {
+                                Text(
+                                    when(reminderType) {
+                                        ReminderType.SINGLE -> "Tek Sefer"
+                                        ReminderType.DAILY -> "Her Gün"
+                                        ReminderType.WEEKLY -> "Haftalık"
+                                        ReminderType.MONTHLY -> "Aylık"
+                                    }
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = when(reminderType) {
+                                        ReminderType.SINGLE -> Icons.Default.NotificationImportant
+                                        ReminderType.DAILY -> Icons.Default.Repeat
+                                        ReminderType.WEEKLY -> Icons.Default.CalendarToday
+                                        ReminderType.MONTHLY -> Icons.Default.CalendarMonth
+                                    },
+                                    contentDescription = null
+                                )
+                            }
+                        )
+                    }
+                }
+
+                // Aktif/Pasif Anahtarı
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Hatırlatıcı Aktif", style = MaterialTheme.typography.bodyMedium)
+                    Switch(
+                        checked = isEnabled,
+                        onCheckedChange = { isEnabled = it }
+                    )
                 }
             }
         },
         confirmButton = {
-            Button(
+            TextButton(
                 onClick = {
-                    if (title.isNotEmpty() && time.isNotEmpty()) {
-                        onSave(title, time, selectedCategory)
+                    if (title.isNotBlank() && time.isNotBlank()) {
+                        val newReminder = Reminder(
+                            id = initialReminder?.id ?: UUID.randomUUID().toString(),
+                            title = title,
+                            time = time,
+                            description = description,
+                            category = category,
+                            type = type,
+                            isEnabled = isEnabled
+                        )
+                        onSave(newReminder)
+                        onDismiss()
                     } else {
-                        showToast(context, "Lütfen tüm alanları doldurun")
+                        showToast(context, "Lütfen başlık ve saat bilgisini doldurun")
                     }
-                },
-                shape = RoundedCornerShape(12.dp)
+                }
             ) {
                 Text("Kaydet")
             }
         },
         dismissButton = {
-            OutlinedButton(
-                onClick = onDismiss,
-                shape = RoundedCornerShape(12.dp)
-            ) {
+            TextButton(onClick = onDismiss) {
                 Text("İptal")
             }
-        },
-        shape = RoundedCornerShape(20.dp)
+        }
     )
 }
 

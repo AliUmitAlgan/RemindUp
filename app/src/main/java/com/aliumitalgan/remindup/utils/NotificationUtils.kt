@@ -23,6 +23,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import android.Manifest
 import android.util.Log
+import com.aliumitalgan.remindup.models.ReminderType
 
 
 object NotificationUtils {
@@ -137,7 +138,6 @@ object NotificationUtils {
     // Zamanlanmış hatırlatıcı ayarla
     fun scheduleReminder(context: Context, reminder: Reminder, notificationId: Int) {
         if (!_notificationsEnabled.value) {
-            // Bildirimler kapalıysa bir şey zamanlanmasın
             Log.d("NotificationUtils", "Bildirimler kapalı, zamanlama yapılmıyor")
             return
         }
@@ -146,9 +146,10 @@ object NotificationUtils {
         val intent = Intent(context, ReminderReceiver::class.java).apply {
             putExtra("REMINDER_TITLE", reminder.title)
             putExtra("NOTIFICATION_ID", notificationId)
+            putExtra("REMINDER_TIME", reminder.time)
+            putExtra("REMINDER_TYPE", reminder.type.name)
         }
 
-        // Time format: HH:mm
         val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
         val date = timeFormat.parse(reminder.time)
         val calendar = Calendar.getInstance().apply {
@@ -159,42 +160,63 @@ object NotificationUtils {
         }
 
         val pendingIntent = PendingIntent.getBroadcast(
-            context, notificationId, intent,
+            context,
+            notificationId,
+            intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        // Hatırlatıcıyı ayarla
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            try {
-                alarmManager.setExactAndAllowWhileIdle(
+        // Tekrar türüne göre farklı alarm ayarlama
+        when (reminder.type) {
+            ReminderType.SINGLE -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        pendingIntent
+                    )
+                } else {
+                    alarmManager.setExact(
+                        AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        pendingIntent
+                    )
+                }
+            }
+            ReminderType.DAILY -> {
+                // Günlük tekrar
+                alarmManager.setRepeating(
                     AlarmManager.RTC_WAKEUP,
                     calendar.timeInMillis,
+                    AlarmManager.INTERVAL_DAY,
                     pendingIntent
                 )
-                Log.d("NotificationUtils", "Hatırlatıcı ayarlandı: ${reminder.title} (${reminder.time})")
-            } catch (e: Exception) {
-                Log.e("NotificationUtils", "Hatırlatıcı ayarlama hatası", e)
-                // Hatırlatıcı ayarlanamazsa, fallback olarak setAlarmClock'u deneyelim
-                val showIntent = Intent(context, MainActivity::class.java)
-                val showPendingIntent = PendingIntent.getActivity(
-                    context, notificationId, showIntent,
-                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-                )
-
-                alarmManager.setAlarmClock(
-                    AlarmManager.AlarmClockInfo(calendar.timeInMillis, showPendingIntent),
-                    pendingIntent
-                )
-                Log.d("NotificationUtils", "Fallback ile hatırlatıcı ayarlandı: ${reminder.title}")
             }
-        } else {
-            alarmManager.setExact(
-                AlarmManager.RTC_WAKEUP,
-                calendar.timeInMillis,
-                pendingIntent
-            )
-            Log.d("NotificationUtils", "Eski API ile hatırlatıcı ayarlandı: ${reminder.title}")
+            ReminderType.WEEKLY -> {
+                // Haftalık tekrar
+                alarmManager.setRepeating(
+                    AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    AlarmManager.INTERVAL_DAY * 7,
+                    pendingIntent
+                )
+            }
+            ReminderType.MONTHLY -> {
+                // Aylık tekrar - biraz daha karmaşık, Manuel hesaplama gerekebilir
+                val monthlyCalendar = Calendar.getInstance().apply {
+                    timeInMillis = calendar.timeInMillis
+                    add(Calendar.MONTH, 1)
+                }
+                alarmManager.setRepeating(
+                    AlarmManager.RTC_WAKEUP,
+                    calendar.timeInMillis,
+                    monthlyCalendar.timeInMillis - calendar.timeInMillis,
+                    pendingIntent
+                )
+            }
         }
+
+        Log.d("NotificationUtils", "Hatırlatıcı zamanlandı: ${reminder.title}, Tip: ${reminder.type}")
     }
 
     // Zamanlanmış hatırlatıcıyı iptal et
