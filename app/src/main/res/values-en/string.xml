@@ -49,6 +49,7 @@
     <string name="my_goals">My Goals</string>
     <string name="add_goal">Add Goal</string>
     <string name="edit_goal">Edit Goal</string>
+
     <string name="goal_title">Goal Title</string>
     <string name="goal_progress">Progress (%)</string>
     <string name="in_progress">In progress</string>
@@ -61,7 +62,7 @@
     <string name="save">Save</string>
     <string name="delete">Delete</string>
     <string name="sub_goals">Sub-Goals</string>
-    <string name="add_sub_goal">Add Sub-Goal</string>
+
     <string name="sub_goal_hint">E.g.: Learn OOP concepts</string>
     <string name="ok">OK</string>
     <string name="no_sub_goals">No sub-goals added yet</string>
@@ -90,6 +91,7 @@
     <string name="edit_reminder">Edit Reminder</string>
     <string name="reminder_title">Reminder Title</string>
     <string name="reminder_time">Time</string>
+    <string name="add_sub_goal">Add New Sub-Goal</string>
     <string name="time">Time: %1$s</string>
     <string name="reminder_description">Description (Optional)</string>
     <string name="reminder_category">Category</string>

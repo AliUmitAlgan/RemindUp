@@ -341,15 +341,15 @@ fun ModernGoalDialog(
                 OutlinedTextField(
                     value = goalTitle,
                     onValueChange = { goalTitle = it },
-                    label = { Text("Hedef Başlığı") },
-                    placeholder = { Text("Örn: Yazılım Öğrenme") },
+                    label = { stringResource(R.string.goal_title) },
+                    placeholder = { stringResource(R.string.sub_goal_hint) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
 
                 // İlerleme Slider
                 Text(
-                    text = "İlerleme: %$goalProgress",
+                    text = stringResource(R.string.progress, goalProgress),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

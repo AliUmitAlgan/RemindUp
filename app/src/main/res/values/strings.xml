@@ -61,7 +61,7 @@
     <string name="save">Kaydet</string>
     <string name="delete">Sil</string>
     <string name="sub_goals">Alt Hedefler</string>
-    <string name="add_sub_goal">Alt Hedef Ekle</string>
+
     <string name="sub_goal_hint">Örn: OOP kavramlarını öğren</string>
     <string name="ok">Tamam</string>
     <string name="no_sub_goals">Henüz alt hedef eklenmemiş</string>
@@ -75,6 +75,7 @@
     <string name="new_progress">Yeni İlerleme (%)</string>
     <string name="completing_goal">Hedefinizi tamamlıyorsunuz!</string>
     <string name="edit_progress">İlerleme Güncelle</string>
+    <string name="add_sub_goal">Yeni Alt Hedef Ekle</string>
 
     <!-- Alt Hedefler -->
     <string name="sub_goals_count">Alt Hedefler (%1$d/%2$d)</string>

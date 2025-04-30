@@ -568,7 +568,7 @@ fun SubGoalsDialog(
             ) {
                 // Başlık
                 Text(
-                    text = "Alt Hedefler",
+                    text = stringResource(R.string. sub_goals),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -654,7 +654,7 @@ fun SubGoalsDialog(
                     )
 
                     Text(
-                        text = "Yeni Alt Hedef Ekle",
+                        text = stringResource(R.string.add_sub_goal),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurface,
