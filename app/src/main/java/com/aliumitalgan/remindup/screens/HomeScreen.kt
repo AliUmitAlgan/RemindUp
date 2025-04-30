@@ -4,7 +4,6 @@ import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -31,7 +30,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import com.aliumitalgan.remindup.components.BottomNavigationBar
 import com.aliumitalgan.remindup.components.GoalCard
 import com.aliumitalgan.remindup.components.ModernCard
@@ -39,7 +37,7 @@ import com.aliumitalgan.remindup.components.MotivationalMessage
 import com.aliumitalgan.remindup.models.Goal
 import com.aliumitalgan.remindup.models.Reminder
 import com.aliumitalgan.remindup.ui.theme.*
-import com.aliumitalgan.remindup.utils.AnimationUtils
+import com.aliumitalgan.remindup.utils.LanguageManager
 import com.aliumitalgan.remindup.utils.ReminderUtils
 import com.google.firebase.auth.FirebaseAuth
 import java.text.SimpleDateFormat
@@ -60,6 +58,7 @@ fun HomeScreenContent(
     onNavigateToProgress: () -> Unit,
     onNavigateToSettings: () -> Unit
 ) {
+    val currentLanguage by LanguageManager.currentLanguage
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var goals by remember { mutableStateOf<List<Goal>>(emptyList()) }
@@ -92,10 +91,13 @@ fun HomeScreenContent(
     val displayName = currentUser?.displayName ?: currentUser?.email?.substringBefore('@') ?: "Misafir"
 
     // Verileri yükle
-    LaunchedEffect(key1 = true) {
+    LaunchedEffect(key1 = true,key2=currentLanguage) {
         try {
-            // Motivasyonel mesaj
-            motivationalMessage = ReminderUtils.getRandomMotivationalMessage()
+            // Context'i al
+            val appContext = context
+
+            // Motivasyonel mesaj - Şimdi context ile çağırılıyor
+            motivationalMessage = ReminderUtils.getRandomMotivationalMessage(context)
 
             // Hedefleri yükle
             com.aliumitalgan.remindup.utils.FirebaseUtils.getGoals { goalsList ->

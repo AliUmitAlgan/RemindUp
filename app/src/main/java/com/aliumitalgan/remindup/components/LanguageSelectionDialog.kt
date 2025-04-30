@@ -22,28 +22,31 @@ import com.aliumitalgan.remindup.utils.LanguageManager
 import com.aliumitalgan.remindup.R
 
 /**
- * Dil seçimi için dialog bileşeni - Geliştirilmiş ve dil değişikliğini daha doğru ele alan
+ * Dil seçimi için tamamen güncellenmiş dialog bileşeni.
+ * Statik metin yerine R.string kullanır ve güvenilir dil değişim desteği sağlar.
  */
 @Composable
 fun LanguageSelectionDialog(
     onDismiss: () -> Unit,
     onLanguageSelected: (String) -> Unit
 ) {
-    Log.d("LanguageSelectionDialog", "Dialog composable called")
+    val TAG = "LanguageSelectionDialog"
+    Log.d(TAG, "Dialog composable started")
 
-    // Composable'ın yeniden oluşturulması için dili dinle
-    val currentLanguageState = LocalLanguage.current
-    val currentLanguage = currentLanguageState.value
+    // Context'i al
     val context = LocalContext.current
 
+    // Mevcut dili takip et
+    val currentLanguage by LanguageManager.currentLanguage
+    Log.d(TAG, "Current language: $currentLanguage")
+
+    // Dialog içeriği
     Dialog(
         onDismissRequest = {
-            Log.d("LanguageSelectionDialog", "Dialog dismissed via outside click")
+            Log.d(TAG, "Dialog dismissed via outside click")
             onDismiss()
         }
     ) {
-        Log.d("LanguageSelectionDialog", "Rendering dialog content")
-
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surface,
@@ -59,7 +62,7 @@ fun LanguageSelectionDialog(
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header
+                // Başlık kısmı
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(bottom = 16.dp)
@@ -72,7 +75,8 @@ fun LanguageSelectionDialog(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = stringResource(R.string.language_select),  // Sabit string - her iki dilde de görünecek
+                        // Başlık için string resource kullanılıyor
+                        text = stringResource(R.string.language_select),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -80,48 +84,43 @@ fun LanguageSelectionDialog(
 
                 Divider(modifier = Modifier.padding(bottom = 16.dp))
 
-                Log.d("LanguageSelectionDialog", "Current language: $currentLanguage")
-
-                // Turkish Option
+                // Türkçe Seçeneği
                 LanguageOption(
                     languageName = "Türkçe",
                     languageCode = LanguageManager.LANGUAGE_TURKISH,
                     isSelected = currentLanguage == LanguageManager.LANGUAGE_TURKISH,
                     onClick = {
-                        Log.d("LanguageSelectionDialog", "Turkish selected")
+                        Log.d(TAG, "Turkish language selected")
                         onLanguageSelected(LanguageManager.LANGUAGE_TURKISH)
-                        onDismiss()
                     }
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // English Option
+                // İngilizce Seçeneği
                 LanguageOption(
                     languageName = "English",
                     languageCode = LanguageManager.LANGUAGE_ENGLISH,
                     isSelected = currentLanguage == LanguageManager.LANGUAGE_ENGLISH,
                     onClick = {
-                        Log.d("LanguageSelectionDialog", "English selected")
+                        Log.d(TAG, "English language selected")
                         onLanguageSelected(LanguageManager.LANGUAGE_ENGLISH)
-                        onDismiss()
                     }
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Cancel button - İptal/Cancel olarak dile göre değişir
+                // İptal butonu
                 Button(
                     onClick = {
-                        Log.d("LanguageSelectionDialog", "Cancel button clicked")
+                        Log.d(TAG, "Cancel button clicked")
                         onDismiss()
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text(
-                        text = stringResource(R.string.cancel)
-                    )
+                    // İptal metni için string resource kullanılıyor
+                    Text(stringResource(R.string.cancel))
                 }
             }
         }
@@ -129,8 +128,8 @@ fun LanguageSelectionDialog(
 }
 
 /**
- * Bir dil seçeneğini temsil eden bileşen.
- * Seçildiğinde farklı arka plan rengi ve işaret gösterir.
+ * Her bir dil seçeneğini temsil eden bileşen.
+ * Seçildiğinde visual feedback ve işaret gösterir.
  */
 @Composable
 private fun LanguageOption(
@@ -139,8 +138,9 @@ private fun LanguageOption(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    Log.d("LanguageOption", "Rendering option for $languageName, isSelected=$isSelected")
+    val TAG = "LanguageOption"
 
+    // Dil seçeneğinin renklerini belirle
     val backgroundColor = if (isSelected) {
         MaterialTheme.colorScheme.primaryContainer
     } else {
@@ -158,7 +158,7 @@ private fun LanguageOption(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .clickable {
-                Log.d("LanguageOption", "Option clicked: $languageName")
+                Log.d(TAG, "Option clicked: $languageName")
                 onClick()
             },
         color = backgroundColor,

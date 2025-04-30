@@ -44,7 +44,7 @@
     <string name="register_success">Kayıt başarılı</string>
     <string name="register_failed">Kayıt başarısız</string>
     <string name="google_login_fail">Google ile giriş başarısız</string>
-
+    <string name="active_goals">Devam Eden Hedefler</string>
     <!-- Hedefler Ekranı -->
     <string name="my_goals">Hedeflerim</string>
     <string name="add_goal">Hedef Ekle</string>
@@ -129,6 +129,7 @@
     <string name="percent_completed">%1$d%%</string>
     <string name="completed_label">Tamamlandı</string>
     <string name="see_all">Tümünü Gör</string>
+    <string name="brief">Özet Görünüm</string>
     <string name="congratulations">Tebrikler!</string>
 
     <!-- Karşılama Mesajları -->

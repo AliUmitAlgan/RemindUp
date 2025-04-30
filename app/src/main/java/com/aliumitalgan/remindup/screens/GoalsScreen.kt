@@ -24,6 +24,7 @@ import com.aliumitalgan.remindup.components.BottomNavigationBar
 import com.aliumitalgan.remindup.components.NestedGoalCard
 import com.aliumitalgan.remindup.models.Goal
 import com.aliumitalgan.remindup.utils.ProgressUtils
+import com.aliumitalgan.remindup.utils.StringResourcesProvider
 import com.aliumitalgan.remindup.utils.SubGoal
 import com.aliumitalgan.remindup.utils.SubGoalUtils
 import com.google.firebase.auth.FirebaseAuth
@@ -186,17 +187,17 @@ fun GoalsScreenContent(
                                             if (newProgress >= 100) {
                                                 activeGoals = activeGoals.filterNot { it.first == id }
                                                 completedGoals = completedGoals + (id to updatedGoal)
-                                                showToast(context, "Tebrikler! Hedefiniz tamamlandı!")
+                                                showToast(context, StringResourcesProvider.getString(context, R.string.goal_completed))
                                             } else {
                                                 activeGoals = activeGoals.map {
                                                     if (it.first == id) id to updatedGoal
                                                     else it
                                                 }
-                                                showToast(context, "İlerleme güncellendi (%$newProgress)")
+                                                showToast(context, StringResourcesProvider.getString(context, R.string.progress_updated, newProgress))
                                             }
                                         },
                                         onError = { error ->
-                                            showToast(context, "İlerleme güncellenemedi: $error")
+                                            showToast(context, StringResourcesProvider.getString(context, R.string.edit_progress, error))
                                         }
                                     )
                                 }

@@ -12,55 +12,62 @@ import com.aliumitalgan.remindup.utils.NotificationUtils
 import java.util.*
 
 class ReminderReceiver : BroadcastReceiver() {
+    private val TAG = "ReminderReceiver"
+
     override fun onReceive(context: Context, intent: Intent) {
         // Gelen intent'ten hatırlatıcı bilgilerini al
         val reminderTitle = intent.getStringExtra("REMINDER_TITLE") ?: "Hatırlatıcı"
         val notificationId = intent.getIntExtra("NOTIFICATION_ID", 0)
-        val reminderType = intent.getStringExtra("REMINDER_TYPE")
+        val reminderTypeStr = intent.getStringExtra("REMINDER_TYPE")
         val reminderTime = intent.getStringExtra("REMINDER_TIME") ?: ""
+        val reminderDescription = intent.getStringExtra("REMINDER_DESCRIPTION") ?: ""
 
-        Log.d("ReminderReceiver", "Hatırlatıcı alındı: $reminderTitle, Tip: $reminderType")
+        Log.d(TAG, "Reminder received: $reminderTitle, Type: $reminderTypeStr, Time: $reminderTime")
 
-        // Bildirim içeriği
-        val reminderMessage = intent.getStringExtra("REMINDER_MESSAGE")
-            ?: "Zamanı geldiği için hatırlatıyoruz!"
+        try {
+            // Reminder tipini doğru şekilde parse et
+            val reminderType = try {
+                if (reminderTypeStr != null) ReminderType.valueOf(reminderTypeStr)
+                else ReminderType.SINGLE
+            } catch (e: Exception) {
+                Log.e(TAG, "Invalid reminder type: $reminderTypeStr, defaulting to SINGLE", e)
+                ReminderType.SINGLE
+            }
 
-        // Bildirimi göster
-        NotificationUtils.showNotification(
-            context,
-            reminderTitle,
-            reminderMessage,
-            notificationId
-        )
+            // Bildirim mesajını oluştur
+            val notificationMessage = if (reminderDescription.isNotEmpty()) {
+                reminderDescription
+            } else {
+                "Zamanı geldiği için hatırlatıyoruz!"
+            }
 
-        // Eğer tek seferlik bir hatırlatıcı ise, alarm'ı iptal et
-        if (reminderType == ReminderType.SINGLE.name) {
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            val cancelIntent = Intent(context, ReminderReceiver::class.java)
-            val pendingIntent = PendingIntent.getBroadcast(
+            // Bildirimi göster
+            NotificationUtils.showNotification(
                 context,
-                notificationId,
-                cancelIntent,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE
+                reminderTitle,
+                notificationMessage,
+                notificationId
             )
 
-            // Eğer pending intent varsa, alarm'ı iptal et
-            pendingIntent?.let {
-                alarmManager.cancel(it)
-                it.cancel()
-                Log.d("ReminderReceiver", "Tek seferlik hatırlatıcı iptal edildi: $reminderTitle")
+            // Eğer tek seferlik bir hatırlatıcı ise, alarm'ı iptal et
+            if (reminderType == ReminderType.SINGLE) {
+                NotificationUtils.cancelReminder(context, notificationId)
+                Log.d(TAG, "Single reminder canceled after triggering: $reminderTitle")
             }
-        }
+            // Tekrarlanan hatırlatıcılar için güncelleme gerekmez, AlarmManager otomatik olarak tekrarlar
 
-        // Cihaz yeniden başlatılırsa
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            Log.d("ReminderReceiver", "Cihaz yeniden başlatıldı, hatırlatıcılar yeniden ayarlanıyor")
-            // TODO: Tüm hatırlatıcıları Firestore'dan alıp yeniden zamanla
-            // Bu kısım daha sonra BootReceiver içinde implemente edilebilir
+            // BOOT_COMPLETED gibi diğer actionlar için de kontrol ekle
+            when (intent.action) {
+                Intent.ACTION_BOOT_COMPLETED -> {
+                    Log.d(TAG, "Device rebooted, should restore reminders")
+                    // Boot Receiver zaten bu işi yapıyor, burada ek bir işlem yapmaya gerek yok
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error processing reminder: ${e.message}", e)
         }
     }
 
-    // Statik metodlar için companion object kullanabilirsiniz
     companion object {
         // Hatırlatıcıyı zamanla
         fun scheduleReminder(context: Context, reminderTitle: String, reminderTime: String, notificationId: Int, reminderType: ReminderType) {

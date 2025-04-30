@@ -150,15 +150,26 @@ fun SettingsScreenContent(
                 onLanguageSelected = { languageCode ->
                     Log.d("SettingsScreen", "Language selected: $languageCode")
                     try {
-                        // Toast mesajı, dil değişmeden önce göster
-                        val message = if (languageCode == LanguageManager.LANGUAGE_TURKISH)
-                            "Dil Türkçe olarak değiştirildi"
-                        else
-                            "Language changed to English"
+                        // Başlangıçtaki dil değerini kaydet
+                        val initialLanguage = LanguageManager.currentLanguage.value
+
+                        // Dili değiştir
+                        LanguageManager.setLanguage(context, languageCode)
+
+                        // Dil değişiminin gerçekleştiğinden emin olmak için kontrol et
+                        val newLanguage = LanguageManager.currentLanguage.value
+                        Log.d("SettingsScreen", "Language change result: $initialLanguage -> $newLanguage")
+
+                        // Dil değişimini UI arayüzünde göster - toast mesajı
+                        val message = if (languageCode == LanguageManager.LANGUAGE_TURKISH) {
+                            context.getString(R.string.language_changed_to_turkish)
+                        } else {
+                            context.getString(R.string.language_changed_to_english)
+                        }
                         showToast(context, message)
 
-                        // Dili değiştir - bu işlem aktiviteyi yeniden başlatır
-                        LanguageManager.setLanguage(context, languageCode)
+                        // Dialog'u kapat
+                        showLanguageDialog = false
                     } catch (e: Exception) {
                         Log.e("SettingsScreen", "Dil değiştirme hatası", e)
                         showToast(context, "Dil değiştirme sırasında hata oluştu: ${e.message}")
@@ -273,7 +284,7 @@ fun SettingsScreenContent(
                     // Dil Ayarları
                     // Dil Ayarları
                     SettingsSection(
-                        title = StringResourcesProvider.string(R.string.language),
+                        title = stringResource(R.string.language),
                         icon = Icons.Default.Language,
                         onClick = {
                             Log.d("SettingsScreen", "Language section clicked")
@@ -293,7 +304,7 @@ fun SettingsScreenContent(
 
                                 Icon(
                                     Icons.Default.ArrowForward,
-                                    contentDescription = StringResourcesProvider.string(R.string.language),
+                                    contentDescription = stringResource(R.string.language),
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(20.dp)
                                 )

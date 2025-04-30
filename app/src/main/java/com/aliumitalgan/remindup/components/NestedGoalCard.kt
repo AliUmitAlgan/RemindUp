@@ -149,7 +149,7 @@ fun NestedGoalCard(
                             exit = fadeOut()
                         ) {
                             Text(
-                                text = "Devam ediyor",
+                                stringResource(R.string. in_progress),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                 fontSize = 13.sp
@@ -174,7 +174,7 @@ fun NestedGoalCard(
                                 Spacer(modifier = Modifier.width(4.dp))
 
                                 Text(
-                                    text = "Tamamlandı!",
+                                    text = stringResource(R.string.completed),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = SuccessGreen,
                                     fontWeight = FontWeight.Bold,
@@ -357,7 +357,7 @@ fun NestedGoalCard(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (isCompleted) "Düzenle" else "İlerle",
+                        text = stringResource(if (isCompleted) R.string.edit else R.string.advance),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium
                     )

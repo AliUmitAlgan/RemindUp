@@ -44,7 +44,7 @@
     <string name="register_success">Registration successful</string>
     <string name="register_failed">Registration failed</string>
     <string name="google_login_fail">Google sign-in failed</string>
-
+    <string name="active_goals">Active Goals</string>
     <!-- Goals Screen -->
     <string name="my_goals">My Goals</string>
     <string name="add_goal">Add Goal</string>
@@ -130,7 +130,7 @@
     <string name="completed_label">Completed</string>
     <string name="see_all">See All</string>
     <string name="congratulations">Congratulations!</string>
-
+    <string name="brief">Summary View</string>
     <!-- Welcome Messages -->
     <string name="welcome_title">Welcome to RemindUp</string>
     <string name="welcome_subtitle">Track your goals, manage your reminders</string>

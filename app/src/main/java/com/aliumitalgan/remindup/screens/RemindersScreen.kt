@@ -241,22 +241,6 @@ fun ModernReminderItem(
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
-    val categoryIcon = when(reminder.category) {
-        ReminderCategory.WORK -> Icons.Default.Work
-        ReminderCategory.HEALTH -> Icons.Default.LocalHospital
-        ReminderCategory.PERSONAL -> Icons.Default.Person
-        ReminderCategory.STUDY -> Icons.Default.School
-        ReminderCategory.FITNESS -> Icons.Default.FitnessCenter
-        else -> Icons.Default.Notifications
-    }
-
-    val typeIcon = when(reminder.type) {
-        ReminderType.DAILY -> Icons.Default.Repeat
-        ReminderType.WEEKLY -> Icons.Default.CalendarToday
-        ReminderType.MONTHLY -> Icons.Default.CalendarMonth
-        else -> Icons.Default.NotificationImportant
-    }
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -268,68 +252,62 @@ fun ModernReminderItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Kategori İkonu
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = categoryIcon,
-                    contentDescription = reminder.category.name,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            // Hatırlatıcı Detayları
+            // Sol taraf: Kategori ve Başlık
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // Kategori etiketi
+                    Text(
+                        text = reminder.category.name,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .background(
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+
+                    // Başlık
                     Text(
                         text = reminder.title,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    // Tekrar tipi ikonu
+                }
+
+                // Saat bilgisi
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     Icon(
-                        imageVector = typeIcon,
-                        contentDescription = reminder.type.name,
+                        imageVector = Icons.Default.AccessTime,
+                        contentDescription = "Saat",
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
-                }
-
-                Text(
-                    text = "Saat: ${reminder.time}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                )
-
-                if (reminder.description.isNotBlank()) {
                     Text(
-                        text = reminder.description,
+                        text = reminder.time,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
                 }
             }
 
-            // Düzenleme ve Silme Aksiyonları
+            // Sağ taraf: Düzenleme ve Silme Aksiyonları
             Column(
-                horizontalAlignment = Alignment.End
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Aktif/Pasif Anahtarı
                 Switch(
@@ -341,8 +319,7 @@ fun ModernReminderItem(
                     )
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
-
+                // Düzenleme ve Silme Butonları
                 Row {
                     IconButton(onClick = onEditClick) {
                         Icon(
@@ -364,6 +341,7 @@ fun ModernReminderItem(
         }
     }
 }
+
 @Composable
 fun ModernReminderDialog(
     onDismiss: () -> Unit,
@@ -390,7 +368,7 @@ fun ModernReminderDialog(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Hatırlatıcı Başlığı") },
+                    label = { Text(stringResource(R.string.reminder_title)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -413,7 +391,7 @@ fun ModernReminderDialog(
                     Icon(Icons.Default.AccessTime, contentDescription = "Saat")
 
                     Text(
-                        text = time.ifEmpty { "Saat Seç" },
+                        text = time.ifEmpty { stringResource(R.string.select_time) },
                         modifier = Modifier
                             .weight(1f)
                             .clickable {

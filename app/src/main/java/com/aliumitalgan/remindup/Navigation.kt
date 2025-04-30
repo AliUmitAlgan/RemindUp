@@ -67,6 +67,10 @@ fun AppNavigation(
 
         composable(Screen.Progress.route) {
             ProgressScreenContent(
+                onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
+                onNavigateToHome = { navController.navigate(Screen.Home.route) },
+                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
+                onNavigateToReminders = { navController.navigate(Screen.Reminders.route) },
                 onNavigateBack = { navController.popBackStack() },
 
             )

@@ -1,21 +1,42 @@
 package com.aliumitalgan.remindup.utils
 
 import android.content.Context
+import com.aliumitalgan.remindup.R
 import com.aliumitalgan.remindup.models.Reminder
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import java.util.*
+import android.util.Log
 
 object ReminderUtils {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
+    private val TAG = "ReminderUtils"
 
     // Hatırlatıcı ekle
     suspend fun addReminder(reminder: Reminder, context: Context): Result<String> {
         return try {
             val currentUser = auth.currentUser
             if (currentUser != null) {
+                // Önce mevcut hatırlatıcıları kontrol et
+                val existingRemindersResult = getUserReminders()
+
+                if (existingRemindersResult.isSuccess) {
+                    val existingReminders = existingRemindersResult.getOrDefault(emptyList())
+
+                    // Aynı başlık ve kategoride hatırlatıcı var mı kontrol et
+                    val duplicateReminder = existingReminders.find {
+                        it.second.title.equals(reminder.title, ignoreCase = true) &&
+                                it.second.category == reminder.category
+                    }
+
+                    if (duplicateReminder != null) {
+                        // Zaten böyle bir hatırlatıcı varsa hata döndür
+                        return Result.failure(Exception("Bu kategoride aynı isimde bir hatırlatıcı zaten var."))
+                    }
+                }
+
                 // Reminder nesnesini güncellenmiş haliyle oluştur
                 val reminderWithUser = reminder.copy(userId = currentUser.uid)
 
@@ -121,8 +142,8 @@ object ReminderUtils {
         }
     }
 
-    // Motivasyon mesajları listesi
-    private val motivationalMessages = listOf(
+    // Sabit motivasyon mesajları - direk uygulama içinde tanımlı
+    private val turkishMotivationalMessages = listOf(
         "Harika gidiyorsun, devam et!",
         "Her küçük adım, başarıya giden yolda bir ilerlemedir!",
         "Bugün dünden daha iyisin, yarın da bugünden daha iyi olacaksın!",
@@ -135,8 +156,33 @@ object ReminderUtils {
         "Gelişim bir yolculuktur, anın tadını çıkar!"
     )
 
-    // Rastgele motivasyon mesajı al
-    fun getRandomMotivationalMessage(): String {
-        return motivationalMessages[Random().nextInt(motivationalMessages.size)]
+    private val englishMotivationalMessages = listOf(
+        "You're doing great, keep it up!",
+        "Every small step is progress on the path to success!",
+        "You're better today than yesterday, and tomorrow will be even better!",
+        "Persistence and determination are the keys to success!",
+        "Challenges make you stronger!",
+        "You can do it!",
+        "Every day is an opportunity to be better than the day before!",
+        "Take a step towards your goals every day!",
+        "Small steps lead to big changes!",
+        "Growth is a journey, enjoy the moment!"
+    )
+
+    // Rastgele motivasyon mesajı al - açık ve net dil kontrolü ile
+    fun getRandomMotivationalMessage(context: Context): String {
+        // Mevcut dili kontrol et
+        val currentLanguage = LanguageManager.currentLanguage.value
+        Log.d(TAG, "Current language for motivational message: $currentLanguage")
+
+        val messages = if (currentLanguage == LanguageManager.LANGUAGE_ENGLISH) {
+            Log.d(TAG, "Using English motivational messages")
+            englishMotivationalMessages
+        } else {
+            Log.d(TAG, "Using Turkish motivational messages")
+            turkishMotivationalMessages
+        }
+
+        return messages[Random().nextInt(messages.size)]
     }
 }

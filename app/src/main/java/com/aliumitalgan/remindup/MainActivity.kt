@@ -22,6 +22,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -43,9 +44,11 @@ import java.util.Locale
 val LocalLanguage = compositionLocalOf { mutableStateOf(LanguageManager.LANGUAGE_TURKISH) }
 
 class MainActivity : ComponentActivity() {
+    private val TAG = "MainActivity"
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.d("RemindUp", "Main Activity onCreate çalıştı")
+        Log.d(TAG, "onCreate started")
 
         // Bildirim kanalını oluştur
         NotificationUtils.createNotificationChannel(this)
@@ -53,11 +56,15 @@ class MainActivity : ComponentActivity() {
         // Uygulama başlatıldığında bildirim durumunu yükle
         NotificationUtils.loadNotificationState(this)
 
+        // Uygulama başlangıcında otomatik bildirimleri engelleme
+        NotificationUtils.resetAppLaunchState()
+
         // Tema durumunu yükle
         ThemeManager.loadDarkThemeState(this)
 
-        // Dil ayarlarını yükle - bu güncellenmiş sürüm resources da değiştirecek
+        // Dil ayarlarını yükle - güncel dilde çalışması için yapılandırılmış
         LanguageManager.loadSavedLanguage(this)
+        Log.d(TAG, "Current language after load: ${LanguageManager.currentLanguage.value}")
 
         // Android 13+ için bildirim izni iste
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -76,27 +83,31 @@ class MainActivity : ComponentActivity() {
             // Dil durumunu dinle ve CompositionLocalProvider ile sağla
             val currentLanguage by LanguageManager.currentLanguage
             val languageState = remember { mutableStateOf(currentLanguage) }
+            Log.d(TAG, "SetContent - Current language: $currentLanguage")
 
             // Tema durumunu doğrudan al
             val isDarkTheme by ThemeManager.isDarkTheme
-            val LocalLanguage = compositionLocalOf { mutableStateOf(LanguageManager.LANGUAGE_TURKISH) }
+
             // Dil değişikliğini dinle ve state'i güncelle
             LaunchedEffect(currentLanguage) {
-                Log.d("MainActivity", "Language changed to: $currentLanguage")
+                Log.d(TAG, "Language changed in MainActivity: $currentLanguage")
                 languageState.value = currentLanguage
             }
 
             // CompositionLocalProvider ile dil durumunu tüm child composable'lara ilet
             CompositionLocalProvider(LocalLanguage provides languageState) {
-                RemindUpTheme(
-                    darkTheme = isDarkTheme
-                ) {
-                    Surface(
-                        modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.background
+                // Dil değişikliğinde UI'ı yeniden oluşturmak için key kullan
+                key(currentLanguage) {
+                    RemindUpTheme(
+                        darkTheme = isDarkTheme
                     ) {
-                        // Kullanıcı oturum açtıysa ana ekrana, açmadıysa giriş ekranına yönlendir
-                        RemindUpApp(currentUser)
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            color = MaterialTheme.colorScheme.background
+                        ) {
+                            // Kullanıcı oturum açtıysa ana ekrana, açmadıysa giriş ekranına yönlendir
+                            RemindUpApp(currentUser)
+                        }
                     }
                 }
             }
@@ -108,6 +119,7 @@ class MainActivity : ComponentActivity() {
         // Kaydedilmiş dil ayarını al
         val sharedPrefs = newBase.getSharedPreferences("language_prefs", Context.MODE_PRIVATE)
         val languageCode = sharedPrefs.getString("language_code", "tr") ?: "tr"
+        Log.d(TAG, "attachBaseContext - Language from prefs: $languageCode")
 
         // Dile göre yeni bir context oluştur
         val locale = when(languageCode) {
@@ -117,14 +129,17 @@ class MainActivity : ComponentActivity() {
 
         // Locale'i ayarla
         Locale.setDefault(locale)
+        Log.d(TAG, "Default Locale set to: ${locale.language}")
 
         // Yeni configuration oluştur
         val config = Configuration(newBase.resources.configuration)
         config.setLocale(locale)
+        Log.d(TAG, "Configuration locale set to: ${locale.language}")
 
         // Context oluştur ve parent'a gönder
         val context = newBase.createConfigurationContext(config)
         super.attachBaseContext(context)
+        Log.d(TAG, "Super.attachBaseContext called with proper locale")
     }
 }
 
@@ -133,9 +148,11 @@ fun RemindUpApp(currentUser: FirebaseUser?) {
     val navController = rememberNavController()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val TAG = "RemindUpApp"
 
     // Dil durumunu dinle
     val currentLanguage by LanguageManager.currentLanguage
+    Log.d(TAG, "RemindUpApp - Current language: $currentLanguage")
 
     // Bildirim izni kontrolü
     var hasNotificationPermission by remember {
@@ -161,7 +178,7 @@ fun RemindUpApp(currentUser: FirebaseUser?) {
 
     // Dil değiştiğinde log
     LaunchedEffect(currentLanguage) {
-        Log.d("RemindUpApp", "Language changed: $currentLanguage")
+        Log.d(TAG, "Language changed in RemindUpApp: $currentLanguage")
     }
 
     // Kullanıcı oturum açtıysa başlangıç sayfası ana sayfa, değilse giriş sayfası
@@ -172,7 +189,7 @@ fun RemindUpApp(currentUser: FirebaseUser?) {
     }
 
     LaunchedEffect(currentUser) {
-        Log.d("RemindUp", "Kullanıcı durumu: ${currentUser != null}")
+        Log.d(TAG, "User state: ${currentUser != null}")
     }
 
     AppNavigation(

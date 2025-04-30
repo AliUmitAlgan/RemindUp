@@ -1,6 +1,7 @@
 package com.aliumitalgan.remindup.utils
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.platform.LocalContext
@@ -39,7 +40,7 @@ object StringResourcesProvider {
     fun string(resId: Int): String {
         // Güncel dili al - bu değiştiğinde composable da yeniden oluşturulacak
         val currentLanguage = LocalLanguage.current.value
-        val context = LocalContext.current
+        Log.d("StringResourcesProvider", "Current language during string lookup: $currentLanguage")
 
         // String kaynağını a
         return stringResource(id = resId)
@@ -50,13 +51,5 @@ object StringResourcesProvider {
      * formatlı string kaynağı alma fonksiyonu. Bu fonksiyon, LocalLanguage değişikliklerini takip eder
      * ve string değerini güncel dile göre sağlar.
      */
-    @Composable
-    @ReadOnlyComposable
-    fun string(resId: Int, vararg formatArgs: Any): String {
-        // Güncel dili al - bu değiştiğinde composable da yeniden oluşturulacak
-        val currentLanguage = LocalLanguage.current.value
 
-        // String kaynağını formatlarla al
-        return stringResource(id = resId, formatArgs = formatArgs)
-    }
 }

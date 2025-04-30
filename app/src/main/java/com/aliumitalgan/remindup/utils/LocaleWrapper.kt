@@ -38,6 +38,7 @@ object LocaleWrapper {
 
     /**
      * Güncel dile göre yapılandırılmış bir Context döndürür.
+     * Bu metot, mevcut context'i alır ve verilen dil koduna göre yapılandırır.
      */
     fun wrapContext(baseContext: Context, languageCode: String): Context {
         Log.d(TAG, "Wrapping context with language: $languageCode")
@@ -49,7 +50,9 @@ object LocaleWrapper {
             setLocale(locale)
         }
 
-        return baseContext.createConfigurationContext(config)
+        val newContext = baseContext.createConfigurationContext(config)
+        Log.d(TAG, "Context wrapped successfully for language: $languageCode")
+        return newContext
     }
 
     /**
@@ -64,15 +67,24 @@ object LocaleWrapper {
     ) {
         // Dil durumunu takip et
         val languageState = remember { mutableStateOf(languageCode) }
+        Log.d(TAG, "Providing locale for language: $languageCode")
 
         // Configuration değişikliğini dinle
         val configuration = LocalConfiguration.current
         val locale = configuration.locales[0]
+        Log.d(TAG, "Current configuration locale: ${locale.language}")
 
         // Composition Local ile verilen içeriği sarma
         CompositionLocalProvider(
             LocalAppLanguage provides languageState.value
         ) {
+            // Context'i doğru dille güncelle
+            val context = LocalContext.current
+            val wrappedContext = remember(languageCode) {
+                wrapContext(context, languageCode)
+            }
+
+            // İçeriği render et
             content()
         }
     }

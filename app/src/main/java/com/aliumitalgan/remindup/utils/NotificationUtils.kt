@@ -35,10 +35,24 @@ object NotificationUtils {
     private const val CHANNEL_ID = "remindup_channel"
     private const val CHANNEL_NAME = "RemindUp Notifications"
     private const val CHANNEL_DESCRIPTION = "Notifications for RemindUp app"
+    private const val TAG = "NotificationUtils"
+
+    // Uygulama başlatma sayacı, uygulama başladığında bildirimleri önlemek için
+    private var isAppJustLaunched = true
 
     // Bildirim izni durumunu tutan StateFlow
     private val _notificationsEnabled = MutableStateFlow(true) // Başlangıçta true
     val notificationsEnabled: StateFlow<Boolean> = _notificationsEnabled
+
+    // Uygulama başlangıç durumunu sıfırla
+    fun resetAppLaunchState() {
+        // 5 saniye sonra normal duruma geç
+        CoroutineScope(Dispatchers.Default).launch {
+            kotlinx.coroutines.delay(5000) // 5 saniyelik gecikme
+            isAppJustLaunched = false
+            Log.d(TAG, "App launch state reset. Normal notification behavior enabled.")
+        }
+    }
 
     // Bildirim kanalını oluştur
     fun createNotificationChannel(context: Context) {
@@ -54,6 +68,7 @@ object NotificationUtils {
 
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
+            Log.d(TAG, "Notification channel created")
         }
     }
 
@@ -78,6 +93,7 @@ object NotificationUtils {
         // SharedPreferences'a kaydet
         val sharedPrefs = context.getSharedPreferences(NOTIFICATION_PREFS, Context.MODE_PRIVATE)
         sharedPrefs.edit().putBoolean(NOTIFICATIONS_ENABLED_KEY, enabled).apply()
+        Log.d(TAG, "Notification state saved: $enabled")
 
         // Hatırlatıcıları güncellemeyi arka planda yap
         CoroutineScope(Dispatchers.IO).launch {
@@ -90,54 +106,26 @@ object NotificationUtils {
                         if (enabled) {
                             // Bildirimler açıldıysa tüm hatırlatıcıları yeniden zamanla
                             reminders.forEach { (id, reminder) ->
-                                scheduleReminder(
-                                    context,
-                                    reminder,
-                                    id.hashCode()
-                                )
+                                if (reminder.isEnabled) {
+                                    scheduleReminder(
+                                        context,
+                                        reminder,
+                                        id.hashCode()
+                                    )
+                                }
                             }
+                            Log.d(TAG, "Reminders rescheduled after enabling notifications")
                         } else {
                             // Bildirimler kapatıldıysa tüm hatırlatıcıları iptal et
                             reminders.forEach { (id, _) ->
                                 cancelReminder(context, id.hashCode())
                             }
+                            Log.d(TAG, "Reminders canceled after disabling notifications")
                         }
                     }
                 }
             } catch (e: Exception) {
-                Log.e("NotificationUtils", "Hatırlatıcıları güncelleme hatası", e)
-            }
-        }
-    }
-
-    // Tüm hatırlatıcıları güncelle
-    private fun updateAllReminders(context: Context, enabled: Boolean) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val remindersResult = ReminderUtils.getUserReminders()
-                if (remindersResult.isSuccess) {
-                    val reminders = remindersResult.getOrDefault(emptyList())
-
-                    withContext(Dispatchers.Main) {
-                        if (enabled) {
-                            // Bildirimler açıldıysa tüm hatırlatıcıları yeniden zamanla
-                            for ((id, reminder) in reminders) {
-                                scheduleReminder(
-                                    context,
-                                    reminder,
-                                    id.hashCode()
-                                )
-                            }
-                        } else {
-                            // Bildirimler kapatıldıysa tüm hatırlatıcıları iptal et
-                            for ((id, reminder) in reminders) {
-                                cancelReminder(context, id.hashCode())
-                            }
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("NotificationUtils", "Hatırlatıcıları güncelleme hatası", e)
+                Log.e(TAG, "Hatırlatıcıları güncelleme hatası", e)
             }
         }
     }
@@ -145,21 +133,27 @@ object NotificationUtils {
     // Bildirim tercihini yükle
     fun loadNotificationState(context: Context): Boolean {
         val sharedPrefs = context.getSharedPreferences(NOTIFICATION_PREFS, Context.MODE_PRIVATE)
-        return sharedPrefs.getBoolean(NOTIFICATIONS_ENABLED_KEY, true) // Varsayılan olarak açık
+        val isEnabled = sharedPrefs.getBoolean(NOTIFICATIONS_ENABLED_KEY, true) // Varsayılan olarak açık
+        _notificationsEnabled.value = isEnabled
+        Log.d(TAG, "Notification state loaded: $isEnabled")
+        return isEnabled
     }
-
-    // Bildirim tercihi flow'u
-    fun getNotificationStateFlow(context: Context) = _notificationsEnabled
 
     // Anında bildirim göster
     fun showNotification(context: Context, title: String, message: String, notificationId: Int) {
+        // Uygulama yeni başlatıldıysa ve bu otomatik bir bildirimse, gösterme
+        if (isAppJustLaunched) {
+            Log.d(TAG, "App just launched, skipping notification: $title")
+            return
+        }
+
         if (!_notificationsEnabled.value) {
-            Log.d("NotificationUtils", "Bildirimler kapalı, gösterilmiyor")
+            Log.d(TAG, "Notifications disabled, not showing notification: $title")
             return
         }
 
         if (!checkNotificationPermission(context)) {
-            Log.d("NotificationUtils", "Bildirim izni yok")
+            Log.d(TAG, "No notification permission, not showing notification: $title")
             return
         }
 
@@ -192,115 +186,140 @@ object NotificationUtils {
                     ) == PackageManager.PERMISSION_GRANTED
                 ) {
                     notify(notificationId, builder.build())
-                    Log.d("NotificationUtils", "Bildirim gösterildi: $title")
+                    Log.d(TAG, "Notification shown: $title")
                 }
             }
         } catch (e: Exception) {
-            Log.e("NotificationUtils", "Bildirim gösterme hatası", e)
+            Log.e(TAG, "Notification display error", e)
         }
     }
 
-    // Zamanlanmış hatırlatıcı ayarla
+    // Zamanlanmış hatırlatıcı ayarla - tam zamanında bildirim için düzeltildi
     fun scheduleReminder(context: Context, reminder: Reminder, notificationId: Int) {
         // Bildirimler kapalıysa veya hatırlatıcı aktif değilse çalışma
         if (!_notificationsEnabled.value || !reminder.isEnabled) {
-            Log.d("NotificationUtils", "Bildirimler kapalı veya hatırlatıcı pasif, zamanlama yapılmıyor")
+            Log.d(TAG, "Notifications disabled or reminder inactive, not scheduling: ${reminder.title}")
             return
         }
 
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(context, ReminderReceiver::class.java).apply {
-            putExtra("REMINDER_TITLE", reminder.title)
-            putExtra("NOTIFICATION_ID", notificationId)
-            putExtra("REMINDER_TIME", reminder.time)
-            putExtra("REMINDER_TYPE", reminder.type.name)
-            putExtra("REMINDER_DESCRIPTION", reminder.description)
-        }
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-        val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-        val date = timeFormat.parse(reminder.time)
-        val calendar = Calendar.getInstance().apply {
-            time = date ?: Date()
-            if (before(Calendar.getInstance())) {
-                add(Calendar.DAY_OF_MONTH, 1) // Eğer zaman geçtiyse, ertesi güne ayarla
+            // İlk önce varsa eski alarmı iptal et (çift bildirim önlemek için)
+            cancelReminder(context, notificationId)
+
+            val intent = Intent(context, ReminderReceiver::class.java).apply {
+                putExtra("REMINDER_TITLE", reminder.title)
+                putExtra("NOTIFICATION_ID", notificationId)
+                putExtra("REMINDER_TIME", reminder.time)
+                putExtra("REMINDER_TYPE", reminder.type.name)
+                putExtra("REMINDER_DESCRIPTION", reminder.description)
             }
-        }
 
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            notificationId,
-            intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
+            // Zamanı doğru parse et
+            val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+            val date = timeFormat.parse(reminder.time)
+            val calendar = Calendar.getInstance().apply {
+                if (date != null) {
+                    val now = Calendar.getInstance()
 
-        // Tekrar türüne göre farklı alarm ayarlama
-        when (reminder.type) {
-            ReminderType.SINGLE -> {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        calendar.timeInMillis,
-                        pendingIntent
-                    )
-                } else {
-                    alarmManager.setExact(
-                        AlarmManager.RTC_WAKEUP,
-                        calendar.timeInMillis,
-                        pendingIntent
-                    )
+                    // Mevcut saat ve dakikayı koru, sadece hatırlatıcının saatini ayarla
+                    set(Calendar.HOUR_OF_DAY, date.hours)
+                    set(Calendar.MINUTE, date.minutes)
+                    set(Calendar.SECOND, 0)
+
+                    // Eğer ayarlanan zaman geçmişte kaldıysa, bir sonraki güne ayarla
+                    if (before(now)) {
+                        add(Calendar.DAY_OF_YEAR, 1)
+                    }
                 }
             }
-            ReminderType.DAILY -> {
-                // Günlük tekrar
-                alarmManager.setRepeating(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    AlarmManager.INTERVAL_DAY,
-                    pendingIntent
-                )
-            }
-            ReminderType.WEEKLY -> {
-                // Haftalık tekrar
-                alarmManager.setRepeating(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    AlarmManager.INTERVAL_DAY * 7,
-                    pendingIntent
-                )
-            }
-            ReminderType.MONTHLY -> {
-                // Aylık tekrar
-                val monthlyCalendar = Calendar.getInstance().apply {
-                    timeInMillis = calendar.timeInMillis
-                    add(Calendar.MONTH, 1)
-                }
-                alarmManager.setRepeating(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    monthlyCalendar.timeInMillis - calendar.timeInMillis,
-                    pendingIntent
-                )
-            }
-        }
 
-        Log.d("NotificationUtils", "Hatırlatıcı zamanlandı: ${reminder.title}, Tip: ${reminder.type}")
+            val triggerTime = calendar.timeInMillis
+
+            Log.d(TAG, "Scheduling reminder '${reminder.title}' for time: ${reminder.time}, actual time: ${Date(triggerTime)}")
+
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                notificationId,
+                intent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+
+            // Tekrar türüne göre farklı alarm ayarlama
+            when (reminder.type) {
+                ReminderType.SINGLE -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        alarmManager.setExactAndAllowWhileIdle(
+                            AlarmManager.RTC_WAKEUP,
+                            triggerTime,
+                            pendingIntent
+                        )
+                        Log.d(TAG, "Single reminder scheduled with setExactAndAllowWhileIdle")
+                    } else {
+                        alarmManager.setExact(
+                            AlarmManager.RTC_WAKEUP,
+                            triggerTime,
+                            pendingIntent
+                        )
+                        Log.d(TAG, "Single reminder scheduled with setExact")
+                    }
+                }
+                ReminderType.DAILY -> {
+                    // Günlük tekrar
+                    alarmManager.setRepeating(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTime,
+                        AlarmManager.INTERVAL_DAY,
+                        pendingIntent
+                    )
+                    Log.d(TAG, "Daily reminder scheduled")
+                }
+                ReminderType.WEEKLY -> {
+                    // Haftalık tekrar
+                    alarmManager.setRepeating(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTime,
+                        AlarmManager.INTERVAL_DAY * 7,
+                        pendingIntent
+                    )
+                    Log.d(TAG, "Weekly reminder scheduled")
+                }
+                ReminderType.MONTHLY -> {
+                    // Aylık tekrar (yaklaşık 30 gün)
+                    alarmManager.setRepeating(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTime,
+                        AlarmManager.INTERVAL_DAY * 30,
+                        pendingIntent
+                    )
+                    Log.d(TAG, "Monthly reminder scheduled")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error scheduling reminder: ${e.message}", e)
+        }
     }
 
     // Zamanlanmış hatırlatıcıyı iptal et
     fun cancelReminder(context: Context, notificationId: Int) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(context, ReminderReceiver::class.java)
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            notificationId,
-            intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE
-        )
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val intent = Intent(context, ReminderReceiver::class.java)
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                notificationId,
+                intent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE
+            )
 
-        pendingIntent?.let {
-            alarmManager.cancel(it)
-            it.cancel()
-            Log.d("NotificationUtils", "Hatırlatıcı iptal edildi: $notificationId")
+            pendingIntent?.let {
+                alarmManager.cancel(it)
+                it.cancel()
+                Log.d(TAG, "Reminder canceled: $notificationId")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error canceling reminder: ${e.message}", e)
         }
     }
 }

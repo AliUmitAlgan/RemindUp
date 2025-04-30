@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import com.aliumitalgan.remindup.utils.LanguageManager
 import com.aliumitalgan.remindup.utils.LocaleWrapper
 import com.aliumitalgan.remindup.utils.ThemeManager
+import android.util.Log
 
 // Typography'yi düzeltin
 val Typography = Typography(
@@ -78,6 +79,7 @@ fun RemindUpTheme(
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
+    val TAG = "RemindUpTheme"
 
     // forceDarkTheme veya darkTheme parametrelerini kullanarak tema durumunu belirleme
     val useDarkTheme = when {
@@ -98,12 +100,18 @@ fun RemindUpTheme(
 
     // Dil durumunu al
     val languageState by LanguageManager.currentLanguage
+    Log.d(TAG, "Current language in theme: $languageState")
 
     // UI tutarlılığı için gecikmeli recomposition engelleme
     val colorScheme = if (useDarkTheme) DarkColors else LightColors
     val rememberedColorScheme = remember(colorScheme, useDarkTheme) { colorScheme }
 
-    // Dil değişikliğinde LocaleWrapper ile komut verme
+    // Aktif dili günlüğe kaydet
+    LaunchedEffect(languageState) {
+        Log.d(TAG, "Language changed in theme: $languageState")
+    }
+
+    // Dil değişikliğinde LocaleWrapper ile komut verme - dil değişikliğini dinle
     LocaleWrapper.ProvideLocale(languageCode = languageState) {
         MaterialTheme(
             colorScheme = rememberedColorScheme,

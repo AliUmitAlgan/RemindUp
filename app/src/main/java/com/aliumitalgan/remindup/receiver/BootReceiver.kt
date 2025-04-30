@@ -16,45 +16,50 @@ import kotlinx.coroutines.withContext
  * AndroidManifest.xml'de BOOT_COMPLETED action'ı ile kaydedilmelidir
  */
 class BootReceiver : BroadcastReceiver() {
+    private val TAG = "BootReceiver"
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            Log.d("BootReceiver", "Cihaz yeniden başlatıldı. Hatırlatıcılar yeniden zamanlanıyor.")
+            Log.d(TAG, "Device rebooted. Rescheduling reminders.")
 
             // NotificationUtils'in başlatılması
             NotificationUtils.createNotificationChannel(context)
 
             // Bildirim durumunu hafızaya yükle
+            val areNotificationsEnabled = NotificationUtils.loadNotificationState(context)
+            if (!areNotificationsEnabled) {
+                Log.d(TAG, "Notifications are disabled, not restoring reminders")
+                return
+            }
+
+            // Hatırlatıcıları yeniden zamanla - sadece bildirimler etkinse
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    // Önce bildirim durumunu yükle
-                    NotificationUtils.loadNotificationState(context)
+                    val remindersResult = ReminderUtils.getUserReminders()
 
-                    // Eğer bildirimler etkinse, hatırlatıcıları yeniden zamanla
-                    if (NotificationUtils.notificationsEnabled.value) {
-                        val remindersResult = ReminderUtils.getUserReminders()
+                    if (remindersResult.isSuccess) {
+                        val reminders = remindersResult.getOrDefault(emptyList())
+                        Log.d(TAG, "Found ${reminders.size} reminders to reschedule")
 
-                        if (remindersResult.isSuccess) {
-                            val reminders = remindersResult.getOrDefault(emptyList())
-
-                            withContext(Dispatchers.Main) {
-                                for ((id, reminder) in reminders) {
+                        withContext(Dispatchers.Main) {
+                            for ((id, reminder) in reminders) {
+                                if (reminder.isEnabled) {
                                     NotificationUtils.scheduleReminder(
                                         context,
                                         reminder,
                                         id.hashCode()
                                     )
-
-                                    Log.d("BootReceiver", "Hatırlatıcı yeniden zamanlandı: ${reminder.title}")
+                                    Log.d(TAG, "Rescheduled reminder after reboot: ${reminder.title}")
+                                } else {
+                                    Log.d(TAG, "Skipped disabled reminder: ${reminder.title}")
                                 }
                             }
-                        } else {
-                            Log.e("BootReceiver", "Hatırlatıcılar alınamadı: ${remindersResult.exceptionOrNull()?.message}")
                         }
                     } else {
-                        Log.d("BootReceiver", "Bildirimler kapalı olduğu için hatırlatıcılar zamanlanmadı.")
+                        Log.e(TAG, "Failed to get reminders: ${remindersResult.exceptionOrNull()?.message}")
                     }
                 } catch (e: Exception) {
-                    Log.e("BootReceiver", "Hatırlatıcılar yeniden zamanlanırken hata oluştu: ${e.message}")
+                    Log.e(TAG, "Error rescheduling reminders after reboot: ${e.message}", e)
                 }
             }
         }
