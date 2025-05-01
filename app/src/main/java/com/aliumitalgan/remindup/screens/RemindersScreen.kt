@@ -265,30 +265,37 @@ fun ModernReminderItem(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // Kategori etiketi
-                    Text(
-                        text = reminder.category.name,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
+                    Box(
                         modifier = Modifier
                             .background(
                                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
                                 shape = RoundedCornerShape(4.dp)
                             )
                             .padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-
-                    // Başlık
-                    Text(
-                        text = reminder.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    ) {
+                        Text(
+                            text = reminder.category.name,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
+
+                // Başlık
+                Text(
+                    text = reminder.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
 
                 // Saat bilgisi
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(top = 4.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.AccessTime,
@@ -300,6 +307,18 @@ fun ModernReminderItem(
                         text = reminder.time,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
+
+                // Açıklama (varsa)
+                if (reminder.description.isNotEmpty()) {
+                    Text(
+                        text = reminder.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 4.dp)
                     )
                 }
             }
@@ -419,7 +438,20 @@ fun ModernReminderDialog(
                             selected = category == reminderCategory,
                             onClick = { category = reminderCategory },
                             label = { Text(reminderCategory.name) },
-                            leadingIcon = { /* ikon kodu aynı */ }
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = when (reminderCategory) {
+                                        ReminderCategory.GENERAL -> Icons.Default.Notifications
+                                        ReminderCategory.WORK -> Icons.Default.Work
+                                        ReminderCategory.HEALTH -> Icons.Default.Favorite
+                                        ReminderCategory.PERSONAL -> Icons.Default.Person
+                                        ReminderCategory.STUDY -> Icons.Default.School
+                                        ReminderCategory.FITNESS -> Icons.Default.FitnessCenter
+                                    },
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         )
                     }
                 }
@@ -441,7 +473,18 @@ fun ModernReminderDialog(
                                     }
                                 )
                             },
-                            leadingIcon = { /* ikon kodu aynı */ }
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = when (reminderType) {
+                                        ReminderType.SINGLE -> Icons.Default.Alarm
+                                        ReminderType.DAILY -> Icons.Default.Today
+                                        ReminderType.WEEKLY -> Icons.Default.DateRange
+                                        ReminderType.MONTHLY -> Icons.Default.Event
+                                    },
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         )
                     }
                 }
@@ -464,10 +507,14 @@ fun ModernReminderDialog(
                 onClick = {
                     if (title.isNotBlank() && time.isNotBlank()) {
                         val newReminder = Reminder(
-                            /* ... */
+                            title = title,
+                            time = time,
+                            description = description,
+                            category = category,
+                            type = type,
+                            isEnabled = isEnabled
                         )
                         onSave(newReminder)
-                        onDismiss()
                     } else {
                         val msg = ctx.getString(R.string.error_empty_fields)
                         showToast(ctx, msg)
@@ -483,7 +530,6 @@ fun ModernReminderDialog(
             }
         }
     )
-
 }
 
 @Composable
@@ -511,7 +557,7 @@ fun EmptyRemindersView(
         ) {
             Icon(
                 imageVector = Icons.Default.Notifications,
-                stringResource(R.string.reminders),
+                contentDescription = stringResource(R.string.reminders),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(64.dp)
             )

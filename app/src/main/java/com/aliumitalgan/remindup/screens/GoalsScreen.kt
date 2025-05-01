@@ -30,7 +30,7 @@ import com.aliumitalgan.remindup.utils.SubGoalUtils
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import java.util.UUID
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -376,12 +376,12 @@ fun ModernGoalDialog(
                     }
                 }
             ) {
-                Text("Kaydet")
+                Text(stringResource(R.string.update))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("İptal")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
@@ -448,7 +448,7 @@ fun EmptyGoalsView(
                 contentDescription = "Ekle"
             )
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Hedef Ekle")
+            Text(stringResource(R.string.add_goal))
         }
     }
 }

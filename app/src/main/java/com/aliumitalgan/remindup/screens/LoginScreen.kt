@@ -46,6 +46,7 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import android.util.Log
 import androidx.compose.ui.res.stringResource
+import com.aliumitalgan.remindup.utils.LanguageManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,6 +64,7 @@ fun LoginScreenContent(
     var passwordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showError by remember { mutableStateOf(false) }
+    val currentLanguage by LanguageManager.currentLanguage
 
     // Google SignIn Client - web_client_id'yi doğrudan string olarak kullanmak daha güvenli olabilir
     val webClientId = context.getString(R.string.web_client_id)
@@ -203,7 +205,7 @@ fun LoginScreenContent(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "Hedeflerinizi Takip Edin, Hatırlatıcılarınızı Yönetin",
+                        text = stringResource(R.string.welcome_subtitle),
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                         textAlign = TextAlign.Center
@@ -304,7 +306,7 @@ fun LoginScreenContent(
                                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                     Icon(
                                         imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                        contentDescription = if (passwordVisible) "Hide Password" else "Show Password"
+                                        contentDescription = if (passwordVisible) stringResource(R.string.hide_password) else stringResource(R.string.show_password)
                                     )
                                 }
                             },
@@ -367,7 +369,7 @@ fun LoginScreenContent(
                                     strokeWidth = 2.dp
                                 )
                             } else {
-                                Text("Giriş Yap", fontSize = 16.sp)
+                                Text(stringResource(R.string.login), fontSize = 16.sp)
                             }
                         }
                     }

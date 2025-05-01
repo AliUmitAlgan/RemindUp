@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -543,6 +544,8 @@ fun EmptyStateCard(
 
 @Composable
 fun ReminderListItem(reminder: Reminder) {
+    val currentLanguage by LanguageManager.currentLanguage
+
     ModernCard(
         modifier = Modifier
             .fillMaxWidth()
@@ -591,13 +594,20 @@ fun ReminderListItem(reminder: Reminder) {
                     text = reminder.title,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
 
+                // Saat bilgisini dil desteği ile göster
                 Text(
-                    text = "Saat: ${reminder.time}",
+                    text = if (currentLanguage == LanguageManager.LANGUAGE_ENGLISH) {
+                        "Time: ${reminder.time}"
+                    } else {
+                        "Saat: ${reminder.time}"
+                    },
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )

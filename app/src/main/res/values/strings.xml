@@ -92,6 +92,7 @@
     <string name="reminder_title">Hatırlatıcı Başlığı</string>
     <string name="reminder_time">Saat</string>
     <string name="time">Saat: %1$s</string>
+
     <string name="reminder_description">Açıklama (İsteğe Bağlı)</string>
     <string name="reminder_category">Kategori</string>
     <string name="reminder_type">Tekrar Türü</string>
@@ -101,6 +102,7 @@
     <string name="add_first_reminder">İlk hatırlatıcını ekleyerek başla</string>
     <string name="reminder_enabled">Hatırlatıcı Aktif</string>
     <string name="reminder_added">Hatırlatıcı eklendi</string>
+
     <string name="reminder_updated">Hatırlatıcı güncellendi</string>
     <string name="reminder_deleted">Hatırlatıcı silindi</string>
     <string name="reminder_scheduled">Hatırlatıcı zamanlandı</string>
@@ -154,15 +156,23 @@
 
     <!-- Genel -->
     <string name="loading">Yükleniyor...</string>
-    <string name="error">Hata</string>
+
     <string name="success">Başarılı</string>
     <string name="confirm">Onayla</string>
-    <string name="or">ya da</string>
+
     <string name="info">Bilgi</string>
     <string name="warning">Uyarı</string>
     <string name="next">İleri</string>
     <string name="back">Geri</string>
-
+    <string name="hide_password">Şifreyi Gizle</string>
+    <string name="show_password">Şifreyi Göster</string>
+    <string name="or">ya da</string>
+    <string name="error">Hata</string>
+    <string name="google_service_error">Google giriş servisi başlatılamadı</string>
+    <string name="google_start_error">Google ile giriş başlatılamadı</string>
+    <string name="google_auth_error">Google kimlik doğrulama hatası</string>
+    <string name="unexpected_error">Beklenmeyen bir hata oluştu</string>
+    <string name="invalid_credentials">Lütfen geçerli bir email ve şifre girin</string>
     <!-- Hata mesajları -->
     <string name="error_login">Giriş yapılamadı. Bilgilerinizi kontrol edin.</string>
     <string name="error_register">Kayıt yapılamadı. Bilgilerinizi kontrol edin.</string>

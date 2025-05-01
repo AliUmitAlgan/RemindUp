@@ -26,8 +26,11 @@ import com.aliumitalgan.remindup.R
 import com.aliumitalgan.remindup.components.BottomNavigationBar
 import com.aliumitalgan.remindup.components.GoalCard
 import com.aliumitalgan.remindup.models.Goal
+import com.aliumitalgan.remindup.utils.LanguageManager
 import com.aliumitalgan.remindup.utils.ProgressUtils
+import com.aliumitalgan.remindup.utils.ReminderUtils
 import kotlinx.coroutines.launch
+import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,6 +49,19 @@ fun ProgressScreenContent(
     var completedGoalsCount by remember { mutableStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
     var showAllGoals by remember { mutableStateOf(false) }
+
+    // Güncel dil durumunu takip et
+    val currentLanguage by LanguageManager.currentLanguage
+
+    // Motivasyon mesajını dil durumuna göre al
+    val motivationalMessage = remember(currentLanguage) {
+        ReminderUtils.getRandomMotivationalMessage(context)
+    }
+
+    // Dil değişikliğini logla
+    LaunchedEffect(currentLanguage) {
+        Log.d("ProgressScreen", "Current language for motivational messages: $currentLanguage")
+    }
 
     // Bottom Navigation Items
     val bottomNavItems = listOf(
@@ -135,16 +151,8 @@ fun ProgressScreenContent(
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Motivasyon mesajı
+                // Motivasyon mesajı - ReminderUtils ile alınıyor (dil duyarlı)
                 item {
-                    val motivationalMessage = remember {
-                        listOf(
-                            "Her küçük adım, başarıya giden yolda bir ilerlemedir!",
-                            "Bugün dünden daha iyisin, yarın da bugünden daha iyi olacaksın!",
-                            "Azim ve kararlılık, başarının anahtarıdır!"
-                        ).random()
-                    }
-
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -364,7 +372,7 @@ fun ProgressScreenContent(
                     if (completedGoals.isNotEmpty()) {
                         item {
                             Text(
-                                "Tamamlanan Hedefler",
+                                stringResource(R.string.completed_goals),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(vertical = 12.dp)
@@ -467,7 +475,7 @@ fun ModernProgressItem(goal: Goal) {
                     Spacer(modifier = Modifier.width(8.dp))
 
                     Text(
-                        text = "Tamamlandı!",
+                        text = stringResource(R.string.completed),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold

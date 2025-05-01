@@ -89,21 +89,22 @@ fun AppNavigation(
         composable(Screen.Settings.route) {
             SettingsScreenContent(
                 onNavigateBack = {
-                    // geri ok tuşuna basınca Home’a dönsün:
+                    // geri ok tuşuna basınca Home'a dönsün:
                     navController.popBackStack(Screen.Home.route, false)
                 },
                 onLogout = {
-                    // çıkış yapınca Login ekranına git ve geçmişi temizle
+                    // Önce Firebase Auth üzerinden logout işlemi yapılmalı (AuthUtils.logout() zaten SettingsScreen'de çağrılıyor)
+
+                    // Çıkış yapınca Login ekranına git ve gezinme geçmişini tamamen temizle
                     navController.navigate(Screen.Login.route) {
-                        // uygulamanın back stack'ini tamamen temizleyelim:
-                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                        // Tüm back stack'i temizle
+                        popUpTo(0) { inclusive = true }
                     }
                 },
                 onNavigateToHome = { navController.navigate(Screen.Home.route) },
                 onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
                 onNavigateToReminders = { navController.navigate(Screen.Reminders.route) },
                 onNavigateToProgress = { navController.navigate(Screen.Progress.route) },
-
             )
         }
 

@@ -25,7 +25,14 @@
     <string name="cancel">Cancel</string>
     <string name="yes_logout">Yes, Log Out</string>
     <string name="logout_confirm">Are you sure you want to log out of your account?</string>
+    <string name="hide_password">Hide Password</string>
+    <string name="show_password">Show Password</string>
 
+    <string name="google_service_error">Could not initialize Google sign-in service</string>
+    <string name="google_start_error">Could not start Google sign-in</string>
+    <string name="google_auth_error">Google authentication error</string>
+    <string name="unexpected_error">An unexpected error occurred</string>
+    <string name="invalid_credentials">Please enter a valid email and password</string>
     <!-- Login/Registration Screens -->
     <string name="login">Log In</string>
     <string name="register">Sign Up</string>

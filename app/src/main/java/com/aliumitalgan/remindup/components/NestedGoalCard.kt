@@ -393,7 +393,7 @@ fun NestedGoalCard(
                         tint = progressColor
                     )
                     Text(
-                        text = "İlerleme Güncelle",
+                         text = stringResource(R.string.edit_progress),
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -403,7 +403,8 @@ fun NestedGoalCard(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
-                        text = "Mevcut ilerleme: $goalProgress%",
+                        text = stringResource(
+                            R.string.current_progress,goalProgress),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
                     )
@@ -420,7 +421,7 @@ fun NestedGoalCard(
                                 }
                             }
                         },
-                        label = { Text("Yeni İlerleme (%)") },
+                        label = { Text(text = stringResource(R.string.new_progress)) },
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Number
                         ),
@@ -442,7 +443,7 @@ fun NestedGoalCard(
 
                     // İlerleme slider'ı
                     Text(
-                        text = "Kaydırarak ayarla:",
+                        text = stringResource(R.string.slide_to_adjust),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -483,7 +484,7 @@ fun NestedGoalCard(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                "Hedefinizi tamamlıyorsunuz!",
+                                stringResource(R.string.completing_goal),
                                 color = SuccessGreen,
                                 fontWeight = FontWeight.Medium
                             )
@@ -509,7 +510,7 @@ fun NestedGoalCard(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Güncelle")
+                    Text( stringResource(R.string.update))
                 }
             },
             dismissButton = {
@@ -526,7 +527,7 @@ fun NestedGoalCard(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("İptal")
+                    Text(stringResource(R.string.cancel))
                 }
             },
             shape = RoundedCornerShape(20.dp),

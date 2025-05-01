@@ -237,7 +237,7 @@ fun GoalCard(
                     // Tamamlandı bilgisi
                     if (isCompleted) {
                         Text(
-                            text = "Tebrikler!",
+                            text =stringResource(R.string.congratulations),
                             style = MaterialTheme.typography.bodyMedium,
                             color = progressColor,
                             fontWeight = FontWeight.SemiBold,
@@ -263,7 +263,7 @@ fun GoalCard(
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Edit,
-                            contentDescription = "İlerleme güncelle",
+                            contentDescription = stringResource(R.string.edit_progress),
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -411,7 +411,7 @@ fun GoalCard(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Güncelle")
+                    Text( stringResource(R.string.update))
                 }
             },
             dismissButton = {
@@ -428,7 +428,7 @@ fun GoalCard(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("İptal")
+                    Text(stringResource(R.string.cancel))
                 }
             },
             shape = RoundedCornerShape(20.dp),

@@ -76,9 +76,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Kullanıcı oturum durumunu kontrol et
-        val currentUser = FirebaseAuth.getInstance().currentUser
-
         setContent {
             // Dil durumunu dinle ve CompositionLocalProvider ile sağla
             val currentLanguage by LanguageManager.currentLanguage
@@ -105,8 +102,8 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.fillMaxSize(),
                             color = MaterialTheme.colorScheme.background
                         ) {
-                            // Kullanıcı oturum açtıysa ana ekrana, açmadıysa giriş ekranına yönlendir
-                            RemindUpApp(currentUser)
+                            // Burada artık FirebaseUser'ı geçmiyoruz, her zaman login ekranından başlayacak
+                            RemindUpApp()
                         }
                     }
                 }
@@ -144,7 +141,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun RemindUpApp(currentUser: FirebaseUser?) {
+fun RemindUpApp() {
     val navController = rememberNavController()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -181,16 +178,8 @@ fun RemindUpApp(currentUser: FirebaseUser?) {
         Log.d(TAG, "Language changed in RemindUpApp: $currentLanguage")
     }
 
-    // Kullanıcı oturum açtıysa başlangıç sayfası ana sayfa, değilse giriş sayfası
-    val startDestination = if (currentUser != null) {
-        Screen.Home.route
-    } else {
-        Screen.Login.route
-    }
-
-    LaunchedEffect(currentUser) {
-        Log.d(TAG, "User state: ${currentUser != null}")
-    }
+    // Başlangıç ekranı olarak her zaman Login ekranını ayarla
+    val startDestination = Screen.Login.route
 
     AppNavigation(
         navController = navController,

@@ -12,7 +12,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.ui.res.stringResource
 import com.aliumitalgan.remindup.R
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -36,25 +35,10 @@ import com.aliumitalgan.remindup.utils.NotificationUtils
 import com.aliumitalgan.remindup.utils.ThemeManager
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Dispatchers
-
 import android.content.Context
 import android.util.Log
-import androidx.compose.ui.res.stringResource
-
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.ui.res.stringResource
-
 import com.aliumitalgan.remindup.components.LanguageSelectionDialog
 import com.aliumitalgan.remindup.utils.LanguageManager
-import com.aliumitalgan.remindup.utils.StringResourcesProvider
 
 @SuppressLint("StateFlowValueCalledInComposition")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -366,15 +350,18 @@ fun SettingsScreenContent(
             confirmButton = {
                 Button(
                     onClick = {
+                        // Önce FirebaseAuth'tan çıkış yap
                         AuthUtils.logout()
+                        // Dialog'u kapat
                         showLogoutDialog = false
-                        onNavigateBack()
+                        // Ardından Login ekranına yönlendir
+                        onLogout()
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error
                     )
                 ) {
-                    Text( stringResource(R.string.yes_logout))
+                    Text(stringResource(R.string.yes_logout))
                 }
             },
             dismissButton = {
