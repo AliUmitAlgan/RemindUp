@@ -60,6 +60,7 @@
     <string name="no_goals">Henüz hedef bulunmuyor</string>
     <string name="add_first_goal">İlk hedefini ekleyerek başla</string>
     <string name="update">Güncelle</string>
+    <string name="start_by_adding_goal">Yeni bir hedef ekleyerek başlayın</string>
     <string name="edit">Düzenle</string>
     <string name="advance">İlerle</string>
     <string name="save">Kaydet</string>

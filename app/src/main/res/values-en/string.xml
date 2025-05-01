@@ -35,9 +35,11 @@
     <string name="invalid_credentials">Please enter a valid email and password</string>
     <!-- Login/Registration Screens -->
     <string name="yes_delete">Yes,Delete</string>
+
+    <string name="start_by_adding_goal">Start by adding a new goal</string>
     <string name="login">Log In</string>
     <string name="delete_goal">Delete Goal</string>
-    <string name="delete_goal_confirmation">Are you sure you want to delete the goal \"${goal.title}\"? This action cannot be undone and all sub-goals will also be deleted.</string>
+    <string name="delete_goal_confirmation">Are you sure you want to delete the goal.This action cannot be undone and all sub-goals will also be deleted.</string>
 
     <string name="register">Sign Up</string>
     <string name="email">Email</string>

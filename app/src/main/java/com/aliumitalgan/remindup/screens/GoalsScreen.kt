@@ -876,7 +876,7 @@ fun GoalsScreenContent(
 fun ModernGoalDialog(
     onDismiss: () -> Unit,
     onSave: (String, Int) -> Unit,
-    title: String = "Hedef Ekle",
+    title: String = stringResource(R.string.add_goal),
     initialTitle: String = "",
     initialProgress: Int = 0
 ) {
@@ -986,7 +986,7 @@ fun EmptyGoalsView(
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "Henüz hedef bulunmuyor",
+            text = stringResource(R.string.no_goals),
             color = MaterialTheme.colorScheme.onBackground,
             fontSize = 20.sp,
             fontWeight = FontWeight.SemiBold
@@ -995,7 +995,7 @@ fun EmptyGoalsView(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Yeni bir hedef ekleyerek başlayın",
+            text = stringResource(R.string.start_by_adding_goal),
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
             fontSize = 16.sp
         )
