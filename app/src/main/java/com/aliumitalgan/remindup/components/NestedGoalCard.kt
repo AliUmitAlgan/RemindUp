@@ -268,12 +268,13 @@ fun NestedGoalCard(
                     enter = expandVertically() + fadeIn(),
                     exit = shrinkVertically() + fadeOut()
                 ) {
-                    Column(
+                    LazyColumn(  // Changed from Column to LazyColumn for better performance with many sub-goals
                         modifier = Modifier
                             .fillMaxWidth()
+                            .heightIn(max = 200.dp)  // Added height limitation
                             .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
                     ) {
-                        subGoals.forEach { subGoal ->
+                        items(subGoals) { subGoal ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -296,20 +297,38 @@ fun NestedGoalCard(
                                 Text(
                                     text = subGoal.title,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color =                 if (subGoal.completed)
+                                    color = if (subGoal.completed)
                                         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                                     else
                                         MaterialTheme.colorScheme.onSurface,
                                     textDecoration = if (subGoal.completed)
                                         TextDecoration.LineThrough
                                     else
-                                        TextDecoration.None
+                                        TextDecoration.None,
+                                    modifier = Modifier.weight(1f)  // Allow text to take remaining space
                                 )
+
+                                // Optional: Add a delete icon for sub-goals
+                                IconButton(
+                                    onClick = {
+                                        // Implement sub-goal deletion logic here
+                                        // You might want to add an onDeleteSubGoal callback
+                                    },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Delete,
+                                        contentDescription = "Delete Sub-Goal",
+                                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
+
+
 
             // Butonlar
             Row(
@@ -537,6 +556,7 @@ fun NestedGoalCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubGoalsDialog(
     onDismiss: () -> Unit,
@@ -569,7 +589,7 @@ fun SubGoalsDialog(
             ) {
                 // Başlık
                 Text(
-                    text = stringResource(R.string. sub_goals),
+                    text = stringResource(R.string.sub_goals),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -638,9 +658,9 @@ fun SubGoalsDialog(
                                     else
                                         MaterialTheme.colorScheme.onSurface,
                                     textDecoration = if (subGoal.completed)
-                                        androidx.compose.ui.text.style.TextDecoration.LineThrough
+                                        TextDecoration.LineThrough
                                     else
-                                        androidx.compose.ui.text.style.TextDecoration.None
+                                        TextDecoration.None
                                 )
                             }
                         }
@@ -669,7 +689,7 @@ fun SubGoalsDialog(
                         OutlinedTextField(
                             value = newSubGoalTitle,
                             onValueChange = { newSubGoalTitle = it },
-                            placeholder = { stringResource(R.string.sub_goal_hint) },
+                            placeholder = { Text(stringResource(R.string.sub_goal_hint)) },
                             modifier = Modifier.weight(1f),
                             singleLine = true,
                             shape = RoundedCornerShape(16.dp),

@@ -1,39 +1,59 @@
 package com.aliumitalgan.remindup.utils
 
+import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 
-// Alt hedef veri sınıfı
 data class SubGoal(
     val id: String = "",
-    val title: String,
+    val title: String = "", // Boş varsayılan değer Firebase için
     val completed: Boolean = false,
     val parentGoalId: String = "",
     val userId: String = ""
-)
-
+) {
+    // Firebase için gerekli boş yapıcı
+    constructor() : this(
+        id = "",
+        title = "",
+        completed = false,
+        parentGoalId = "",
+        userId = ""
+    )
+}
 object SubGoalUtils {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
+    private const val TAG = "SubGoalUtils"
 
     // Alt hedef ekle
     suspend fun addSubGoal(subGoal: SubGoal): Result<String> {
         return try {
             val currentUser = auth.currentUser
-            if (currentUser != null) {
-                // SubGoal nesnesini kullanıcı ID'si ile güncelle
-                val subGoalWithUser = subGoal.copy(
-                    userId = currentUser.uid
-                )
-
-                // Firestore'a kaydet
-                val docRef = db.collection("subgoals").add(subGoalWithUser).await()
-                Result.success(docRef.id)
-            } else {
-                Result.failure(Exception("Kullanıcı oturum açmamış"))
+            if (currentUser == null) {
+                Log.e(TAG, "No user logged in")
+                return Result.failure(Exception("Kullanıcı oturum açmamış"))
             }
+
+            // Kullanıcı ID'sini kontrol et/güncelle
+            val completeSubGoal = if (subGoal.userId.isEmpty()) {
+                subGoal.copy(userId = currentUser.uid)
+            } else {
+                subGoal
+            }
+
+            Log.d(TAG, "Adding subgoal with ID: ${completeSubGoal.id}, title: ${completeSubGoal.title}, parentId: ${completeSubGoal.parentGoalId}")
+
+            // Doküman referansını oluştur ve ID'yi belirt
+            val docRef = db.collection("subgoals").document(completeSubGoal.id)
+
+            // Veriyi set et ve bekle
+            docRef.set(completeSubGoal).await()
+
+            Log.d(TAG, "Successfully added subgoal with ID: ${completeSubGoal.id}")
+            Result.success(completeSubGoal.id)
         } catch (e: Exception) {
+            Log.e(TAG, "Error adding sub-goal: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -42,26 +62,39 @@ object SubGoalUtils {
     suspend fun getSubGoalsForParent(parentGoalId: String): Result<List<Pair<String, SubGoal>>> {
         return try {
             val currentUser = auth.currentUser
-            if (currentUser != null) {
-                val querySnapshot = db.collection("subgoals")
-                    .whereEqualTo("parentGoalId", parentGoalId)
-                    .whereEqualTo("userId", currentUser.uid)
-                    .get()
-                    .await()
+            if (currentUser == null) {
+                Log.e(TAG, "No user logged in")
+                return Result.failure(Exception("Kullanıcı oturum açmamış"))
+            }
 
-                val subGoalsList = mutableListOf<Pair<String, SubGoal>>()
-                for (document in querySnapshot.documents) {
+            Log.d(TAG, "Fetching subgoals for parentId: $parentGoalId, userId: ${currentUser.uid}")
+
+            val querySnapshot = db.collection("subgoals")
+                .whereEqualTo("parentGoalId", parentGoalId)
+                .whereEqualTo("userId", currentUser.uid)
+                .get()
+                .await()
+
+            val subGoals = mutableListOf<Pair<String, SubGoal>>()
+
+            for (document in querySnapshot.documents) {
+                try {
                     val subGoal = document.toObject(SubGoal::class.java)
                     if (subGoal != null) {
-                        subGoalsList.add(Pair(document.id, subGoal))
+                        Log.d(TAG, "Found subgoal: ${document.id} -> $subGoal")
+                        subGoals.add(Pair(document.id, subGoal))
+                    } else {
+                        Log.w(TAG, "Null subgoal data for document: ${document.id}")
                     }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error converting document ${document.id}: ${e.message}")
                 }
-
-                Result.success(subGoalsList)
-            } else {
-                Result.failure(Exception("Kullanıcı oturum açmamış"))
             }
+
+            Log.d(TAG, "Total subgoals found: ${subGoals.size}")
+            Result.success(subGoals)
         } catch (e: Exception) {
+            Log.e(TAG, "Error fetching subgoals: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -69,14 +102,17 @@ object SubGoalUtils {
     // Alt hedef güncelle (tamamlandı durumunu değiştirme)
     suspend fun updateSubGoalStatus(subGoalId: String, completed: Boolean): Result<Boolean> {
         return try {
-            // Firestore'da subgoal belgesini güncelle
+            Log.d(TAG, "Updating subgoal status: $subGoalId to completed=$completed")
+
             db.collection("subgoals")
                 .document(subGoalId)
                 .update("completed", completed)
                 .await()
 
+            Log.d(TAG, "Successfully updated subgoal: $subGoalId")
             Result.success(true)
         } catch (e: Exception) {
+            Log.e(TAG, "Error updating subgoal status: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -84,14 +120,17 @@ object SubGoalUtils {
     // Alt hedef sil
     suspend fun deleteSubGoal(subGoalId: String): Result<Boolean> {
         return try {
-            // Firestore'dan subgoal belgesini sil
+            Log.d(TAG, "Deleting subgoal: $subGoalId")
+
             db.collection("subgoals")
                 .document(subGoalId)
                 .delete()
                 .await()
 
+            Log.d(TAG, "Successfully deleted subgoal: $subGoalId")
             Result.success(true)
         } catch (e: Exception) {
+            Log.e(TAG, "Error deleting subgoal: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -99,24 +138,25 @@ object SubGoalUtils {
     // Bir hedefe ait tüm alt hedefleri sil (hedef silindiğinde)
     suspend fun deleteAllSubGoalsForParent(parentGoalId: String): Result<Boolean> {
         return try {
-            val batch = db.batch()
+            Log.d(TAG, "Deleting all subgoals for parent: $parentGoalId")
 
-            // İlgili tüm alt hedefleri bul
+            val batch = db.batch()
             val querySnapshot = db.collection("subgoals")
                 .whereEqualTo("parentGoalId", parentGoalId)
                 .get()
                 .await()
 
-            // Batch işlemi ile hepsini sil
+            var count = 0
             for (document in querySnapshot.documents) {
                 batch.delete(document.reference)
+                count++
             }
 
-            // Batch işlemini uygula
             batch.commit().await()
-
+            Log.d(TAG, "Successfully deleted $count subgoals for parent: $parentGoalId")
             Result.success(true)
         } catch (e: Exception) {
+            Log.e(TAG, "Error deleting subgoals for parent: ${e.message}", e)
             Result.failure(e)
         }
     }

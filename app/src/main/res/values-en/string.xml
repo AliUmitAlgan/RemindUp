@@ -34,6 +34,7 @@
     <string name="unexpected_error">An unexpected error occurred</string>
     <string name="invalid_credentials">Please enter a valid email and password</string>
     <!-- Login/Registration Screens -->
+
     <string name="login">Log In</string>
     <string name="register">Sign Up</string>
     <string name="email">Email</string>

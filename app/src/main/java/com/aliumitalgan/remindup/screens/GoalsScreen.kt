@@ -1,5 +1,6 @@
 package com.aliumitalgan.remindup.screens
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -30,6 +31,7 @@ import com.aliumitalgan.remindup.utils.SubGoalUtils
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.UUID
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -48,6 +50,7 @@ fun GoalsScreenContent(
     var completedGoals by remember { mutableStateOf<List<Pair<String, Goal>>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var showAddDialog by remember { mutableStateOf(false) }
+
     var editingGoal by remember { mutableStateOf<Pair<String, Goal>?>(null) }
 
     // Alt hedefleri saklayacak Map (GoalId -> List<SubGoal>)
@@ -64,35 +67,52 @@ fun GoalsScreenContent(
     var selectedNavItem by remember { mutableStateOf(bottomNavItems[1].route) }
 
     // Tüm hedefleri ve alt hedefleri yükle
+    // When loading sub-goals
     LaunchedEffect(key1 = true) {
-        loadGoals(
-            onSuccess = { goalsList ->
-                // Hedefleri aktif ve tamamlanmış olarak ayır
-                activeGoals = goalsList.filter { it.second.progress < 100 }
-                completedGoals = goalsList.filter { it.second.progress >= 100 }
+        coroutineScope.launch {
+            try {
+                // Load goals
+                val goalsResult = ProgressUtils.getUserGoals()
+                if (goalsResult.isSuccess) {
+                    val goalsList = goalsResult.getOrDefault(emptyList())
+                    activeGoals = goalsList.filter { it.second.progress < 100 }
+                    completedGoals = goalsList.filter { it.second.progress >= 100 }
 
-                // Her hedef için alt hedefleri yükle
-                val subGoalsMapTemp = mutableMapOf<String, List<Pair<String, SubGoal>>>()
-                coroutineScope.launch {
+                    // Load sub-goals for each goal
+                    val subGoalsMapTemp = mutableMapOf<String, List<Pair<String, SubGoal>>>()
                     goalsList.forEach { (goalId, _) ->
                         try {
+                            Log.d("GoalsScreen", "Fetching sub-goals for goal: $goalId")
                             val subGoalsResult = SubGoalUtils.getSubGoalsForParent(goalId)
+
+                            Log.d("GoalsScreen", "Sub-goals fetch result for $goalId: ${subGoalsResult.isSuccess}")
+
                             if (subGoalsResult.isSuccess) {
-                                subGoalsMapTemp[goalId] = subGoalsResult.getOrDefault(emptyList())
+                                val subGoals = subGoalsResult.getOrDefault(emptyList())
+                                Log.d("GoalsScreen", "Sub-goals for $goalId: $subGoals")
+
+                                if (subGoals.isNotEmpty()) {
+                                    subGoalsMapTemp[goalId] = subGoals
+                                }
+                            } else {
+                                Log.e("GoalsScreen", "Failed to fetch sub-goals for goal: $goalId")
                             }
                         } catch (e: Exception) {
-                            // Alt hedefler yüklenemedi, boş liste ile devam et
+                            Log.e("GoalsScreen", "Error fetching sub-goals for goal: $goalId", e)
                         }
                     }
+
                     subGoalsMap = subGoalsMapTemp
-                    isLoading = false
+                    Log.d("GoalsScreen", "Final sub-goals map: $subGoalsMap")
+                } else {
+                    Log.e("GoalsScreen", "Failed to load goals")
                 }
-            },
-            onError = { error ->
-                showToast(context, "Hedefler yüklenemedi: $error")
+            } catch (e: Exception) {
+                Log.e("GoalsScreen", "Unexpected error loading goals", e)
+            } finally {
                 isLoading = false
             }
-        )
+        }
     }
 
     Scaffold(
@@ -202,14 +222,175 @@ fun GoalsScreenContent(
                                     )
                                 }
                             },
-                            // Diğer fonksiyonlar aynı kalacak
+                            // Add Sub Goal
+                            // onAddSubGoal kısmını şu şekilde değiştirin:
+                            // GoalsScreen.kt dosyasında onAddSubGoal fonksiyonunu değiştirin:
+
+                            // GoalsScreen.kt içindeki onAddSubGoal fonksiyonunu şu şekilde değiştirin
+
                             onAddSubGoal = { subGoalTitle ->
-                                // Önceki kod aynı kalacak
+                                coroutineScope.launch {
+                                    try {
+                                        // Kullanıcı kontrolü
+                                        val currentUser = FirebaseAuth.getInstance().currentUser
+                                        if (currentUser == null) {
+                                            Log.e("GoalsScreen", "User not logged in")
+                                            Toast.makeText(context, "Kullanıcı girişi yapılmamış", Toast.LENGTH_SHORT).show()
+                                            return@launch
+                                        }
+
+                                        // Subgoal oluştur
+                                        val newSubGoalId = UUID.randomUUID().toString()
+                                        val newSubGoal = SubGoal(
+                                            id = newSubGoalId,
+                                            title = subGoalTitle,
+                                            parentGoalId = id, // id, for döngüsünden gelen goal id'si
+                                            userId = currentUser.uid,
+                                            completed = false
+                                        )
+
+                                        Log.d("GoalsScreen", "Adding new subgoal: $newSubGoal")
+
+                                        // SubGoal'ı Firestore'a ekle
+                                        val result = SubGoalUtils.addSubGoal(newSubGoal)
+
+                                        if (result.isSuccess) {
+                                            Log.d("GoalsScreen", "Subgoal successfully added with ID: ${result.getOrNull()}")
+                                            Toast.makeText(context, "Alt hedef eklendi", Toast.LENGTH_SHORT).show()
+
+                                            // Eklenen alt hedefi mevcut listeye ekle (UI'yi hemen güncellemek için)
+                                            val currentSubGoals = subGoalsMap[id]?.toMutableList() ?: mutableListOf()
+                                            currentSubGoals.add(Pair(newSubGoalId, newSubGoal))
+
+                                            // Map'i güncelleyerek state'i değiştir
+                                            subGoalsMap = subGoalsMap.toMutableMap().apply {
+                                                put(id, currentSubGoals)
+                                            }
+
+                                            // Yeni ilerleme durumunu hesapla
+                                            val updatedSubGoals = currentSubGoals.map { it.second }
+                                            val newProgress = SubGoalUtils.calculateProgressFromSubGoals(updatedSubGoals)
+
+                                            // Hedefin ilerleme durumunu güncelle
+                                            updateGoalProgress(
+                                                goalId = id,
+                                                newProgress = newProgress,
+                                                onSuccess = {
+                                                    Log.d("GoalsScreen", "Goal progress updated to $newProgress%")
+
+                                                    // UI'yi güncelle - active ve completed listelerini güncelle
+                                                    if (newProgress >= 100) {
+                                                        // Hedef tamamlandı, active'den remove et, completed'e ekle
+                                                        val goalToUpdate = activeGoals.find { it.first == id }?.second
+                                                        if (goalToUpdate != null) {
+                                                            val updatedGoal = goalToUpdate.copy(progress = newProgress)
+                                                            activeGoals = activeGoals.filter { it.first != id }
+                                                            completedGoals = completedGoals + (id to updatedGoal)
+                                                        }
+                                                    } else {
+                                                        // Hedef hala aktif, ilerlemesini güncelle
+                                                        activeGoals = activeGoals.map {
+                                                            if (it.first == id) id to it.second.copy(progress = newProgress)
+                                                            else it
+                                                        }
+                                                    }
+                                                },
+                                                onError = { error ->
+                                                    Log.e("GoalsScreen", "Failed to update goal progress: $error")
+                                                    Toast.makeText(context, "Hedef ilerlemesi güncellenirken hata oluştu", Toast.LENGTH_SHORT).show()
+                                                }
+                                            )
+                                        } else {
+                                            // Alt hedef ekleme hatası
+                                            Log.e("GoalsScreen", "Error adding subgoal: ${result.exceptionOrNull()?.message}")
+                                            Toast.makeText(context, "Alt hedef eklenemedi: ${result.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        // Genel hata
+                                        Log.e("GoalsScreen", "Unexpected error adding subgoal", e)
+                                        Toast.makeText(context, "Beklenmeyen hata: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
                             },
+                                    // Diğer fonksiyonlar aynı kalacak
                             onToggleSubGoal = { subGoal, isCompleted ->
-                                // Önceki kod aynı kalacak
-                            }
-                        )
+                                // Use a callback approach or move coroutine logic outside of composable
+                                val toggleSubGoal: (SubGoal, Boolean) -> Unit = { goal, completed ->
+                                    coroutineScope.launch {
+                                        try {
+                                            // Alt hedefin tamamlanma durumunu güncelle
+                                            val result = SubGoalUtils.updateSubGoalStatus(goal.id, completed)
+
+                                            if (result.isSuccess) {
+                                                // Alt hedef durumu başarıyla güncellendi
+                                                // Alt hedefleri yeniden yükle
+                                                val updatedSubGoalsResult = SubGoalUtils.getSubGoalsForParent(id)
+
+                                                if (updatedSubGoalsResult.isSuccess) {
+                                                    // Alt hedef listesini güncelle
+                                                    subGoalsMap = subGoalsMap.toMutableMap().apply {
+                                                        put(id, updatedSubGoalsResult.getOrDefault(emptyList()))
+                                                    }
+
+                                                    // Alt hedeflere göre hedefin ilerlemesini hesapla
+                                                    val subGoals = updatedSubGoalsResult.getOrDefault(emptyList())
+                                                    val newProgress = SubGoalUtils.calculateProgressFromSubGoals(subGoals.map { it.second })
+
+                                                    // Hedef ilerlemesini güncelle
+                                                    updateGoalProgress(
+                                                        goalId = id,
+                                                        newProgress = newProgress,
+                                                        onSuccess = {
+                                                            // Başarılı güncelleme
+                                                            Toast.makeText(
+                                                                context,
+                                                                if (completed)
+                                                                    context.getString(R.string.sub_goal_completed)
+                                                                else
+                                                                    "Alt hedef güncellendi",
+                                                                Toast.LENGTH_SHORT
+                                                            ).show()
+                                                        },
+                                                        onError = { error ->
+                                                            // Güncelleme hatası
+                                                            Toast.makeText(
+                                                                context,
+                                                                "Hedef güncellenemedi: $error",
+                                                                Toast.LENGTH_SHORT
+                                                            ).show()
+                                                        }
+                                                    )
+                                                } else {
+                                                    // Alt hedefleri yüklerken hata
+                                                    Toast.makeText(
+                                                        context,
+                                                        "Alt hedefler yüklenemedi",
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                }
+                                            } else {
+                                                // Alt hedef durumu güncellenirken hata
+                                                Toast.makeText(
+                                                    context,
+                                                    "Alt hedef güncellenemedi: ${result.exceptionOrNull()?.message}",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        } catch (e: Exception) {
+                                            // Beklenmeyen hata
+                                            Toast.makeText(
+                                                context,
+                                                "Beklenmeyen bir hata oluştu: ${e.message}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                            Log.e("GoalsScreen", "Sub-goal toggle error", e)
+                                        }
+                                    }
+                                }
+
+                                // Call the function
+                                toggleSubGoal(subGoal, isCompleted)
+                            })
                     }
 
                     // Tamamlanmış Hedefler Başlığı
