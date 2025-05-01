@@ -618,6 +618,3 @@ private fun showTimePicker(context: Context, onTimeSelected: (String) -> Unit) {
 }
 
 // Toast mesajı göster
-private fun showToast(context: Context, message: String) {
-    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-}

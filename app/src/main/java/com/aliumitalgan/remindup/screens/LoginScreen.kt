@@ -1,6 +1,6 @@
 package com.aliumitalgan.remindup.screens
 
-import android.content.Context
+
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -12,7 +12,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.ktx.Firebase
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -26,7 +27,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import com.aliumitalgan.remindup.ui.theme.BluePrimary
 import com.aliumitalgan.remindup.ui.theme.GreenSecondary
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -63,7 +63,8 @@ fun LoginScreenContent(
     var passwordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showError by remember { mutableStateOf(false) }
-
+    var showForgotPasswordDialog by remember { mutableStateOf(false) }
+    var forgotPasswordEmail by remember { mutableStateOf("") }
     // Google SignIn Client - try-catch'i Composable dışına taşıyoruz
     val webClientId = context.getString(R.string.web_client_id)
     val googleSignInClient = remember {
@@ -334,12 +335,19 @@ fun LoginScreenContent(
                                     }
                                 }
                             ) {
-                                Text(
-                                    text = stringResource(R.string.forgot_password),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
+                                TextButton(
+                                    onClick = { showForgotPasswordDialog = true },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(end = 16.dp), // Add padding if needed
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.forgot_password),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = TextAlign.End // This will align the text to the end
+                                    )
+                                }
                             }
                         }
 
@@ -415,6 +423,7 @@ fun LoginScreenContent(
                     )
                 }
 
+
                 // Google Sign in Button
                 Button(
                     onClick = {
@@ -486,8 +495,61 @@ fun LoginScreenContent(
                 }
             }
         }
+        if (showForgotPasswordDialog) {
+            AlertDialog(
+                onDismissRequest = { showForgotPasswordDialog = false },
+                title = { Text("Şifre Sıfırlama") },
+                text = {
+                    Column {
+                        Text("Şifrenizi sıfırlamak için e-posta adresinizi girin.")
+                        Spacer(modifier = Modifier.height(16.dp))
+                        OutlinedTextField(
+                            value = forgotPasswordEmail,
+                            onValueChange = { forgotPasswordEmail = it },
+                            label = { Text("E-posta") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Email,
+                                imeAction = ImeAction.Done
+                            ),
+                            leadingIcon = {
+                                Icon(Icons.Default.Email, contentDescription = "Email")
+                            }
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (forgotPasswordEmail.isNotEmpty() && forgotPasswordEmail.contains("@")) {
+                                // Firebase password reset logic
+                                Firebase.auth.sendPasswordResetEmail(forgotPasswordEmail)
+                                    .addOnCompleteListener { task ->
+                                        if (task.isSuccessful) {
+                                            showToast(context, "Şifre sıfırlama bağlantısı e-postanıza gönderildi.")
+                                        } else {
+                                            showToast(context, "Şifre sıfırlama başarısız: ${task.exception?.message}")
+                                        }
+                                    }
+                                showForgotPasswordDialog = false
+                            } else {
+                                showToast(context, "Lütfen geçerli bir e-posta adresi girin.")
+                            }
+                        }
+                    ) {
+                        Text("Gönder")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showForgotPasswordDialog = false }) {
+                        Text("İptal")
+                    }
+                }
+            )
+        }
     }
 }
+
 
 // Input doğrulama
 private fun validateInput(email: String, password: String): Boolean {

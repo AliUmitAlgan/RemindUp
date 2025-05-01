@@ -531,7 +531,3 @@ private fun validateInput(name: String, email: String, password: String, confirm
             password == confirmPassword
 }
 
-// Composable'ın dışında tanımlanmış bir yardımcı fonksiyon
-private fun showToast(context: Context, message: String) {
-    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-}
