@@ -50,6 +50,7 @@ fun GoalsScreenContent(
     var completedGoals by remember { mutableStateOf<List<Pair<String, Goal>>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var showAddDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf<Pair<String, Goal>?>(null) }
 
     var editingGoal by remember { mutableStateOf<Pair<String, Goal>?>(null) }
 
@@ -173,7 +174,7 @@ fun GoalsScreenContent(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)  // Elemanlar arasında eşit boşluk
                 ) {
                     // Aktif Hedefler Başlığı
                     if (activeGoals.isNotEmpty()) {
@@ -223,11 +224,6 @@ fun GoalsScreenContent(
                                 }
                             },
                             // Add Sub Goal
-                            // onAddSubGoal kısmını şu şekilde değiştirin:
-                            // GoalsScreen.kt dosyasında onAddSubGoal fonksiyonunu değiştirin:
-
-                            // GoalsScreen.kt içindeki onAddSubGoal fonksiyonunu şu şekilde değiştirin
-
                             onAddSubGoal = { subGoalTitle ->
                                 coroutineScope.launch {
                                     try {
@@ -312,7 +308,69 @@ fun GoalsScreenContent(
                                     }
                                 }
                             },
-                                    // Diğer fonksiyonlar aynı kalacak
+                            // Alt hedef silme işlemi
+                            onDeleteSubGoal = { subGoal ->
+                                coroutineScope.launch {
+                                    try {
+                                        // Alt hedefi sil
+                                        val result = SubGoalUtils.deleteSubGoal(subGoal.id)
+
+                                        if (result.isSuccess) {
+                                            Toast.makeText(context, context.getString(R.string.sub_goal_deleted), Toast.LENGTH_SHORT).show()
+
+                                            // UI'yi güncelle
+                                            val updatedSubGoals = subGoalsMap[id]?.filter { it.second.id != subGoal.id } ?: emptyList()
+
+                                            // Map'i güncelle
+                                            subGoalsMap = subGoalsMap.toMutableMap().apply {
+                                                put(id, updatedSubGoals)
+                                            }
+
+                                            // Hedefin ilerleme yüzdesini güncelle
+                                            val newProgress = SubGoalUtils.calculateProgressFromSubGoals(updatedSubGoals.map { it.second })
+
+                                            updateGoalProgress(
+                                                goalId = id,
+                                                newProgress = newProgress,
+                                                onSuccess = {
+                                                    // Hedefin ilerleme durumunu güncelle
+                                                    if (newProgress >= 100) {
+                                                        val goalToUpdate = activeGoals.find { it.first == id }?.second
+                                                        if (goalToUpdate != null) {
+                                                            val updatedGoal = goalToUpdate.copy(progress = newProgress)
+                                                            activeGoals = activeGoals.filter { it.first != id }
+                                                            completedGoals = completedGoals + (id to updatedGoal)
+                                                        }
+                                                    } else {
+                                                        // Hedef hala aktif, ilerlemesini güncelle
+                                                        activeGoals = activeGoals.map {
+                                                            if (it.first == id) id to it.second.copy(progress = newProgress)
+                                                            else it
+                                                        }
+                                                    }
+                                                },
+                                                onError = { error ->
+                                                    Log.e("GoalsScreen", "Failed to update goal progress: $error")
+                                                }
+                                            )
+                                        } else {
+                                            Toast.makeText(
+                                                context,
+                                                "Alt hedef silinemedi: ${result.exceptionOrNull()?.message}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e("GoalsScreen", "Error deleting subgoal", e)
+                                        Toast.makeText(
+                                            context,
+                                            "Alt hedef silinirken hata oluştu: ${e.message}",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                            },
+                            // Toggle sub goal
                             onToggleSubGoal = { subGoal, isCompleted ->
                                 // Use a callback approach or move coroutine logic outside of composable
                                 val toggleSubGoal: (SubGoal, Boolean) -> Unit = { goal, completed ->
@@ -350,6 +408,23 @@ fun GoalsScreenContent(
                                                                     "Alt hedef güncellendi",
                                                                 Toast.LENGTH_SHORT
                                                             ).show()
+
+                                                            // Arayüzü güncelle - active ve completed listelerini güncelle
+                                                            if (newProgress >= 100) {
+                                                                // Hedef tamamlandı, active'den remove et, completed'e ekle
+                                                                val goalToUpdate = activeGoals.find { it.first == id }?.second
+                                                                if (goalToUpdate != null) {
+                                                                    val updatedGoal = goalToUpdate.copy(progress = newProgress)
+                                                                    activeGoals = activeGoals.filter { it.first != id }
+                                                                    completedGoals = completedGoals + (id to updatedGoal)
+                                                                }
+                                                            } else {
+                                                                // Hedef hala aktif, ilerlemesini güncelle
+                                                                activeGoals = activeGoals.map {
+                                                                    if (it.first == id) id to it.second.copy(progress = newProgress)
+                                                                    else it
+                                                                }
+                                                            }
                                                         },
                                                         onError = { error ->
                                                             // Güncelleme hatası
@@ -390,7 +465,13 @@ fun GoalsScreenContent(
 
                                 // Call the function
                                 toggleSubGoal(subGoal, isCompleted)
-                            })
+                            },
+                            // Hedefi silme fonksiyonu
+                            onDeleteGoal = {
+                                // Hedefi silmek için doğrulama dialog'u göster
+                                showDeleteConfirmDialog = id to goal
+                            }
+                        )
                     }
 
                     // Tamamlanmış Hedefler Başlığı
@@ -416,6 +497,245 @@ fun GoalsScreenContent(
                             subGoals = subGoals,
                             onProgressUpdate = { newProgress ->
                                 // Gerekirse düzenleme yapılabilir
+                                coroutineScope.launch {
+                                    updateGoalProgress(
+                                        goalId = id,
+                                        newProgress = newProgress,
+                                        onSuccess = {
+                                            // Hedefi aktif veya tamamlanmış listesine taşı
+                                            val updatedGoal = goal.copy(progress = newProgress)
+                                            if (newProgress < 100) {
+                                                completedGoals = completedGoals.filterNot { it.first == id }
+                                                activeGoals = activeGoals + (id to updatedGoal)
+                                                showToast(context, "Hedef aktif duruma getirildi")
+                                            } else {
+                                                completedGoals = completedGoals.map {
+                                                    if (it.first == id) id to updatedGoal
+                                                    else it
+                                                }
+                                                showToast(context, "Hedef güncellendi")
+                                            }
+                                        },
+                                        onError = { error ->
+                                            showToast(context, "Hedef güncellenemedi: $error")
+                                        }
+                                    )
+                                }
+                            },
+                            // Alt hedef ekleme
+                            onAddSubGoal = { subGoalTitle ->
+                                coroutineScope.launch {
+                                    try {
+                                        // Kullanıcı kontrolü
+                                        val currentUser = FirebaseAuth.getInstance().currentUser
+                                        if (currentUser == null) {
+                                            Log.e("GoalsScreen", "User not logged in")
+                                            Toast.makeText(context, "Kullanıcı girişi yapılmamış", Toast.LENGTH_SHORT).show()
+                                            return@launch
+                                        }
+
+                                        // Subgoal oluştur
+                                        val newSubGoalId = UUID.randomUUID().toString()
+                                        val newSubGoal = SubGoal(
+                                            id = newSubGoalId,
+                                            title = subGoalTitle,
+                                            parentGoalId = id,
+                                            userId = currentUser.uid,
+                                            completed = false
+                                        )
+
+                                        // SubGoal'ı Firestore'a ekle
+                                        val result = SubGoalUtils.addSubGoal(newSubGoal)
+
+                                        if (result.isSuccess) {
+                                            Toast.makeText(context, "Alt hedef eklendi", Toast.LENGTH_SHORT).show()
+
+                                            // UI'yi güncelle
+                                            val currentSubGoals = subGoalsMap[id]?.toMutableList() ?: mutableListOf()
+                                            currentSubGoals.add(Pair(newSubGoalId, newSubGoal))
+
+                                            subGoalsMap = subGoalsMap.toMutableMap().apply {
+                                                put(id, currentSubGoals)
+                                            }
+
+                                            // Progress yüzdesini yeniden hesapla
+                                            val updatedSubGoals = currentSubGoals.map { it.second }
+                                            val newProgress = SubGoalUtils.calculateProgressFromSubGoals(updatedSubGoals)
+
+                                            updateGoalProgress(
+                                                goalId = id,
+                                                newProgress = newProgress,
+                                                onSuccess = {
+                                                    // UI'yi güncelle
+                                                    if (newProgress < 100) {
+                                                        // Hedef artık tamamlanmamış, completed'den active'e taşı
+                                                        val goalToUpdate = completedGoals.find { it.first == id }?.second
+                                                        if (goalToUpdate != null) {
+                                                            val updatedGoal = goalToUpdate.copy(progress = newProgress)
+                                                            completedGoals = completedGoals.filter { it.first != id }
+                                                            activeGoals = activeGoals + (id to updatedGoal)
+                                                        }
+                                                    } else {
+                                                        // Hedef hala tamamlanmış, progress'i güncelle
+                                                        completedGoals = completedGoals.map {
+                                                            if (it.first == id) id to it.second.copy(progress = newProgress)
+                                                            else it
+                                                        }
+                                                    }
+                                                },
+                                                onError = { error ->
+                                                    Log.e("GoalsScreen", "Failed to update goal progress: $error")
+                                                }
+                                            )
+                                        } else {
+                                            Toast.makeText(context, "Alt hedef eklenemedi: ${result.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e("GoalsScreen", "Unexpected error adding subgoal", e)
+                                        Toast.makeText(context, "Beklenmeyen hata: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            // Alt hedef silme
+                            onDeleteSubGoal = { subGoal ->
+                                coroutineScope.launch {
+                                    try {
+                                        // Alt hedefi sil
+                                        val result = SubGoalUtils.deleteSubGoal(subGoal.id)
+
+                                        if (result.isSuccess) {
+                                            Toast.makeText(context, context.getString(R.string.sub_goal_deleted), Toast.LENGTH_SHORT).show()
+
+                                            // UI'yi güncelle
+                                            val updatedSubGoals = subGoalsMap[id]?.filter { it.second.id != subGoal.id } ?: emptyList()
+
+                                            // Map'i güncelle
+                                            subGoalsMap = subGoalsMap.toMutableMap().apply {
+                                                put(id, updatedSubGoals)
+                                            }
+
+                                            // Hedefin ilerleme yüzdesini güncelle
+                                            val newProgress = SubGoalUtils.calculateProgressFromSubGoals(updatedSubGoals.map { it.second })
+
+                                            updateGoalProgress(
+                                                goalId = id,
+                                                newProgress = newProgress,
+                                                onSuccess = {
+                                                    // Hedefin durumunu güncelle
+                                                    if (newProgress < 100) {
+                                                        val goalToUpdate = completedGoals.find { it.first == id }?.second
+                                                        if (goalToUpdate != null) {
+                                                            val updatedGoal = goalToUpdate.copy(progress = newProgress)
+                                                            completedGoals = completedGoals.filter { it.first != id }
+                                                            activeGoals = activeGoals + (id to updatedGoal)
+                                                        }
+                                                    } else {
+                                                        // Hedef hala tamamlanmış, progress'i güncelle
+                                                        completedGoals = completedGoals.map {
+                                                            if (it.first == id) id to it.second.copy(progress = newProgress)
+                                                            else it
+                                                        }
+                                                    }
+                                                },
+                                                onError = { error ->
+                                                    Log.e("GoalsScreen", "Failed to update goal progress: $error")
+                                                }
+                                            )
+                                        } else {
+                                            Toast.makeText(
+                                                context,
+                                                "Alt hedef silinemedi: ${result.exceptionOrNull()?.message}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e("GoalsScreen", "Error deleting subgoal", e)
+                                        Toast.makeText(
+                                            context,
+                                            "Alt hedef silinirken hata oluştu: ${e.message}",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                            },
+                            // Toggle sub goal
+                            onToggleSubGoal = { subGoal, isCompleted ->
+                                coroutineScope.launch {
+                                    try {
+                                        // Alt hedefin tamamlanma durumunu güncelle
+                                        val result = SubGoalUtils.updateSubGoalStatus(subGoal.id, isCompleted)
+
+                                        if (result.isSuccess) {
+                                            // UI'yi güncelle
+                                            val currentSubGoals = subGoalsMap[id]?.toMutableList() ?: mutableListOf()
+                                            val updatedSubGoals = currentSubGoals.map {
+                                                if (it.second.id == subGoal.id) {
+                                                    Pair(it.first, it.second.copy(completed = isCompleted))
+                                                } else {
+                                                    it
+                                                }
+                                            }
+
+                                            // Map'i güncelle
+                                            subGoalsMap = subGoalsMap.toMutableMap().apply {
+                                                put(id, updatedSubGoals)
+                                            }
+
+                                            // Hedefin ilerleme yüzdesini güncelle
+                                            val newProgress = SubGoalUtils.calculateProgressFromSubGoals(updatedSubGoals.map { it.second })
+
+                                            updateGoalProgress(
+                                                goalId = id,
+                                                newProgress = newProgress,
+                                                onSuccess = {
+                                                    // UI'yi güncelle
+                                                    if (newProgress < 100 && goal.progress >= 100) {
+                                                        // Hedef tamamlanmış durumdan çıktı
+                                                        completedGoals = completedGoals.filter { it.first != id }
+                                                        activeGoals = activeGoals + (id to goal.copy(progress = newProgress))
+                                                    } else if (newProgress >= 100 && goal.progress < 100) {
+                                                        // Hedef tamamlandı
+                                                        activeGoals = activeGoals.filter { it.first != id }
+                                                        completedGoals = completedGoals + (id to goal.copy(progress = newProgress))
+                                                    } else {
+                                                        // Sadece progress güncellendi
+                                                        completedGoals = completedGoals.map {
+                                                            if (it.first == id) id to it.second.copy(progress = newProgress)
+                                                            else it
+                                                        }
+                                                    }
+
+                                                    Toast.makeText(
+                                                        context,
+                                                        if (isCompleted) "Alt hedef tamamlandı" else "Alt hedef güncellendi",
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                },
+                                                onError = { error ->
+                                                    Log.e("GoalsScreen", "Failed to update goal progress: $error")
+                                                }
+                                            )
+                                        } else {
+                                            Toast.makeText(
+                                                context,
+                                                "Alt hedef güncellenemedi: ${result.exceptionOrNull()?.message}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e("GoalsScreen", "Error updating subgoal", e)
+                                        Toast.makeText(
+                                            context,
+                                            "Alt hedef güncellenirken hata oluştu: ${e.message}",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                            },
+                            // Hedefi silme fonksiyonu
+                            onDeleteGoal = {
+                                // Hedefi silmek için doğrulama dialog'u göster
+                                showDeleteConfirmDialog = id to goal
                             }
                         )
                     }
@@ -485,9 +805,69 @@ fun GoalsScreenContent(
                     }
                 )
             }
+
+            // Hedef Silme Doğrulama Dialog'u
+            showDeleteConfirmDialog?.let { (goalId, goal) ->
+                AlertDialog(
+                    onDismissRequest = { showDeleteConfirmDialog = null },
+                    title = { Text("Hedefi Sil") },
+                    text = { Text("\"${goal.title}\" hedefini silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve tüm alt hedefler de silinecektir.") },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    try {
+                                        // Önce alt hedefleri sil
+                                        val subGoalsResult = SubGoalUtils.deleteAllSubGoalsForParent(goalId)
+
+                                        if (subGoalsResult.isSuccess) {
+                                            // Şimdi hedefi sil
+                                            deleteGoal(
+                                                goalId = goalId,
+                                                onSuccess = {
+                                                    // Listelerden kaldır
+                                                    activeGoals = activeGoals.filterNot { it.first == goalId }
+                                                    completedGoals = completedGoals.filterNot { it.first == goalId }
+
+                                                    // SubGoalsMap'ten kaldır
+                                                    subGoalsMap = subGoalsMap.toMutableMap().apply {
+                                                        remove(goalId)
+                                                    }
+
+                                                    showToast(context, "Hedef silindi")
+                                                },
+                                                onError = { error ->
+                                                    showToast(context, "Hedef silinemedi: $error")
+                                                }
+                                            )
+                                        } else {
+                                            showToast(context, "Alt hedefler silinemedi: ${subGoalsResult.exceptionOrNull()?.message}")
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e("GoalsScreen", "Error deleting goal", e)
+                                        showToast(context, "Hedef silinirken hata oluştu: ${e.message}")
+                                    }
+                                }
+                                showDeleteConfirmDialog = null
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("Evet, Sil")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteConfirmDialog = null }) {
+                            Text("İptal")
+                        }
+                    }
+                )
+            }
         }
     }
 }
+
 @Composable
 fun ModernGoalDialog(
     onDismiss: () -> Unit,
@@ -522,15 +902,15 @@ fun ModernGoalDialog(
                 OutlinedTextField(
                     value = goalTitle,
                     onValueChange = { goalTitle = it },
-                    label = { stringResource(R.string.goal_title) },
-                    placeholder = { stringResource(R.string.sub_goal_hint) },
+                    label = { Text(stringResource(R.string.goal_title)) },
+                    placeholder = { Text(stringResource(R.string.sub_goal_hint)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
 
                 // İlerleme Slider
                 Text(
-                    text = stringResource(R.string.progress, goalProgress),
+                    text = stringResource(R.string.current_progress, goalProgress),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -557,7 +937,7 @@ fun ModernGoalDialog(
                     }
                 }
             ) {
-                Text(stringResource(R.string.update))
+                Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
@@ -567,6 +947,7 @@ fun ModernGoalDialog(
         }
     )
 }
+
 @Composable
 fun EmptyGoalsView(
     onAddClick: () -> Unit
@@ -689,6 +1070,25 @@ private suspend fun updateGoal(
     }
 }
 
+// Hedef sil
+private suspend fun deleteGoal(
+    goalId: String,
+    onSuccess: () -> Unit,
+    onError: (String) -> Unit
+) {
+    try {
+        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+            .collection("goals")
+            .document(goalId)
+            .delete()
+            .await()
+
+        onSuccess()
+    } catch (e: Exception) {
+        onError(e.message ?: "Bilinmeyen hata")
+    }
+}
+
 // İlerleme güncelle
 private suspend fun updateGoalProgress(
     goalId: String,
@@ -704,5 +1104,4 @@ private suspend fun updateGoalProgress(
     }
 }
 
-// Toast mesajı göster
-// Toast mesajı göster
+

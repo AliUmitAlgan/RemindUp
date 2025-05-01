@@ -42,7 +42,9 @@ fun NestedGoalCard(
     onProgressUpdate: ((Int) -> Unit)? = null,
     subGoals: List<SubGoal> = emptyList(),
     onAddSubGoal: ((String) -> Unit)? = null,
-    onToggleSubGoal: ((SubGoal, Boolean) -> Unit)? = null
+    onToggleSubGoal: ((SubGoal, Boolean) -> Unit)? = null,
+    onDeleteSubGoal: ((SubGoal) -> Unit)? = null,
+    onDeleteGoal: (() -> Unit)? = null
 ) {
     val animatedProgress = animateFloatAsState(
         targetValue = goalProgress / 100f,
@@ -103,7 +105,8 @@ fun NestedGoalCard(
             ) {
                 // Sol taraf: Başlık ve icon
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
                 ) {
                     // Icon kutusu (Gölgeli ve gradyanlı)
                     Box(
@@ -149,7 +152,7 @@ fun NestedGoalCard(
                             exit = fadeOut()
                         ) {
                             Text(
-                                stringResource(R.string. in_progress),
+                                text = stringResource(R.string.in_progress),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                 fontSize = 13.sp
@@ -268,10 +271,10 @@ fun NestedGoalCard(
                     enter = expandVertically() + fadeIn(),
                     exit = shrinkVertically() + fadeOut()
                 ) {
-                    LazyColumn(  // Changed from Column to LazyColumn for better performance with many sub-goals
+                    LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 200.dp)  // Added height limitation
+                            .heightIn(max = 200.dp)
                             .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
                     ) {
                         items(subGoals) { subGoal ->
@@ -305,22 +308,21 @@ fun NestedGoalCard(
                                         TextDecoration.LineThrough
                                     else
                                         TextDecoration.None,
-                                    modifier = Modifier.weight(1f)  // Allow text to take remaining space
+                                    modifier = Modifier.weight(1f)
                                 )
 
-                                // Optional: Add a delete icon for sub-goals
-                                IconButton(
-                                    onClick = {
-                                        // Implement sub-goal deletion logic here
-                                        // You might want to add an onDeleteSubGoal callback
-                                    },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Delete,
-                                        contentDescription = "Delete Sub-Goal",
-                                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
-                                    )
+                                // Silme butonu
+                                if (onDeleteSubGoal != null) {
+                                    IconButton(
+                                        onClick = { onDeleteSubGoal(subGoal) },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Delete,
+                                            contentDescription = "Alt hedefi sil",
+                                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -328,58 +330,83 @@ fun NestedGoalCard(
                 }
             }
 
-
-
-            // Butonlar
+            // Butonlar satırı
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 16.dp),
-                horizontalArrangement = Arrangement.End
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Alt Hedefler butonu
-                OutlinedButton(
-                    onClick = { showSubGoalsDialog = true },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.primary
-                    ),
-                    border = BorderStroke(
-                        width = 1.5.dp,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                    ),                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.List,
-                        contentDescription = "Alt Hedefler",
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(stringResource(R.string.sub_goals), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                // SİLME BUTONU - SOL EN ALTA TAŞINDI
+                if (onDeleteGoal != null) {
+                    IconButton(
+                        onClick = { onDeleteGoal() },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.1f))
+                            .padding(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            contentDescription = "Hedefi Sil",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
-
-                // İlerle butonu
-                Button(
-                    onClick = { showUpdateDialog = true },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = progressColor
-                    ),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                // Sağdaki butonlar için bir Row
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Icon(
-                        imageVector = if (isCompleted) Icons.Filled.Edit else Icons.Filled.Add,
-                        contentDescription = if (isCompleted) "Düzenle" else "İlerle",
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = stringResource(if (isCompleted) R.string.edit else R.string.advance),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    // Alt Hedefler butonu
+                    OutlinedButton(
+                        onClick = { showSubGoalsDialog = true },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.primary
+                        ),
+                        border = BorderStroke(
+                            width = 1.5.dp,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.List,
+                            contentDescription = "Alt Hedefler",
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(stringResource(R.string.sub_goals), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    // İlerle butonu
+                    Button(
+                        onClick = { showUpdateDialog = true },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = progressColor
+                        ),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isCompleted) Icons.Filled.Edit else Icons.Filled.Add,
+                            contentDescription = if (isCompleted) "Düzenle" else "İlerle",
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = stringResource(if (isCompleted) R.string.edit else R.string.advance),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }
@@ -391,7 +418,8 @@ fun NestedGoalCard(
             onDismiss = { showSubGoalsDialog = false },
             subGoals = subGoals,
             onAddSubGoal = onAddSubGoal,
-            onToggleSubGoal = onToggleSubGoal
+            onToggleSubGoal = onToggleSubGoal,
+            onDeleteSubGoal = onDeleteSubGoal
         )
     }
 
@@ -412,7 +440,7 @@ fun NestedGoalCard(
                         tint = progressColor
                     )
                     Text(
-                         text = stringResource(R.string.edit_progress),
+                        stringResource(R.string.edit_progress),
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -422,8 +450,7 @@ fun NestedGoalCard(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
-                        text = stringResource(
-                            R.string.current_progress,goalProgress),
+                        text = stringResource(R.string.current_progress, goalProgress),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
                     )
@@ -440,7 +467,7 @@ fun NestedGoalCard(
                                 }
                             }
                         },
-                        label = { Text(text = stringResource(R.string.new_progress)) },
+                        label = { Text(stringResource(R.string.new_progress)) },
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Number
                         ),
@@ -529,7 +556,7 @@ fun NestedGoalCard(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text( stringResource(R.string.update))
+                    Text(stringResource(R.string.update))
                 }
             },
             dismissButton = {
@@ -562,7 +589,8 @@ fun SubGoalsDialog(
     onDismiss: () -> Unit,
     subGoals: List<SubGoal>,
     onAddSubGoal: ((String) -> Unit)? = null,
-    onToggleSubGoal: ((SubGoal, Boolean) -> Unit)? = null
+    onToggleSubGoal: ((SubGoal, Boolean) -> Unit)? = null,
+    onDeleteSubGoal: ((SubGoal) -> Unit)? = null
 ) {
     var newSubGoalTitle by remember { mutableStateOf("") }
 
@@ -660,8 +688,23 @@ fun SubGoalsDialog(
                                     textDecoration = if (subGoal.completed)
                                         TextDecoration.LineThrough
                                     else
-                                        TextDecoration.None
+                                        TextDecoration.None,
+                                    modifier = Modifier.weight(1f)
                                 )
+
+                                // Delete sub-goal button in dialog
+                                if (onDeleteSubGoal != null) {
+                                    IconButton(
+                                        onClick = { onDeleteSubGoal(subGoal) },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Delete,
+                                            contentDescription = "Alt hedefi sil",
+                                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
