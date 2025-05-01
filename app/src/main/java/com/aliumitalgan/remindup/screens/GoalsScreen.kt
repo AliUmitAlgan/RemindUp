@@ -810,8 +810,12 @@ fun GoalsScreenContent(
             showDeleteConfirmDialog?.let { (goalId, goal) ->
                 AlertDialog(
                     onDismissRequest = { showDeleteConfirmDialog = null },
-                    title = { Text("Hedefi Sil") },
-                    text = { Text("\"${goal.title}\" hedefini silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve tüm alt hedefler de silinecektir.") },
+                    title = { Text(stringResource(R.string.delete_goal)) },
+                    text = {
+                        Text(
+                            "\"${goal.title}\" ${stringResource(R.string.delete_goal_confirmation)}"
+                        )
+                    },
                     confirmButton = {
                         Button(
                             onClick = {
@@ -854,12 +858,12 @@ fun GoalsScreenContent(
                                 containerColor = MaterialTheme.colorScheme.error
                             )
                         ) {
-                            Text("Evet, Sil")
+                            Text(stringResource(R.string.yes_delete))
                         }
                     },
                     dismissButton = {
                         TextButton(onClick = { showDeleteConfirmDialog = null }) {
-                            Text("İptal")
+                            Text(stringResource(R.string.cancel))
                         }
                     }
                 )

@@ -23,6 +23,10 @@
     <string name="language_changed_to_english">Dil İngilizce olarak değiştirildi</string>
     <string name="logout">Çıkış Yap</string>
     <string name="cancel">İptal</string>
+    <string name="delete_goal">Hedefi Sil</string>
+    <string name="delete_goal_confirmation">Bu hedefini silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve tüm alt hedefler de silinecektir.</string>
+
+    <string name="yes_delete">Evet,Sil</string>
     <string name="yes_logout">Evet, Çıkış Yap</string>
     <string name="logout_confirm">Hesabınızdan çıkış yapmak istediğinize emin misiniz?</string>
 

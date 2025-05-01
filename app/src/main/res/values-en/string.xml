@@ -34,8 +34,11 @@
     <string name="unexpected_error">An unexpected error occurred</string>
     <string name="invalid_credentials">Please enter a valid email and password</string>
     <!-- Login/Registration Screens -->
-
+    <string name="yes_delete">Yes,Delete</string>
     <string name="login">Log In</string>
+    <string name="delete_goal">Delete Goal</string>
+    <string name="delete_goal_confirmation">Are you sure you want to delete the goal \"${goal.title}\"? This action cannot be undone and all sub-goals will also be deleted.</string>
+
     <string name="register">Sign Up</string>
     <string name="email">Email</string>
     <string name="password">Password</string>
