@@ -11,9 +11,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -37,16 +39,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aliumitalgan.remindup.R
-import com.aliumitalgan.remindup.utils.AnimationUtils
 import com.aliumitalgan.remindup.utils.AuthUtils
 import com.aliumitalgan.remindup.utils.GoogleAuthHelper
 import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import android.util.Log
 import androidx.compose.ui.res.stringResource
-import com.aliumitalgan.remindup.utils.LanguageManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,64 +63,44 @@ fun LoginScreenContent(
     var passwordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showError by remember { mutableStateOf(false) }
-    val currentLanguage by LanguageManager.currentLanguage
 
-    // Google SignIn Client - web_client_id'yi doğrudan string olarak kullanmak daha güvenli olabilir
+    // Google SignIn Client - try-catch'i Composable dışına taşıyoruz
     val webClientId = context.getString(R.string.web_client_id)
-
-    Log.d(TAG, "Web Client ID: $webClientId")
-
     val googleSignInClient = remember {
-        try {
-            GoogleAuthHelper.getGoogleSignInClient(context, webClientId)
-        } catch (e: Exception) {
-            Log.e(TAG, "Google SignIn Client oluştururken hata: ${e.message}", e)
-            null
-        }
+        GoogleAuthHelper.getGoogleSignInClient(context, webClientId)
     }
 
-    // Google SignIn Launcher - açık ve daha ayrıntılı hata işleme
+    // Google SignIn Launcher - try-catch blokları kaldırıldı ve coroutineScope içine alındı
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         Log.d(TAG, "Google SignIn sonucu alındı, kod: ${result.resultCode}")
 
         isLoading = true
-        try {
-            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-            coroutineScope.launch {
-                try {
-                    Log.d(TAG, "Google hesap bilgisi işleniyor...")
-                    val authResult = GoogleAuthHelper.handleSignInResult(task)
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
 
-                    if (authResult.isSuccess) {
-                        Log.d(TAG, "Google ile giriş başarılı")
-                        showToast(context, "Google ile giriş başarılı")
-                        onLoginSuccess()
-                    } else {
-                        val error = authResult.exceptionOrNull()
-                        Log.e(TAG, "Google ile giriş başarısız: ${error?.message}", error)
-                        errorMessage = error?.message ?: "Google ile giriş başarısız"
-                        showError = true
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Google işleminde beklenmeyen hata: ${e.message}", e)
-                    errorMessage = "Beklenmeyen bir hata oluştu: ${e.message}"
+        coroutineScope.launch {
+            try {
+                Log.d(TAG, "Google hesap bilgisi işleniyor...")
+                val authResult = GoogleAuthHelper.handleSignInResult(task)
+
+                if (authResult.isSuccess) {
+                    Log.d(TAG, "Google ile giriş başarılı")
+                    Toast.makeText(context, "Google ile giriş başarılı", Toast.LENGTH_SHORT).show()
+                    onLoginSuccess()
+                } else {
+                    val error = authResult.exceptionOrNull()
+                    Log.e(TAG, "Google ile giriş başarısız: ${error?.message}", error)
+                    errorMessage = error?.message ?: "Google ile giriş başarısız"
                     showError = true
-                } finally {
-                    isLoading = false
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Google işleminde beklenmeyen hata: ${e.message}", e)
+                errorMessage = "Beklenmeyen bir hata oluştu: ${e.message}"
+                showError = true
+            } finally {
+                isLoading = false
             }
-        } catch (e: ApiException) {
-            Log.e(TAG, "Google SignIn API hatası: ${e.statusCode} - ${e.message}", e)
-            isLoading = false
-            errorMessage = "Google giriş hatası: ${e.message} (Kod: ${e.statusCode})"
-            showError = true
-        } catch (e: Exception) {
-            Log.e(TAG, "Google SignIn genel hatası: ${e.message}", e)
-            isLoading = false
-            errorMessage = "Google ile giriş sırasında hata: ${e.message}"
-            showError = true
         }
     }
 
@@ -160,9 +139,10 @@ fun LoginScreenContent(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .verticalScroll(rememberScrollState())  // Scroll desteği ekledik
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
+                verticalArrangement = Arrangement.spacedBy(16.dp)  // Elemanlar arasında eşit boşluk
             ) {
                 // Logo ve Başlık
                 Column(
@@ -211,6 +191,8 @@ fun LoginScreenContent(
                         textAlign = TextAlign.Center
                     )
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Hata mesajı
                 AnimatedVisibility(
@@ -324,6 +306,43 @@ fun LoginScreenContent(
                             )
                         )
 
+                        // Şifremi Unuttum linki - BURAYA EKLENDİ
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(
+                                onClick = {
+                                    // Şifre sıfırlama işlemi için gerekli işlemleri buraya ekleyebilirsiniz
+                                    if (email.isNotEmpty() && email.contains("@")) {
+                                        coroutineScope.launch {
+                                            try {
+                                                FirebaseAuth.getInstance().sendPasswordResetEmail(email)
+                                                Toast.makeText(
+                                                    context,
+                                                    "Şifre sıfırlama bağlantısı e-posta adresinize gönderildi",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            } catch (e: Exception) {
+                                                errorMessage = "Şifre sıfırlama e-postası gönderilemedi: ${e.message}"
+                                                showError = true
+                                            }
+                                        }
+                                    } else {
+                                        errorMessage = "Lütfen geçerli bir e-posta adresi girin"
+                                        showError = true
+                                    }
+                                }
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.forgot_password),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+
                         Spacer(modifier = Modifier.height(8.dp))
 
                         // Login Button
@@ -335,7 +354,7 @@ fun LoginScreenContent(
                                         try {
                                             val result = AuthUtils.loginWithEmail(email, password)
                                             if (result.isSuccess) {
-                                                showToast(context, "Giriş başarılı")
+                                                Toast.makeText(context, "Giriş başarılı", Toast.LENGTH_SHORT).show()
                                                 onLoginSuccess()
                                             } else {
                                                 errorMessage = result.exceptionOrNull()?.message ?: "Giriş başarısız"
@@ -386,7 +405,7 @@ fun LoginScreenContent(
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f)
                     )
                     Text(
-                        text = "ya da",
+                        text = stringResource(R.string.or),
                         modifier = Modifier.padding(horizontal = 16.dp),
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                     )
@@ -396,25 +415,16 @@ fun LoginScreenContent(
                     )
                 }
 
-                // Google Sign in Button - daha güvenilir hata işlemeli
+                // Google Sign in Button
                 Button(
                     onClick = {
                         isLoading = true
-                        try {
-                            Log.d(TAG, "Google SignIn butonu tıklandı")
-                            googleSignInClient?.let {
-                                // Daha basit ve güvenilir Google girişi
-                                Log.d(TAG, "Google SignIn başlatılıyor...")
-                                GoogleAuthHelper.signIn(googleSignInLauncher, it)
-                            } ?: run {
-                                Log.e(TAG, "Google SignIn client null")
-                                errorMessage = "Google giriş servisi başlatılamadı"
-                                showError = true
-                                isLoading = false
-                            }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Google SignIn başlatılırken hata: ${e.message}", e)
-                            errorMessage = "Google ile giriş başlatılamadı: ${e.message}"
+                        if (googleSignInClient != null) {
+                            Log.d(TAG, "Google SignIn başlatılıyor...")
+                            GoogleAuthHelper.signIn(googleSignInLauncher, googleSignInClient)
+                        } else {
+                            Log.e(TAG, "Google SignIn client null")
+                            errorMessage = "Google giriş servisi başlatılamadı"
                             showError = true
                             isLoading = false
                         }
@@ -454,6 +464,8 @@ fun LoginScreenContent(
                     }
                 }
 
+                Spacer(modifier = Modifier.weight(1f, fill = true))
+
                 // Register link
                 Row(
                     modifier = Modifier.padding(vertical = 24.dp),
@@ -466,7 +478,7 @@ fun LoginScreenContent(
                     )
                     TextButton(onClick = onNavigateToRegister) {
                         Text(
-                            stringResource(R.string.register),
+                            stringResource(R.string.register_now),
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold
                         )
@@ -480,9 +492,4 @@ fun LoginScreenContent(
 // Input doğrulama
 private fun validateInput(email: String, password: String): Boolean {
     return email.contains("@") && email.isNotEmpty() && password.length >= 6
-}
-
-// Toast mesajı göster
-private fun showToast(context: Context, message: String) {
-    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
 }
