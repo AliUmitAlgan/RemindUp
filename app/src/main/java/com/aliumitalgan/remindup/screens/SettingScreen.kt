@@ -15,6 +15,9 @@ import androidx.compose.foundation.border
 import com.aliumitalgan.remindup.R
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -39,6 +42,9 @@ import android.content.Context
 import android.util.Log
 import com.aliumitalgan.remindup.components.LanguageSelectionDialog
 import com.aliumitalgan.remindup.utils.LanguageManager
+import com.google.firebase.auth.UserProfileChangeRequest
+
+
 
 @SuppressLint("StateFlowValueCalledInComposition")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,8 +55,7 @@ fun SettingsScreenContent(
     onNavigateToGoals: () -> Unit = {},
     onNavigateToReminders: () -> Unit = {},
     onNavigateToProgress: () -> Unit = {},
-    onLogout:       () -> Unit
-
+    onLogout: () -> Unit
 ) {
     val context = LocalContext.current
     val currentUser = FirebaseAuth.getInstance().currentUser
@@ -64,6 +69,10 @@ fun SettingsScreenContent(
     val isDarkTheme by ThemeManager.isDarkTheme
     val coroutineScope = rememberCoroutineScope()
     val currentLanguage by LanguageManager.currentLanguage
+
+    // İsim düzenleme için geçici değişken
+    var newUserName by remember { mutableStateOf("") }
+    var isUpdatingName by remember { mutableStateOf(false) }
 
     // Bildirim durumu
     var notificationsEnabled by remember {
@@ -121,9 +130,6 @@ fun SettingsScreenContent(
             )
         }
     ) { innerPadding ->
-
-        // Dil Seçim Dialog
-
         // Dil Seçim Dialog
         if (showLanguageDialog) {
             LanguageSelectionDialog(
@@ -161,192 +167,267 @@ fun SettingsScreenContent(
                 }
             )
         }
+
+        // LazyColumn yerine verticalScroll kullanıyoruz
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(16.dp),
+                .verticalScroll(rememberScrollState()), // Scroll özelliği ekliyoruz
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Profil Kartı
-            AnimatedVisibility(
-                visible = true,
-                enter = fadeIn(animationSpec = tween(1000)) +
-                        slideInHorizontally(
-                            animationSpec = tween(1000),
-                            initialOffsetX = { -it }
-                        )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                ProfileSection(
-                    userName = userName,
-                    userEmail = currentUser?.email ?: "",
-                    onEditProfile = { showEditNameDialog = true }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Ayarlar Bölümleri
-            AnimatedVisibility(
-                visible = true,
-                enter = fadeIn(animationSpec = tween(1200, delayMillis = 300))
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                // Profil Kartı
+                AnimatedVisibility(
+                    visible = true,
+                    enter = fadeIn(animationSpec = tween(1000)) +
+                            slideInHorizontally(
+                                animationSpec = tween(1000),
+                                initialOffsetX = { -it }
+                            )
                 ) {
-                    // Bildirim Ayarları
-                    SettingsSection(
-                        stringResource(R.string.notifications),
-                        icon = Icons.Default.Notifications,
-                        trailingContent = {
-                            if (isProcessing) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            } else {
-                                Switch(
-                                    checked = notificationsEnabled,
-                                    onCheckedChange = { newState ->
-                                        // İşlem devam ederken kullanıcının başka bir işlem yapmasını engelle
-                                        isProcessing = true
+                    ProfileSection(
+                        userName = userName,
+                        userEmail = currentUser?.email ?: "",
+                        onEditProfile = {
+                            newUserName = userName // Mevcut ismi başlangıç değeri olarak ata
+                            showEditNameDialog = true
+                        }
+                    )
+                }
 
-                                        coroutineScope.launch {
-                                            try {
-                                                // NotificationUtils'in saveNotificationState metodunu çağır
-                                                NotificationUtils.saveNotificationState(context, newState)
+                Spacer(modifier = Modifier.height(16.dp))
 
-                                                // UI thread'inde state'i güncelle
-                                                withContext(Dispatchers.Main) {
-                                                    notificationsEnabled = newState
-                                                    showToast(
-                                                        context,
-                                                        if (newState) "Bildirimler açıldı" else "Bildirimler kapatıldı"
-                                                    )
+                // Ayarlar Bölümleri
+                AnimatedVisibility(
+                    visible = true,
+                    enter = fadeIn(animationSpec = tween(1200, delayMillis = 300))
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // Bildirim Ayarları
+                        SettingsSection(
+                            stringResource(R.string.notifications),
+                            icon = Icons.Default.Notifications,
+                            trailingContent = {
+                                if (isProcessing) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                } else {
+                                    Switch(
+                                        checked = notificationsEnabled,
+                                        onCheckedChange = { newState ->
+                                            // İşlem devam ederken kullanıcının başka bir işlem yapmasını engelle
+                                            isProcessing = true
+
+                                            coroutineScope.launch {
+                                                try {
+                                                    // NotificationUtils'in saveNotificationState metodunu çağır
+                                                    NotificationUtils.saveNotificationState(context, newState)
+
+                                                    // UI thread'inde state'i güncelle
+                                                    withContext(Dispatchers.Main) {
+                                                        notificationsEnabled = newState
+                                                        showToast(
+                                                            context,
+                                                            if (newState) "Bildirimler açıldı" else "Bildirimler kapatıldı"
+                                                        )
+                                                    }
+                                                } catch (e: Exception) {
+                                                    // Hata durumunda kullanıcıya bilgi ver
+                                                    showToast(context, "İşlem sırasında hata oluştu: ${e.message}")
+                                                    Log.e("SettingsScreen", "Bildirim durumu güncelleme hatası", e)
+                                                } finally {
+                                                    // İşlem bittiğinde işlemi sonlandır
+                                                    isProcessing = false
                                                 }
-                                            } catch (e: Exception) {
-                                                // Hata durumunda kullanıcıya bilgi ver
-                                                showToast(context, "İşlem sırasında hata oluştu: ${e.message}")
-                                                Log.e("SettingsScreen", "Bildirim durumu güncelleme hatası", e)
-                                            } finally {
-                                                // İşlem bittiğinde işlemi sonlandır
-                                                isProcessing = false
                                             }
-                                        }
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                                        ),
+                                        // İşlem devam ederken switch'i devre dışı bırak
+                                        enabled = !isProcessing
+                                    )
+                                }
+                            }
+                        )
+
+                        // Tema Ayarları
+                        SettingsSection(
+                            stringResource(R.string.dark_mode),
+                            icon = Icons.Default.DarkMode,
+                            trailingContent = {
+                                Switch(
+                                    checked = isDarkTheme,
+                                    onCheckedChange = {
+                                        ThemeManager.saveDarkThemeState(context, it)
                                     },
                                     colors = SwitchDefaults.colors(
                                         checkedThumbColor = MaterialTheme.colorScheme.primary,
                                         checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
-                                    ),
-                                    // İşlem devam ederken switch'i devre dışı bırak
-                                    enabled = !isProcessing
+                                    )
                                 )
                             }
-                        }
-                    )
+                        )
 
-                    // Tema Ayarları
-                    SettingsSection(
-                        stringResource(R.string.dark_mode),
-                        icon = Icons.Default.DarkMode,
-                        trailingContent = {
-                            Switch(
-                                checked = isDarkTheme,
-                                onCheckedChange = {
-                                    ThemeManager.saveDarkThemeState(context, it)
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = MaterialTheme.colorScheme.primary,
-                                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
-                                )
-                            )
-                        }
-                    )
+                        // Dil Ayarları
+                        SettingsSection(
+                            title = stringResource(R.string.language),
+                            icon = Icons.Default.Language,
+                            onClick = {
+                                Log.d("SettingsScreen", "Language section clicked")
+                                showLanguageDialog = true
+                            },
+                            trailingContent = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        LanguageManager.getLanguageName(),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                    )
 
+                                    Spacer(modifier = Modifier.width(4.dp))
 
-                    // Dil Ayarları
-                    // Dil Ayarları
-                    SettingsSection(
-                        title = stringResource(R.string.language),
-                        icon = Icons.Default.Language,
-                        onClick = {
-                            Log.d("SettingsScreen", "Language section clicked")
-                            showLanguageDialog = true
-                        },
-                        trailingContent = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    LanguageManager.getLanguageName(),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                )
+                                    Icon(
+                                        Icons.Default.ArrowForward,
+                                        contentDescription = stringResource(R.string.language),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        )
 
-                                Spacer(modifier = Modifier.width(4.dp))
-
+                        // Hesap Yönetimi
+                        SettingsSection(
+                            stringResource(R.string.logout),
+                            icon = Icons.Default.Logout,
+                            onClick = { showLogoutDialog = true },
+                            trailingContent = {
                                 Icon(
                                     Icons.Default.ArrowForward,
-                                    contentDescription = stringResource(R.string.language),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
+                                    contentDescription = "Çıkış",
+                                    tint = MaterialTheme.colorScheme.error
                                 )
                             }
-                        }
-                    )
+                        )
 
-                    // Hesap Yönetimi
-                    SettingsSection(
-                        stringResource(R.string.logout),
-                        icon = Icons.Default.Logout,
-                        onClick = { showLogoutDialog = true },
-                        trailingContent = {
-                            Icon(
-                                Icons.Default.ArrowForward,
-                                contentDescription = "Çıkış",
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    )
+                        // Kullanıcının daha fazla scroll yapılabildiğini görebilmesi için
+                        // ekstra boşluk eklenebilir
+                        Spacer(modifier = Modifier.height(60.dp))
+                    }
                 }
             }
         }
     }
 
     // İsim Düzenleme Dialog
-    if (showLogoutDialog) {
+    if (showEditNameDialog) {
         AlertDialog(
-            onDismissRequest = { showLogoutDialog = false },
-            title = { Text(stringResource(R.string.logout)) },
-            text  = { Text(stringResource(R.string.logout_confirm)) },
+            onDismissRequest = {
+                if (!isUpdatingName) {
+                    showEditNameDialog = false
+                }
+            },
+            title = { Text(stringResource(id = R.string.edit_profile)) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = newUserName,
+                        onValueChange = { newUserName = it },
+                        label = { Text(stringResource(id = R.string.name)) },
+                        singleLine = true,
+                        enabled = !isUpdatingName,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    if (isUpdatingName) {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 16.dp)
+                        )
+                    }
+                }
+            },
             confirmButton = {
                 Button(
                     onClick = {
-                        showLogoutDialog = false
-                        AuthUtils.logout()   // önce oturumu kapat
-                        onLogout()           // sonra dışarıya bildir
+                        // Boş isim veya aynı isim kontrolü
+                        if (newUserName.isBlank()) {
+                            showToast(context, "İsim boş olamaz")
+                            return@Button
+                        }
+
+                        if (newUserName == userName) {
+                            showEditNameDialog = false
+                            return@Button
+                        }
+
+                        isUpdatingName = true
+
+                        // Firebase'de kullanıcı adını güncelle
+                        currentUser?.let { user ->
+                            val profileUpdates = UserProfileChangeRequest.Builder()
+                                .setDisplayName(newUserName)
+                                .build()
+
+                            user.updateProfile(profileUpdates)
+                                .addOnCompleteListener { task ->
+                                    if (task.isSuccessful) {
+                                        // İsim başarıyla güncellendi
+                                        userName = newUserName
+                                        showToast(context, "İsminiz başarıyla güncellendi")
+                                    } else {
+                                        // Hata durumu
+                                        showToast(context, "İsim güncellenirken bir hata oluştu: ${task.exception?.message}")
+                                        Log.e("SettingsScreen", "İsim güncelleme hatası", task.exception)
+                                    }
+                                    isUpdatingName = false
+                                    showEditNameDialog = false
+                                }
+                        } ?: run {
+                            // Kullanıcı oturum açmamışsa
+                            showToast(context, "Kullanıcı bilgilerine erişilemiyor")
+                            isUpdatingName = false
+                            showEditNameDialog = false
+                        }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    enabled = !isUpdatingName && newUserName.isNotBlank()
                 ) {
-                    Text(stringResource(R.string.yes_logout))
+                    Text(stringResource(id = R.string.save))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showLogoutDialog = false }) {
-                    Text(stringResource(R.string.cancel))
+                TextButton(
+                    onClick = { showEditNameDialog = false },
+                    enabled = !isUpdatingName
+                ) {
+                    Text(stringResource(id = R.string.cancel))
                 }
             }
         )
     }
 
     // Çıkış Dialog
-    // Çıkış Dialog
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
             title = { Text(stringResource(id = R.string.logout)) },
-            text = { Text("Hesabınızdan çıkış yapmak istediğinize emin misiniz?") },
+            text = { Text(stringResource(id = R.string.logout_confirm)) },
             confirmButton = {
                 Button(
                     onClick = {
