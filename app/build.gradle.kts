@@ -14,11 +14,13 @@
             applicationId = "com.aliumitalgan.remindup"
             minSdk = 25
             targetSdk = 35
-            versionCode = 2
-            versionName = "1.0.1"
+            versionCode = 3
+            versionName = "1.0.2"
 
             testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-            manifestPlaceholders["web_client_id"] = "${System.getenv("117825801795-d70srog7cr7m6hjengcjrl411har5u63.apps.googleusercontent.com") ?: ""}"
+            manifestPlaceholders["web_client_id"] = "117825801795-d70srog7cr7m6hjengcjrl411har5u63.apps.googleusercontent.com"
+
+
         }
 
         signingConfigs {

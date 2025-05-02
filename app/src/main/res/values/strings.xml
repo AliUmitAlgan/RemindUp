@@ -9,7 +9,6 @@
     <string name="reminders">Hatırlatıcılar</string>
     <string name="progress">İlerleme</string>
     <string name="profile">Profil</string>
-    <string name="web_client_id">117825801795-d70srog7cr7m6hjengcjrl411har5u63.apps.googleusercontent.com</string>
     <!-- Ayarlar Ekranı -->
     <string name="settings">Ayarlar</string>
     <string name="settings_title">Ayarlar</string>
@@ -50,6 +49,7 @@
     <string name="google_login_fail">Google ile giriş başarısız</string>
     <string name="active_goals">Devam Eden Hedefler</string>
     <!-- Hedefler Ekranı -->
+    <string name="web_client_id">117825801795-d70srog7cr7m6hjengcjrl411har5u63.apps.googleusercontent.com</string>
     <string name="my_goals">Hedeflerim</string>
     <string name="add_goal">Hedef Ekle</string>
     <string name="edit_goal">Hedef Düzenle</string>

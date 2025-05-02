@@ -1,5 +1,6 @@
 package com.aliumitalgan.remindup.utils
 
+import android.util.Log
 import com.aliumitalgan.remindup.models.Goal
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -44,6 +45,7 @@ object ProgressUtils {
         return try {
             val currentUser = auth.currentUser
             if (currentUser != null) {
+                // Sadece giriş yapmış kullanıcının hedeflerini sorgula
                 val querySnapshot = db.collection("goals")
                     .whereEqualTo("userId", currentUser.uid)
                     .get()
@@ -53,7 +55,12 @@ object ProgressUtils {
                 for (document in querySnapshot.documents) {
                     val goal = document.toObject(Goal::class.java)
                     if (goal != null) {
-                        goalsList.add(Pair(document.id, goal))
+                        // İkinci bir güvenlik kontrolü olarak, userId'nin mevcut kullanıcıya ait olduğunu doğrula
+                        if (goal.userId == currentUser.uid) {
+                            goalsList.add(Pair(document.id, goal))
+                        } else {
+                            Log.w("ProgressUtils", "Farklı kullanıcıya ait hedef bulundu, atlanıyor: ${document.id}")
+                        }
                     }
                 }
 

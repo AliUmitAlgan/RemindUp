@@ -1,5 +1,6 @@
 package com.aliumitalgan.remindup.screens
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
@@ -101,10 +102,18 @@ fun HomeScreenContent(
             motivationalMessage = ReminderUtils.getRandomMotivationalMessage(context)
 
             // Hedefleri yükle
-            com.aliumitalgan.remindup.utils.FirebaseUtils.getGoals { goalsList ->
-                goals = goalsList
-                isLoading = false
-            }
+            com.aliumitalgan.remindup.utils.ProgressUtils.getUserGoals()
+                .onSuccess { goalsList ->
+                    // Liste eşleştirmesi için Map-Pair çevrimi
+                    goals = goalsList.map { it.second }
+                    isLoading = false
+                }
+                .onFailure { error ->
+                    Log.e("HomeScreen", "Hedefleri yükleme hatası: ${error.message}", error)
+                    goals = emptyList()
+                    isLoading = false
+                    Toast.makeText(context, "Hedefleri yüklerken hata: ${error.message}", Toast.LENGTH_SHORT).show()
+                }
 
             // Hatırlatıcıları yükle
             val remindersResult = ReminderUtils.getUserReminders()

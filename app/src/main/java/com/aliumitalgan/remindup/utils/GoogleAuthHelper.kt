@@ -33,17 +33,13 @@ object GoogleAuthHelper {
             .requestProfile()
             .build()
 
-        // Client'ı oluştururken, önceki oturumlarda sorun olmaması için önce sign out yapalım
-        val client = GoogleSignIn.getClient(context, gso)
-        client.signOut() // Önceki oturumları temizle
-
-        return client
+        return GoogleSignIn.getClient(context, gso)
     }
 
     // Google ile giriş yap
     fun signIn(launcher: ActivityResultLauncher<Intent>, googleSignInClient: GoogleSignInClient) {
         try {
-            // Temiz bir başlangıç için önce sign out yapalım
+            // Önceki oturumları temizle ve yeni bir giriş başlat
             googleSignInClient.signOut().addOnCompleteListener {
                 val signInIntent = googleSignInClient.signInIntent
                 Log.d(TAG, "SignIn başlatılıyor...")
@@ -85,7 +81,8 @@ object GoogleAuthHelper {
                 Result.failure(Exception("Google ID Token alınamadı"))
             }
         } catch (e: ApiException) {
-            Log.e(TAG, "Google sign in ApiException: ${e.statusCode} - ${e.message}", e)
+            // ApiException kodunu ve mesajını kaydet
+            Log.e(TAG, "Google sign in ApiException: Status code: ${e.statusCode}, Message: ${e.message}", e)
             Result.failure(e)
         } catch (e: Exception) {
             Log.e(TAG, "Google sign in Exception: ${e.message}", e)

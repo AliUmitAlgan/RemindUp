@@ -21,12 +21,13 @@ data class SubGoal(
         userId = ""
     )
 }
+
 object SubGoalUtils {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
     private const val TAG = "SubGoalUtils"
 
-    // Alt hedef ekle
+    // Alt hedef ekle - Enhanced with security checks
     suspend fun addSubGoal(subGoal: SubGoal): Result<String> {
         return try {
             val currentUser = auth.currentUser
@@ -35,11 +36,29 @@ object SubGoalUtils {
                 return Result.failure(Exception("Kullanıcı oturum açmamış"))
             }
 
-            // Kullanıcı ID'sini kontrol et/güncelle
-            val completeSubGoal = if (subGoal.userId.isEmpty()) {
-                subGoal.copy(userId = currentUser.uid)
-            } else {
-                subGoal
+            // Always ensure userId is set to current user's ID
+            val completeSubGoal = subGoal.copy(userId = currentUser.uid)
+
+            // Verify the parent goal belongs to the current user
+            if (completeSubGoal.parentGoalId.isNotEmpty()) {
+                try {
+                    val parentGoal = db.collection("goals")
+                        .document(completeSubGoal.parentGoalId)
+                        .get()
+                        .await()
+
+                    if (!parentGoal.exists()) {
+                        return Result.failure(Exception("Parent goal not found"))
+                    }
+
+                    val parentGoalUserId = parentGoal.getString("userId")
+                    if (parentGoalUserId != currentUser.uid) {
+                        return Result.failure(Exception("Permission denied: The parent goal doesn't belong to you"))
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error verifying parent goal: ${e.message}", e)
+                    return Result.failure(Exception("Failed to verify parent goal ownership"))
+                }
             }
 
             Log.d(TAG, "Adding subgoal with ID: ${completeSubGoal.id}, title: ${completeSubGoal.title}, parentId: ${completeSubGoal.parentGoalId}")
@@ -58,13 +77,33 @@ object SubGoalUtils {
         }
     }
 
-    // Bir hedefe ait alt hedefleri getir
+    // Bir hedefe ait alt hedefleri getir - Enhanced with security checks
     suspend fun getSubGoalsForParent(parentGoalId: String): Result<List<Pair<String, SubGoal>>> {
         return try {
             val currentUser = auth.currentUser
             if (currentUser == null) {
                 Log.e(TAG, "No user logged in")
                 return Result.failure(Exception("Kullanıcı oturum açmamış"))
+            }
+
+            // First, verify the parent goal belongs to the current user
+            try {
+                val parentGoal = db.collection("goals")
+                    .document(parentGoalId)
+                    .get()
+                    .await()
+
+                if (!parentGoal.exists()) {
+                    return Result.failure(Exception("Parent goal not found"))
+                }
+
+                val parentGoalUserId = parentGoal.getString("userId")
+                if (parentGoalUserId != currentUser.uid) {
+                    return Result.failure(Exception("Permission denied: The parent goal doesn't belong to you"))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error verifying parent goal: ${e.message}", e)
+                return Result.failure(Exception("Failed to verify parent goal ownership"))
             }
 
             Log.d(TAG, "Fetching subgoals for parentId: $parentGoalId, userId: ${currentUser.uid}")
@@ -81,8 +120,11 @@ object SubGoalUtils {
                 try {
                     val subGoal = document.toObject(SubGoal::class.java)
                     if (subGoal != null) {
-                        Log.d(TAG, "Found subgoal: ${document.id} -> $subGoal")
-                        subGoals.add(Pair(document.id, subGoal))
+                        // Double-check that the subgoal belongs to the current user
+                        if (subGoal.userId == currentUser.uid) {
+                            Log.d(TAG, "Found subgoal: ${document.id} -> $subGoal")
+                            subGoals.add(Pair(document.id, subGoal))
+                        }
                     } else {
                         Log.w(TAG, "Null subgoal data for document: ${document.id}")
                     }
@@ -99,9 +141,30 @@ object SubGoalUtils {
         }
     }
 
-    // Alt hedef güncelle (tamamlandı durumunu değiştirme)
+    // Alt hedef güncelle (tamamlandı durumunu değiştirme) - Enhanced with security checks
     suspend fun updateSubGoalStatus(subGoalId: String, completed: Boolean): Result<Boolean> {
         return try {
+            val currentUser = auth.currentUser
+            if (currentUser == null) {
+                Log.e(TAG, "No user logged in")
+                return Result.failure(Exception("Kullanıcı oturum açmamış"))
+            }
+
+            // Verify the subgoal belongs to the current user
+            val subGoalDoc = db.collection("subgoals")
+                .document(subGoalId)
+                .get()
+                .await()
+
+            if (!subGoalDoc.exists()) {
+                return Result.failure(Exception("SubGoal not found"))
+            }
+
+            val subGoalUserId = subGoalDoc.getString("userId")
+            if (subGoalUserId != currentUser.uid) {
+                return Result.failure(Exception("Permission denied: This subgoal doesn't belong to you"))
+            }
+
             Log.d(TAG, "Updating subgoal status: $subGoalId to completed=$completed")
 
             db.collection("subgoals")
@@ -117,9 +180,30 @@ object SubGoalUtils {
         }
     }
 
-    // Alt hedef sil
+    // Alt hedef sil - Enhanced with security checks
     suspend fun deleteSubGoal(subGoalId: String): Result<Boolean> {
         return try {
+            val currentUser = auth.currentUser
+            if (currentUser == null) {
+                Log.e(TAG, "No user logged in")
+                return Result.failure(Exception("Kullanıcı oturum açmamış"))
+            }
+
+            // Verify the subgoal belongs to the current user
+            val subGoalDoc = db.collection("subgoals")
+                .document(subGoalId)
+                .get()
+                .await()
+
+            if (!subGoalDoc.exists()) {
+                return Result.failure(Exception("SubGoal not found"))
+            }
+
+            val subGoalUserId = subGoalDoc.getString("userId")
+            if (subGoalUserId != currentUser.uid) {
+                return Result.failure(Exception("Permission denied: This subgoal doesn't belong to you"))
+            }
+
             Log.d(TAG, "Deleting subgoal: $subGoalId")
 
             db.collection("subgoals")
@@ -135,14 +219,41 @@ object SubGoalUtils {
         }
     }
 
-    // Bir hedefe ait tüm alt hedefleri sil (hedef silindiğinde)
+    // Bir hedefe ait tüm alt hedefleri sil (hedef silindiğinde) - Enhanced with security checks
     suspend fun deleteAllSubGoalsForParent(parentGoalId: String): Result<Boolean> {
         return try {
+            val currentUser = auth.currentUser
+            if (currentUser == null) {
+                Log.e(TAG, "No user logged in")
+                return Result.failure(Exception("Kullanıcı oturum açmamış"))
+            }
+
+            // First, verify the parent goal belongs to the current user
+            try {
+                val parentGoal = db.collection("goals")
+                    .document(parentGoalId)
+                    .get()
+                    .await()
+
+                if (!parentGoal.exists()) {
+                    return Result.failure(Exception("Parent goal not found"))
+                }
+
+                val parentGoalUserId = parentGoal.getString("userId")
+                if (parentGoalUserId != currentUser.uid) {
+                    return Result.failure(Exception("Permission denied: The parent goal doesn't belong to you"))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error verifying parent goal: ${e.message}", e)
+                return Result.failure(Exception("Failed to verify parent goal ownership"))
+            }
+
             Log.d(TAG, "Deleting all subgoals for parent: $parentGoalId")
 
             val batch = db.batch()
             val querySnapshot = db.collection("subgoals")
                 .whereEqualTo("parentGoalId", parentGoalId)
+                .whereEqualTo("userId", currentUser.uid) // Ensure we only delete user's own subgoals
                 .get()
                 .await()
 

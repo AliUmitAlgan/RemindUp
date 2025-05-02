@@ -67,37 +67,59 @@ fun LoginScreenContent(
     var forgotPasswordEmail by remember { mutableStateOf("") }
     // Google SignIn Client - try-catch'i Composable dışına taşıyoruz
     val webClientId = context.getString(R.string.web_client_id)
+    Log.d(TAG, "Using web client ID: $webClientId")
     val googleSignInClient = remember {
         GoogleAuthHelper.getGoogleSignInClient(context, webClientId)
     }
 
     // Google SignIn Launcher - try-catch blokları kaldırıldı ve coroutineScope içine alındı
+    // Update this part in LoginScreen.kt
+
+// Google SignIn Launcher with improved error handling
+    // Separate state for error handling
+    var signInErrorMessage by remember { mutableStateOf<String?>(null) }
+
+// Google SignIn Launcher with proper error handling for Compose
+    // Google SignIn Launcher with proper error handling for Compose
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        Log.d(TAG, "Google SignIn sonucu alındı, kod: ${result.resultCode}")
-
+        Log.d(TAG, "Google SignIn result received, code: ${result.resultCode}")
         isLoading = true
+
+        if (result.data == null) {
+            Log.e(TAG, "Google SignIn result data is null")
+            errorMessage = "Google ile giriş başarısız: Veri alınamadı"
+            showError = true
+            isLoading = false
+            return@rememberLauncherForActivityResult
+        }
+
         val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
 
+        // Use the existing coroutineScope
         coroutineScope.launch {
             try {
-                Log.d(TAG, "Google hesap bilgisi işleniyor...")
+                Log.d(TAG, "Processing Google account info...")
                 val authResult = GoogleAuthHelper.handleSignInResult(task)
 
+                // Now we're back in a coroutine context, we can safely update UI state
                 if (authResult.isSuccess) {
-                    Log.d(TAG, "Google ile giriş başarılı")
-                    Toast.makeText(context, "Google ile giriş başarılı", Toast.LENGTH_SHORT).show()
+                    Log.d(TAG, "Google sign-in successful")
+                    // Since we're already in the coroutineScope, we can directly update UI
+                    Toast.makeText(context, context.getString(R.string.login_success), Toast.LENGTH_SHORT).show()
                     onLoginSuccess()
                 } else {
                     val error = authResult.exceptionOrNull()
-                    Log.e(TAG, "Google ile giriş başarısız: ${error?.message}", error)
-                    errorMessage = error?.message ?: "Google ile giriş başarısız"
+                    Log.e(TAG, "Google sign-in failed: ${error?.message}", error)
+                    // Update state values which will trigger recomposition
+                    errorMessage = error?.message ?: context.getString(R.string.google_login_fail)
                     showError = true
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Google işleminde beklenmeyen hata: ${e.message}", e)
-                errorMessage = "Beklenmeyen bir hata oluştu: ${e.message}"
+                Log.e(TAG, "Unexpected error during Google sign-in process: ${e.message}", e)
+                // Update state values which will trigger recomposition
+                errorMessage = context.getString(R.string.unexpected_error) + ": ${e.message}"
                 showError = true
             } finally {
                 isLoading = false
@@ -430,7 +452,15 @@ fun LoginScreenContent(
                         isLoading = true
                         if (googleSignInClient != null) {
                             Log.d(TAG, "Google SignIn başlatılıyor...")
-                            GoogleAuthHelper.signIn(googleSignInLauncher, googleSignInClient)
+                            // Don't clear cookies or sign out before starting
+                            try {
+                                GoogleAuthHelper.signIn(googleSignInLauncher, googleSignInClient)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Google SignIn error: ${e.message}", e)
+                                errorMessage = "Google ile giriş sırasında hata oluştu: ${e.message}"
+                                showError = true
+                                isLoading = false
+                            }
                         } else {
                             Log.e(TAG, "Google SignIn client null")
                             errorMessage = "Google giriş servisi başlatılamadı"
