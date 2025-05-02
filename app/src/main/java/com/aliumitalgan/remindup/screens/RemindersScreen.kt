@@ -2,9 +2,11 @@ package com.aliumitalgan.remindup.screens
 
 import android.app.TimePickerDialog
 import android.content.Context
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -32,6 +34,7 @@ import com.aliumitalgan.remindup.models.Reminder
 import com.aliumitalgan.remindup.models.ReminderCategory
 import com.aliumitalgan.remindup.models.ReminderType
 import com.aliumitalgan.remindup.utils.ReminderUtils
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import java.util.*
 
@@ -50,6 +53,7 @@ fun RemindersScreenContent(
     var isLoading by remember { mutableStateOf(true) }
     var showAddDialog by remember { mutableStateOf(false) }
     var editingReminder by remember { mutableStateOf<Pair<String, Reminder>?>(null) }
+
 
     // Bottom Navigation Items
     val bottomNavItems = listOf(
@@ -193,43 +197,63 @@ fun RemindersScreenContent(
 
             // Hatırlatıcı Ekleme/Düzenleme Diyaloğu
             if (showAddDialog) {
+                val reminderToEdit = editingReminder?.second
                 ModernReminderDialog(
                     onDismiss = {
                         showAddDialog = false
                         editingReminder = null
                     },
-                    onSave = { newReminder ->
+                    onSave = { newReminderData ->
                         coroutineScope.launch {
-                            if (editingReminder != null) {
-                                // Düzenleme
-                                val result = ReminderUtils.updateReminder(editingReminder!!.first, newReminder, context)
+                            // Mevcut düzenleme bilgisini al
+                            val currentEditingReminder = editingReminder
+
+                            if (currentEditingReminder != null) {
+                                // GÜNCELLEME
+                                val (id, existingReminder) = currentEditingReminder
+                                val updatedReminder = existingReminder.copy(
+                                    title       = newReminderData.title,
+                                    time        = newReminderData.time,
+                                    description = newReminderData.description,
+                                    category    = newReminderData.category,
+                                    type        = newReminderData.type,
+                                    isEnabled   = newReminderData.isEnabled
+                                )
+
+                                Log.d("RemindersScreen", "Güncelleme: $id → $updatedReminder")
+                                val result = ReminderUtils.updateReminder(id, updatedReminder, context)
                                 if (result.isSuccess) {
                                     reminders = reminders.map {
-                                        if (it.first == editingReminder!!.first) editingReminder!!.first to newReminder
-                                        else it
+                                        if (it.first == id) id to updatedReminder else it
                                     }
                                     showToast(context, "Hatırlatıcı güncellendi")
                                 } else {
-                                    showToast(context, "Hatırlatıcı güncellenemedi")
+                                    showToast(context, "Güncelleme başarısız: ${result.exceptionOrNull()?.message}")
                                 }
                             } else {
-                                // Ekleme
+                                // YENİ EKLEME
+                                val newReminder = newReminderData.copy(
+                                    userId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+                                )
                                 val result = ReminderUtils.addReminder(newReminder, context)
                                 if (result.isSuccess) {
                                     val newId = result.getOrDefault("")
                                     reminders = reminders + (newId to newReminder)
                                     showToast(context, "Hatırlatıcı eklendi")
                                 } else {
-                                    showToast(context, "Hatırlatıcı eklenemedi")
+                                    showToast(context, "Ekleme başarısız: ${result.exceptionOrNull()?.message}")
                                 }
                             }
+
+                            // **DEĞİŞİKLİK**: Dialog kapatma ve editingReminder sıfırlama burada yapılıyor
+                            showAddDialog = false
+                            editingReminder = null
                         }
-                        showAddDialog = false
-                        editingReminder = null
                     },
-                    initialReminder = editingReminder?.second
+                    initialReminder = reminderToEdit
                 )
             }
+
         }
     }
 }
@@ -377,6 +401,13 @@ fun ModernReminderDialog(
 
     val context = LocalContext.current
 
+    // Loglama için düzenleme bilgisini göster
+    if (initialReminder != null) {
+        LaunchedEffect(Unit) {
+            Log.d("ModernReminderDialog", "Düzenleniyor: ${initialReminder.title}, Saat: ${initialReminder.time}, UserId: ${initialReminder.userId}")
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -408,26 +439,44 @@ fun ModernReminderDialog(
                     maxLines = 3
                 )
 
-                // Saat Seçimi
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        Icons.Default.AccessTime,
-                        contentDescription = stringResource(R.string.reminder_time)
-                    )
-                    Text(
-                        text = time.ifEmpty { stringResource(R.string.select_time) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable {
-                                showTimePicker(context) { selectedTime ->
-                                    time = selectedTime
-                                }
+                // Saat Seçimi - İYİLEŞTİRİLMİŞ BÖLÜM
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            showTimePickerDialog(context) { selectedTime ->
+                                time = selectedTime
+                                Log.d("ModernReminderDialog", "Yeni saat seçildi: $selectedTime")
                             }
-                            .padding(8.dp)
-                    )
+                        }
+                        .padding(16.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            Icons.Default.AccessTime,
+                            contentDescription = stringResource(R.string.reminder_time),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+
+                        Text(
+                            text = if (time.isEmpty()) stringResource(R.string.select_time) else time,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (time.isEmpty())
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            else
+                                MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
 
                 // Kategori
@@ -503,21 +552,32 @@ fun ModernReminderDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            Button(
                 onClick = {
                     if (title.isNotBlank() && time.isNotBlank()) {
+                        // Yeni bir reminder objesi oluştur
                         val newReminder = Reminder(
                             title = title,
                             time = time,
                             description = description,
                             category = category,
                             type = type,
-                            isEnabled = isEnabled
+                            isEnabled = isEnabled,
+                            // Ensure userId is properly preserved from the initial reminder
+                            userId = initialReminder?.userId ?: FirebaseAuth.getInstance().currentUser?.uid ?: ""
                         )
+
+                        Log.d("ModernReminderDialog", "Kaydediliyor: $title, Saat: $time, UserId: ${newReminder.userId}")
                         onSave(newReminder)
                     } else {
-                        val msg = ctx.getString(R.string.error_empty_fields)
-                        showToast(ctx, msg)
+                        val msg = if (title.isBlank() && time.isBlank()) {
+                            "Lütfen başlık ve saat giriniz"
+                        } else if (title.isBlank()) {
+                            "Lütfen başlık giriniz"
+                        } else {
+                            "Lütfen saat seçiniz"
+                        }
+                        Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
                     }
                 }
             ) {
@@ -599,8 +659,8 @@ fun EmptyRemindersView(
     }
 }
 
-// Saat seçme diyaloğu göster
-private fun showTimePicker(context: Context, onTimeSelected: (String) -> Unit) {
+// Saat seçme diyaloğu göster - İyileştirilmiş sürüm
+private fun showTimePickerDialog(context: Context, onTimeSelected: (String) -> Unit) {
     val calendar = Calendar.getInstance()
     val hour = calendar.get(Calendar.HOUR_OF_DAY)
     val minute = calendar.get(Calendar.MINUTE)
@@ -609,6 +669,7 @@ private fun showTimePicker(context: Context, onTimeSelected: (String) -> Unit) {
         context,
         { _, selectedHour, selectedMinute ->
             val formattedTime = String.format("%02d:%02d", selectedHour, selectedMinute)
+            Log.d("TimePickerDialog", "Saat seçildi: $formattedTime")
             onTimeSelected(formattedTime)
         },
         hour,

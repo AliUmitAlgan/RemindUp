@@ -100,10 +100,15 @@ object ReminderUtils {
     }
 
     // Hatırlatıcı güncelle - Enhanced with security checks
+    // Hatırlatıcı güncelle - İyileştirilmiş versiyon
+    // From ReminderUtils.kt
     suspend fun updateReminder(reminderId: String, reminder: Reminder, context: Context): Result<Boolean> {
         return try {
+            Log.d(TAG, "updateReminder başlatıldı: $reminderId, başlık: ${reminder.title}, saat: ${reminder.time}")
+
             val currentUser = auth.currentUser
             if (currentUser == null) {
+                Log.e(TAG, "Kullanıcı oturum açmamış")
                 return Result.failure(Exception("Kullanıcı oturum açmamış"))
             }
 
@@ -114,25 +119,33 @@ object ReminderUtils {
                 .await()
 
             if (!reminderDoc.exists()) {
+                Log.e(TAG, "Hatırlatıcı bulunamadı: $reminderId")
                 return Result.failure(Exception("Hatırlatıcı bulunamadı"))
             }
 
+            // Belgedeki userId değerini kontrol et
             val reminderUserId = reminderDoc.getString("userId")
+            Log.d(TAG, "Hatırlatıcı sahibi: $reminderUserId, mevcut kullanıcı: ${currentUser.uid}")
+
             if (reminderUserId != currentUser.uid) {
+                Log.e(TAG, "İzin reddedildi: Bu hatırlatıcı kullanıcıya ait değil")
                 return Result.failure(Exception("İzin reddedildi: Bu hatırlatıcı size ait değil"))
             }
 
-            // Always ensure the userId is set to the current user
+            // Kullanıcı ID'sini doğru bir şekilde ayarla
             val validReminder = reminder.copy(userId = currentUser.uid)
+            Log.d(TAG, "Güncellenecek hatırlatıcı: ${validReminder.title}, saat: ${validReminder.time}, userId: ${validReminder.userId}")
 
             // Önce eski hatırlatıcıyı iptal et
             NotificationUtils.cancelReminder(context, reminderId.hashCode())
+            Log.d(TAG, "Eski hatırlatıcı iptal edildi")
 
             // Firestore'daki hatırlatıcıyı güncelle
             db.collection("reminders")
                 .document(reminderId)
                 .set(validReminder)
                 .await()
+            Log.d(TAG, "Firestore belge güncellendi")
 
             // Yeni hatırlatıcıyı zamanla
             NotificationUtils.scheduleReminder(
@@ -140,13 +153,14 @@ object ReminderUtils {
                 validReminder,
                 reminderId.hashCode()
             )
+            Log.d(TAG, "Yeni hatırlatıcı zamanlandı")
 
             Result.success(true)
         } catch (e: Exception) {
+            Log.e(TAG, "Hatırlatıcı güncelleme hatası: ${e.message}", e)
             Result.failure(e)
         }
     }
-
     // Hatırlatıcı sil - Enhanced with security checks
     suspend fun deleteReminder(reminderId: String, context: Context): Result<Boolean> {
         return try {

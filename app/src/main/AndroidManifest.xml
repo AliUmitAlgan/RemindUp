@@ -12,6 +12,7 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
 
+
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <!-- Cihaz başlangıcında çalışma izni -->
@@ -39,20 +40,12 @@
             </intent-filter>
         </activity>
 
-        <!-- Hatırlatıcı Alıcı -->
-        <receiver
-            android:name=".receiver.ReminderReceiver"
-            android:enabled="true"
-            android:exported="false" />
-
-        <!-- Cihaz Başlangıç Alıcı -->
-        <receiver
-            android:name=".receiver.BootReceiver"
-            android:enabled="true"
-            android:exported="true">
+        <receiver android:name=".receiver.ReminderReceiver" android:exported="false" />
+        <receiver android:name=".receiver.BootReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <category android:name="android.intent.category.DEFAULT" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
 

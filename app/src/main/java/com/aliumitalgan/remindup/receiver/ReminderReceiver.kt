@@ -1,14 +1,14 @@
 package com.aliumitalgan.remindup.receiver
 
-import android.app.AlarmManager
-import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import com.aliumitalgan.remindup.models.Reminder
 import com.aliumitalgan.remindup.models.ReminderType
 import com.aliumitalgan.remindup.utils.NotificationUtils
+import java.text.SimpleDateFormat
 import java.util.*
 
 class ReminderReceiver : BroadcastReceiver() {
@@ -21,6 +21,7 @@ class ReminderReceiver : BroadcastReceiver() {
         val reminderTypeStr = intent.getStringExtra("REMINDER_TYPE")
         val reminderTime = intent.getStringExtra("REMINDER_TIME") ?: ""
         val reminderDescription = intent.getStringExtra("REMINDER_DESCRIPTION") ?: ""
+        val reminderId = intent.getStringExtra("REMINDER_ID") ?: notificationId.toString()
 
         Log.d(TAG, "Reminder received: $reminderTitle, Type: $reminderTypeStr, Time: $reminderTime")
 
@@ -49,34 +50,21 @@ class ReminderReceiver : BroadcastReceiver() {
                 notificationId
             )
 
-            // Eğer tek seferlik bir hatırlatıcı ise, alarm'ı iptal et
-            if (reminderType == ReminderType.SINGLE) {
-                NotificationUtils.cancelReminder(context, notificationId)
-                Log.d(TAG, "Single reminder canceled after triggering: $reminderTitle")
-            }
-            // Tekrarlanan hatırlatıcılar için güncelleme gerekmez, AlarmManager otomatik olarak tekrarlar
+            // Tek seferlik hatırlatıcı için tekrar bir şey yapmaya gerek yok
+            // Diğer tip hatırlatıcılar için AlarmManager kendisi tekrar zamanlar
 
-            // BOOT_COMPLETED gibi diğer actionlar için de kontrol ekle
+            // Eğer cihaz yeni başlatıldıysa veya özel durumlarla karşılaşıldıysa
+            // ACTION_BOOT_COMPLETED, ACTION_LOCKED_BOOT_COMPLETED gibi intent'ler için
             when (intent.action) {
-                Intent.ACTION_BOOT_COMPLETED -> {
-                    Log.d(TAG, "Device rebooted, should restore reminders")
-                    // Boot Receiver zaten bu işi yapıyor, burada ek bir işlem yapmaya gerek yok
+                Intent.ACTION_BOOT_COMPLETED,
+                "android.intent.action.QUICKBOOT_POWERON",
+                "com.htc.intent.action.QUICKBOOT_POWERON" -> {
+                    Log.d(TAG, "Device rebooted, restoring reminders")
+                    NotificationUtils.restoreRemindersAfterReboot(context)
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error processing reminder: ${e.message}", e)
-        }
-    }
-
-    companion object {
-        // Hatırlatıcıyı zamanla
-        fun scheduleReminder(context: Context, reminderTitle: String, reminderTime: String, notificationId: Int, reminderType: ReminderType) {
-            val reminder = com.aliumitalgan.remindup.models.Reminder(
-                title = reminderTitle,
-                time = reminderTime,
-                type = reminderType
-            )
-            NotificationUtils.scheduleReminder(context, reminder, notificationId)
         }
     }
 }

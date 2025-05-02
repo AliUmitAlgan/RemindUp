@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat
 import com.aliumitalgan.remindup.MainActivity
 import com.aliumitalgan.remindup.R
 import com.aliumitalgan.remindup.models.Reminder
+import com.aliumitalgan.remindup.models.ReminderType
 import com.aliumitalgan.remindup.receiver.ReminderReceiver
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,7 +24,6 @@ import java.text.SimpleDateFormat
 import java.util.*
 import android.Manifest
 import android.util.Log
-import com.aliumitalgan.remindup.models.ReminderType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -161,6 +161,7 @@ object NotificationUtils {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
 
+        // PendingIntent oluştur - FLAG_IMMUTABLE önemli!
         val pendingIntent = PendingIntent.getActivity(
             context, 0, intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
@@ -194,7 +195,7 @@ object NotificationUtils {
         }
     }
 
-    // Zamanlanmış hatırlatıcı ayarla - tam zamanında bildirim için düzeltildi
+    // Zamanlanmış hatırlatıcı ayarla - tam zamanında bildirim için iyileştirildi
     fun scheduleReminder(context: Context, reminder: Reminder, notificationId: Int) {
         // Bildirimler kapalıysa veya hatırlatıcı aktif değilse çalışma
         if (!_notificationsEnabled.value || !reminder.isEnabled) {
@@ -214,6 +215,8 @@ object NotificationUtils {
                 putExtra("REMINDER_TIME", reminder.time)
                 putExtra("REMINDER_TYPE", reminder.type.name)
                 putExtra("REMINDER_DESCRIPTION", reminder.description)
+                // Reminder ID'sini de ekleyelim - yeniden çizelgeleme için
+                putExtra("REMINDER_ID", notificationId.toString())
             }
 
             // Zamanı doğru parse et
@@ -250,6 +253,7 @@ object NotificationUtils {
             when (reminder.type) {
                 ReminderType.SINGLE -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        // API 23+ için setExactAndAllowWhileIdle kullan (Doze modunda çalışabilmesi için)
                         alarmManager.setExactAndAllowWhileIdle(
                             AlarmManager.RTC_WAKEUP,
                             triggerTime,
@@ -320,6 +324,42 @@ object NotificationUtils {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error canceling reminder: ${e.message}", e)
+        }
+    }
+
+    // Cihaz yeniden başlatıldıktan sonra hatırlatıcıları yükle
+    fun restoreRemindersAfterReboot(context: Context) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val notificationsEnabled = loadNotificationState(context)
+
+                if (!notificationsEnabled) {
+                    Log.d(TAG, "Bildirimler devre dışı, hatırlatıcılar yeniden yüklenmeyecek")
+                    return@launch
+                }
+
+                val remindersResult = ReminderUtils.getUserReminders()
+
+                if (remindersResult.isSuccess) {
+                    val reminders = remindersResult.getOrDefault(emptyList())
+                    Log.d(TAG, "Toplam ${reminders.size} hatırlatıcı yeniden zamanlanacak")
+
+                    for ((id, reminder) in reminders) {
+                        if (reminder.isEnabled) {
+                            scheduleReminder(
+                                context,
+                                reminder,
+                                id.hashCode()
+                            )
+                            Log.d(TAG, "Reboot sonrası hatırlatıcı yeniden zamanlandı: ${reminder.title}")
+                        }
+                    }
+                } else {
+                    Log.e(TAG, "Reboot sonrası hatırlatıcılar alınamadı: ${remindersResult.exceptionOrNull()?.message}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Reboot sonrası hatırlatıcı yükleme hatası: ${e.message}", e)
+            }
         }
     }
 }
