@@ -146,6 +146,8 @@
     <string name="see_all">See All</string>
     <string name="congratulations">Congratulations!</string>
     <string name="brief">Summary View</string>
+    <string name="description">Description</string>
+
     <!-- Welcome Messages -->
     <string name="welcome_title">Welcome to RemindUp</string>
     <string name="welcome_subtitle">Track your goals, manage your reminders</string>

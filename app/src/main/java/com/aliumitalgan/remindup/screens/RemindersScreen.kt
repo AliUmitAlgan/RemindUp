@@ -5,6 +5,8 @@ import android.content.Context
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,26 +18,37 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.aliumitalgan.remindup.components.BottomNavigationBar
 import com.aliumitalgan.remindup.R
+import com.aliumitalgan.remindup.components.EmptyRemindersView
+import com.aliumitalgan.remindup.components.ReminderCard
 import com.aliumitalgan.remindup.models.Reminder
 import com.aliumitalgan.remindup.models.ReminderCategory
 import com.aliumitalgan.remindup.models.ReminderType
 import com.aliumitalgan.remindup.utils.ReminderUtils
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,57 +67,222 @@ fun RemindersScreenContent(
     var showAddDialog by remember { mutableStateOf(false) }
     var editingReminder by remember { mutableStateOf<Pair<String, Reminder>?>(null) }
 
+    // Filter state
+    var selectedCategory by remember { mutableStateOf<ReminderCategory?>(null) }
+    var selectedType by remember { mutableStateOf<ReminderType?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+    var isSearchActive by remember { mutableStateOf(false) }
 
     // Bottom Navigation Items
     val bottomNavItems = listOf(
-        BottomNavItem("Ana Sayfa", Icons.Filled.Home, Icons.Filled.Home, "home"),
-        BottomNavItem("Hedefler", Icons.Filled.CheckCircle, Icons.Filled.CheckCircle, "goals"),
-        BottomNavItem("Hatırlatıcılar", Icons.Filled.Notifications, Icons.Filled.Notifications, "reminders"),
-        BottomNavItem("İlerleme", Icons.Filled.ShowChart, Icons.Filled.ShowChart, "progress"),
-        BottomNavItem("Profil", Icons.Filled.Person, Icons.Filled.Person, "profile")
+        BottomNavItem(stringResource(R.string.home), Icons.Filled.Home, Icons.Outlined.Home, "home"),
+        BottomNavItem(stringResource(R.string.goals), Icons.Filled.CheckCircle, Icons.Outlined.CheckCircle, "goals"),
+        BottomNavItem(stringResource(R.string.reminders), Icons.Filled.Notifications, Icons.Outlined.Notifications, "reminders"),
+        BottomNavItem(stringResource(R.string.progress), Icons.Filled.ShowChart, Icons.Outlined.ShowChart, "progress"),
+        BottomNavItem(stringResource(R.string.profile), Icons.Filled.Person, Icons.Outlined.Person, "profile")
     )
     var selectedNavItem by remember { mutableStateOf(bottomNavItems[2].route) }
 
-    // Verileri yükle - LaunchedEffect içinde
-    LaunchedEffect(key1 = true) {
+    // Verileri yükle
+    LaunchedEffect(Unit, selectedCategory, selectedType, searchQuery) {
         try {
-            // Daha verimli bir şekilde hatırlatıcıları yükle
+            isLoading = true
+            // Load all reminders (suspend fonksiyon çağrısı)
             val result = ReminderUtils.getUserReminders()
+
             if (result.isSuccess) {
-                reminders = result.getOrDefault(emptyList())
+                var filteredReminders = result.getOrDefault(emptyList())
+
+                // Apply category filter
+                selectedCategory?.let { cat ->
+                    filteredReminders = filteredReminders.filter { it.second.category == cat }
+                }
+
+                // Apply type filter
+                selectedType?.let { type ->
+                    filteredReminders = filteredReminders.filter { it.second.type == type }
+                }
+
+                // Apply search filter
+                if (searchQuery.isNotEmpty()) {
+                    filteredReminders = filteredReminders.filter {
+                        it.second.title.contains(searchQuery, ignoreCase = true) ||
+                                it.second.description.contains(searchQuery, ignoreCase = true)
+                    }
+                }
+
+                // Sort by time
+                reminders = filteredReminders.sortedBy { it.second.time }
             } else {
-                // Hata olursa boş liste kullan
                 reminders = emptyList()
-                showToast(context, "Hatırlatıcılar yüklenemedi: ${result.exceptionOrNull()?.message ?: "Bilinmeyen hata"}")
+                showToast(context, "Yüklenemedi: ${result.exceptionOrNull()?.message ?: "Bilinmeyen hata"}")
             }
         } catch (e: Exception) {
             reminders = emptyList()
-            showToast(context, "Bir hata oluştu: ${e.message}")
+            showToast(context, "Hata: ${e.message}")
         } finally {
-            // Yükleme işlemi bittiğinde loading durumunu false yap
             isLoading = false
         }
     }
 
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.reminders)) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Geri")
-                    }
-                },
-                actions = {
-                    // Ekleme butonu üst kısımda
-                    IconButton(onClick = { showAddDialog = true }) {
-                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_reminder))
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+            Column {
+                // Main Top Bar with Search
+                TopAppBar(
+                    title = {
+                        if (isSearchActive) {
+                            OutlinedTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("Hatırlatıcı ara...") },
+                                singleLine = true,
+                                leadingIcon = {
+                                    Icon(Icons.Default.Search, contentDescription = null)
+                                },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                                    cursorColor = MaterialTheme.colorScheme.primary,
+                                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                                ),
+                                shape = RoundedCornerShape(24.dp)
+                            )
+                        } else {
+                            Text(
+                                text = stringResource(R.string.reminders),
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Geri"
+                            )
+                        }
+                    },
+                    actions = {
+                        // Search toggle button
+                        IconButton(onClick = {
+                            isSearchActive = !isSearchActive
+                            if (!isSearchActive) searchQuery = ""
+                        }) {
+                            Icon(
+                                imageVector = if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
+                                contentDescription = if (isSearchActive) "Aramayı Kapat" else "Ara"
+                            )
+                        }
+
+                        // Add reminder button
+                        IconButton(onClick = { showAddDialog = true }) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = stringResource(R.string.add_reminder)
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
+                    )
                 )
-            )
+
+                // Category filter chips
+                AnimatedVisibility(
+                    visible = !isSearchActive || searchQuery.isEmpty(),
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    FilterChips(
+                        selectedCategory = selectedCategory,
+                        selectedType = selectedType,
+                        onCategorySelected = { selectedCategory = it },
+                        onTypeSelected = { selectedType = it }
+                    )
+                }
+
+                // Active filters info
+                AnimatedVisibility(
+                    visible = searchQuery.isNotEmpty() || selectedCategory != null || selectedType != null,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Active filters count
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Text(
+                                text = "${reminders.size} sonuç",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+
+                        // Show active filters
+                        if (selectedCategory != null) {
+                            FilterChip(
+                                selected = true,
+                                onClick = { selectedCategory = null },
+                                label = {
+                                    Text(getCategoryName(selectedCategory!!))
+                                },
+                                trailingIcon = {
+                                    Icon(Icons.Default.Close, contentDescription = null, Modifier.size(16.dp))
+                                },
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                        }
+
+                        if (selectedType != null) {
+                            FilterChip(
+                                selected = true,
+                                onClick = { selectedType = null },
+                                label = {
+                                    Text(getTypeName(selectedType!!))
+                                },
+                                trailingIcon = {
+                                    Icon(Icons.Default.Close, contentDescription = null, Modifier.size(16.dp))
+                                },
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.weight(1f))
+
+                        // Clear all filters button
+                        if (searchQuery.isNotEmpty() || selectedCategory != null || selectedType != null) {
+                            TextButton(
+                                onClick = {
+                                    searchQuery = ""
+                                    selectedCategory = null
+                                    selectedType = null
+                                    isSearchActive = false
+                                }
+                            ) {
+                                Icon(Icons.Default.FilterAlt, contentDescription = null, Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Temizle")
+                            }
+                        }
+                    }
+                }
+            }
         },
         bottomBar = {
             BottomNavigationBar(
@@ -121,6 +299,27 @@ fun RemindersScreenContent(
                     }
                 }
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { showAddDialog = true },
+                modifier = Modifier
+                    .padding(bottom = 16.dp, end = 16.dp)
+                    .size(56.dp),
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = RoundedCornerShape(16.dp),
+                elevation = FloatingActionButtonDefaults.elevation(
+                    defaultElevation = 6.dp,
+                    pressedElevation = 8.dp
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = stringResource(R.string.add_reminder),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
     ) { innerPadding ->
         Box(
@@ -129,7 +328,7 @@ fun RemindersScreenContent(
                 .padding(innerPadding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // Yükleniyor durumunu göster
+            // Content
             if (isLoading) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -137,32 +336,33 @@ fun RemindersScreenContent(
                 ) {
                     CircularProgressIndicator(
                         color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 4.dp,
                         modifier = Modifier.size(48.dp)
                     )
                 }
             } else if (reminders.isEmpty()) {
-                // Hatırlatıcı yoksa boş durum göster
+                // No reminders state
                 EmptyRemindersView(
-                    onAddClick = { showAddDialog = true }
+                    onAddClick = { showAddDialog = true },
+                    isFiltered = searchQuery.isNotEmpty() || selectedCategory != null || selectedType != null
                 )
             } else {
-                // Hatırlatıcıları listele
+                // Reminders list
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(reminders) { (id, reminder) ->
-                        ModernReminderItem(
+                    items(reminders, key = { it.first }) { (id, reminder) ->
+                        ReminderCard(
                             reminder = reminder,
                             onToggleEnabled = { isEnabled ->
-                                // Hatırlatıcının aktiflik durumunu güncelle
                                 coroutineScope.launch {
                                     val updatedReminder = reminder.copy(isEnabled = isEnabled)
                                     val result = ReminderUtils.updateReminder(id, updatedReminder, context)
                                     if (result.isSuccess) {
-                                        // Listeyi güncelle
+                                        // Update local list
                                         reminders = reminders.map {
                                             if (it.first == id) id to updatedReminder
                                             else it
@@ -174,12 +374,10 @@ fun RemindersScreenContent(
                                 }
                             },
                             onEditClick = {
-                                // Düzenleme için mevcut hatırlatıcıyı ayarla
                                 editingReminder = id to reminder
                                 showAddDialog = true
                             },
                             onDeleteClick = {
-                                // Hatırlatıcıyı sil
                                 coroutineScope.launch {
                                     val result = ReminderUtils.deleteReminder(id, context)
                                     if (result.isSuccess) {
@@ -192,10 +390,13 @@ fun RemindersScreenContent(
                             }
                         )
                     }
+
+                    // Add extra space at the bottom for FAB
+                    item { Spacer(modifier = Modifier.height(80.dp)) }
                 }
             }
 
-            // Hatırlatıcı Ekleme/Düzenleme Diyaloğu
+            // Reminder Add/Edit Dialog
             if (showAddDialog) {
                 val reminderToEdit = editingReminder?.second
                 ModernReminderDialog(
@@ -205,11 +406,10 @@ fun RemindersScreenContent(
                     },
                     onSave = { newReminderData ->
                         coroutineScope.launch {
-                            // Mevcut düzenleme bilgisini al
                             val currentEditingReminder = editingReminder
 
                             if (currentEditingReminder != null) {
-                                // GÜNCELLEME
+                                // Update existing reminder
                                 val (id, existingReminder) = currentEditingReminder
                                 val updatedReminder = existingReminder.copy(
                                     title       = newReminderData.title,
@@ -217,10 +417,10 @@ fun RemindersScreenContent(
                                     description = newReminderData.description,
                                     category    = newReminderData.category,
                                     type        = newReminderData.type,
-                                    isEnabled   = newReminderData.isEnabled
+                                    isEnabled   = newReminderData.isEnabled,
+                                    isImportant = newReminderData.isImportant // Add new field
                                 )
 
-                                Log.d("RemindersScreen", "Güncelleme: $id → $updatedReminder")
                                 val result = ReminderUtils.updateReminder(id, updatedReminder, context)
                                 if (result.isSuccess) {
                                     reminders = reminders.map {
@@ -231,7 +431,7 @@ fun RemindersScreenContent(
                                     showToast(context, "Güncelleme başarısız: ${result.exceptionOrNull()?.message}")
                                 }
                             } else {
-                                // YENİ EKLEME
+                                // Add new reminder
                                 val newReminder = newReminderData.copy(
                                     userId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
                                 )
@@ -245,7 +445,6 @@ fun RemindersScreenContent(
                                 }
                             }
 
-                            // **DEĞİŞİKLİK**: Dialog kapatma ve editingReminder sıfırlama burada yapılıyor
                             showAddDialog = false
                             editingReminder = null
                         }
@@ -253,429 +452,895 @@ fun RemindersScreenContent(
                     initialReminder = reminderToEdit
                 )
             }
-
         }
     }
 }
 
 @Composable
-fun ModernReminderItem(
-    reminder: Reminder,
-    onToggleEnabled: (Boolean) -> Unit,
-    onEditClick: () -> Unit,
-    onDeleteClick: () -> Unit
+fun FilterChips(
+    selectedCategory: ReminderCategory?,
+    selectedType: ReminderType?,
+    onCategorySelected: (ReminderCategory?) -> Unit,
+    onTypeSelected: (ReminderType?) -> Unit
 ) {
-    Card(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(4.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+        // Categories scrollable row
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(bottom = 12.dp)
         ) {
-            // Sol taraf: Kategori ve Başlık
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Kategori etiketi
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
-                                shape = RoundedCornerShape(4.dp)
-                            )
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = reminder.category.name,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
+            // Add "All" option
+            item {
+                FilterChip(
+                    selected = selectedCategory == null,
+                    onClick = { onCategorySelected(null) },
+                    label = { Text("Tümü") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Category,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
                         )
-                    }
-                }
-
-                // Başlık
-                Text(
-                    text = reminder.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 4.dp)
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                 )
-
-                // Saat bilgisi
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.padding(top = 4.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AccessTime,
-                        contentDescription = "Saat",
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                    Text(
-                        text = reminder.time,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
-                }
-
-                // Açıklama (varsa)
-                if (reminder.description.isNotEmpty()) {
-                    Text(
-                        text = reminder.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
             }
 
-            // Sağ taraf: Düzenleme ve Silme Aksiyonları
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Aktif/Pasif Anahtarı
-                Switch(
-                    checked = reminder.isEnabled,
-                    onCheckedChange = { onToggleEnabled(it) },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = MaterialTheme.colorScheme.primary,
-                        checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+            // Add category options
+            items(ReminderCategory.values()) { category ->
+                FilterChip(
+                    selected = selectedCategory == category,
+                    onClick = {
+                        if (selectedCategory == category) onCategorySelected(null)
+                        else onCategorySelected(category)
+                    },
+                    label = { Text(getCategoryName(category)) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = getCategoryIcon(category),
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = getCategoryChipColor(category),
+                        selectedLabelColor = Color.White,
+                        selectedLeadingIconColor = Color.White
                     )
                 )
+            }
+        }
 
-                // Düzenleme ve Silme Butonları
-                Row {
-                    IconButton(onClick = onEditClick) {
+        // Types scrollable row
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Add "All" option
+            item {
+                FilterChip(
+                    selected = selectedType == null,
+                    onClick = { onTypeSelected(null) },
+                    label = { Text("Tümü") },
+                    leadingIcon = {
                         Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Düzenle",
-                            tint = MaterialTheme.colorScheme.primary
+                            imageVector = Icons.Default.Schedule,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
                         )
-                    }
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                )
+            }
 
-                    IconButton(onClick = onDeleteClick) {
+            // Add type options
+            items(ReminderType.values()) { type ->
+                FilterChip(
+                    selected = selectedType == type,
+                    onClick = {
+                        if (selectedType == type) onTypeSelected(null)
+                        else onTypeSelected(type)
+                    },
+                    label = { Text(getTypeName(type)) },
+                    leadingIcon = {
                         Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Sil",
-                            tint = MaterialTheme.colorScheme.error
+                            imageVector = getTypeIcon(type),
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
                         )
-                    }
-                }
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                )
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModernReminderDialog(
     onDismiss: () -> Unit,
     onSave: (Reminder) -> Unit,
     initialReminder: Reminder? = null
 ) {
-    val ctx = LocalContext.current
+    // State variables
     var title by remember { mutableStateOf(initialReminder?.title ?: "") }
-    var time by remember { mutableStateOf(initialReminder?.time ?: "") }
+    var time by remember { mutableStateOf(initialReminder?.time ?: getCurrentTime()) }
     var description by remember { mutableStateOf(initialReminder?.description ?: "") }
     var category by remember { mutableStateOf(initialReminder?.category ?: ReminderCategory.GENERAL) }
     var type by remember { mutableStateOf(initialReminder?.type ?: ReminderType.SINGLE) }
     var isEnabled by remember { mutableStateOf(initialReminder?.isEnabled ?: true) }
+    var isImportant by remember { mutableStateOf(initialReminder?.isImportant ?: false) } // New field
+
+    val isEditing = initialReminder != null
 
     val context = LocalContext.current
 
-    // Loglama için düzenleme bilgisini göster
-    if (initialReminder != null) {
-        LaunchedEffect(Unit) {
-            Log.d("ModernReminderDialog", "Düzenleniyor: ${initialReminder.title}, Saat: ${initialReminder.time}, UserId: ${initialReminder.userId}")
-        }
-    }
+    // Time picker dialog
+    var showTimePicker by remember { mutableStateOf(false) }
 
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = if (initialReminder == null)
-                    stringResource(R.string.add_reminder)
-                else
-                    stringResource(R.string.edit_reminder)
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        )
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = CardDefaults.cardElevation(
+                defaultElevation = 8.dp
             )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                // Başlık
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Dialog header
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = if (isEditing) Icons.Default.Edit else Icons.Default.Add,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Text(
+                        text = if (isEditing) stringResource(R.string.edit_reminder) else stringResource(R.string.add_reminder),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Divider()
+
+                // Title field
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
                     label = { Text(stringResource(R.string.reminder_title)) },
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    shape = RoundedCornerShape(12.dp),
+                    leadingIcon = {
+                        Icon(Icons.Default.Title, contentDescription = null)
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        cursorColor = MaterialTheme.colorScheme.primary
+                    )
                 )
 
-                // Açıklama
+                // Time field
+                OutlinedTextField(
+                    value = time,
+                    onValueChange = { time = it },
+                    label = { Text(stringResource(R.string.reminder_time)) },
+                    readOnly = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showTimePicker = true },
+                    shape = RoundedCornerShape(12.dp),
+                    leadingIcon = {
+                        Icon(Icons.Default.AccessTime, contentDescription = null)
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = { showTimePicker = true }) {
+                            Icon(Icons.Default.Schedule, contentDescription = "Saat Seç")
+                        }
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+
+                // Description field
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
                     label = { Text(stringResource(R.string.reminder_description)) },
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    leadingIcon = {
+                        Icon(Icons.Default.Description, contentDescription = null)
+                    },
                     minLines = 2,
-                    maxLines = 3
+                    maxLines = 3,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        cursorColor = MaterialTheme.colorScheme.primary
+                    )
                 )
 
-                // Saat Seçimi - İYİLEŞTİRİLMİŞ BÖLÜM
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                            shape = RoundedCornerShape(8.dp)
-                        )
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable {
-                            showTimePickerDialog(context) { selectedTime ->
-                                time = selectedTime
-                                Log.d("ModernReminderDialog", "Yeni saat seçildi: $selectedTime")
-                            }
-                        }
-                        .padding(16.dp)
+                // Category selection
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                    Text(
+                        text = stringResource(R.string.reminder_category),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.width(100.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    // Category chips
+                    LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Icon(
-                            Icons.Default.AccessTime,
-                            contentDescription = stringResource(R.string.reminder_time),
-                            tint = MaterialTheme.colorScheme.primary
+                        items(ReminderCategory.values()) { cat ->
+                            FilterChip(
+                                selected = category == cat,
+                                onClick = { category = cat },
+                                label = { Text(getCategoryName(cat), fontSize = 12.sp) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = getCategoryIcon(cat),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = getCategoryChipColor(cat),
+                                    selectedLabelColor = Color.White,
+                                    selectedLeadingIconColor = Color.White
+                                )
+                            )
+                        }
+                    }
+                }
+
+                // Reminder type selection
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.reminder_type),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.width(100.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    // Type chips
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        items(ReminderType.values()) { reminderType ->
+                            FilterChip(
+                                selected = type == reminderType,
+                                onClick = { type = reminderType },
+                                label = { Text(getTypeName(reminderType), fontSize = 12.sp) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = getTypeIcon(reminderType),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.secondary,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onSecondary,
+                                    selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondary
+                                )
+                            )
+                        }
+                    }
+                }
+
+                // Reminder status toggles
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Enabled toggle
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = isEnabled,
+                            onCheckedChange = { isEnabled = it },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = MaterialTheme.colorScheme.primary
+                            )
                         )
 
                         Text(
-                            text = if (time.isEmpty()) stringResource(R.string.select_time) else time,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = if (time.isEmpty())
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                            else
-                                MaterialTheme.colorScheme.onSurface
+                            text = stringResource(R.string.reminder_active),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+
+                    // Important toggle (new feature)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = isImportant,
+                            onCheckedChange = { isImportant = it },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = MaterialTheme.colorScheme.error
+                            )
+                        )
+
+                        Text(
+                            text = "Önemli",
+                            style = MaterialTheme.typography.bodyMedium
                         )
                     }
                 }
 
-                // Kategori
-                Text(stringResource(R.string.reminder_category), style = MaterialTheme.typography.bodyMedium)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(ReminderCategory.values()) { reminderCategory ->
-                        FilterChip(
-                            selected = category == reminderCategory,
-                            onClick = { category = reminderCategory },
-                            label = { Text(reminderCategory.name) },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = when (reminderCategory) {
-                                        ReminderCategory.GENERAL -> Icons.Default.Notifications
-                                        ReminderCategory.WORK -> Icons.Default.Work
-                                        ReminderCategory.HEALTH -> Icons.Default.Favorite
-                                        ReminderCategory.PERSONAL -> Icons.Default.Person
-                                        ReminderCategory.STUDY -> Icons.Default.School
-                                        ReminderCategory.FITNESS -> Icons.Default.FitnessCenter
-                                    },
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        )
-                    }
-                }
+                Divider()
 
-                // Tekrar Türü
-                Text(stringResource(R.string.reminder_type), style = MaterialTheme.typography.bodyMedium)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(ReminderType.values()) { reminderType ->
-                        FilterChip(
-                            selected = type == reminderType,
-                            onClick = { type = reminderType },
-                            label = {
-                                Text(
-                                    when (reminderType) {
-                                        ReminderType.SINGLE  -> stringResource(R.string.type_single)
-                                        ReminderType.DAILY   -> stringResource(R.string.type_daily)
-                                        ReminderType.WEEKLY  -> stringResource(R.string.type_weekly)
-                                        ReminderType.MONTHLY -> stringResource(R.string.type_monthly)
-                                    }
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = when (reminderType) {
-                                        ReminderType.SINGLE -> Icons.Default.Alarm
-                                        ReminderType.DAILY -> Icons.Default.Today
-                                        ReminderType.WEEKLY -> Icons.Default.DateRange
-                                        ReminderType.MONTHLY -> Icons.Default.Event
-                                    },
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        )
-                    }
-                }
-
-                // Aktif/Pasif Anahtarı
+                // Action buttons
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(stringResource(R.string.reminder_active), style = MaterialTheme.typography.bodyMedium)
-                    Switch(
-                        checked = isEnabled,
-                        onCheckedChange = { isEnabled = it }
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (title.isNotBlank() && time.isNotBlank()) {
-                        // Yeni bir reminder objesi oluştur
-                        val newReminder = Reminder(
-                            title = title,
-                            time = time,
-                            description = description,
-                            category = category,
-                            type = type,
-                            isEnabled = isEnabled,
-                            // Ensure userId is properly preserved from the initial reminder
-                            userId = initialReminder?.userId ?: FirebaseAuth.getInstance().currentUser?.uid ?: ""
+                    // Cancel button
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurface
                         )
+                    ) {
+                        Text(stringResource(R.string.cancel))
+                    }
 
-                        Log.d("ModernReminderDialog", "Kaydediliyor: $title, Saat: $time, UserId: ${newReminder.userId}")
-                        onSave(newReminder)
-                    } else {
-                        val msg = if (title.isBlank() && time.isBlank()) {
-                            "Lütfen başlık ve saat giriniz"
-                        } else if (title.isBlank()) {
-                            "Lütfen başlık giriniz"
-                        } else {
-                            "Lütfen saat seçiniz"
-                        }
-                        Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
+                    // Save button
+                    Button(
+                        onClick = {
+                            if (title.isNotBlank() && time.isNotBlank()) {
+                                val newReminder = Reminder(
+                                    id = initialReminder?.id ?: UUID.randomUUID().toString(),
+                                    title = title,
+                                    time = time,
+                                    description = description,
+                                    category = category,
+                                    type = type,
+                                    isEnabled = isEnabled,
+                                    isImportant = isImportant,
+                                    userId = initialReminder?.userId ?: ""
+                                )
+                                onSave(newReminder)
+                            } else {
+                                Toast.makeText(context, "Başlık ve saat alanları boş olamaz", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        Text(stringResource(R.string.save))
                     }
                 }
-            ) {
-                Text(stringResource(R.string.save))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
             }
         }
-    )
+    }
+
+    // Show time picker dialog
+    if (showTimePicker) {
+        val timeFormatter = SimpleDateFormat("HH:mm", Locale.getDefault())
+        val initialTime = try {
+            timeFormatter.parse(time)
+        } catch (e: Exception) {
+            Calendar.getInstance().time
+        }
+
+        val calendar = Calendar.getInstance().apply {
+            if (initialTime != null) {
+                set(Calendar.HOUR_OF_DAY, initialTime.hours)
+                set(Calendar.MINUTE, initialTime.minutes)
+            }
+        }
+
+        TimePickerDialog(
+            context,
+            { _, hourOfDay, minute ->
+                time = String.format("%02d:%02d", hourOfDay, minute)
+                showTimePicker = false
+            },
+            calendar.get(Calendar.HOUR_OF_DAY),
+            calendar.get(Calendar.MINUTE),
+            true
+        ).show()
+    }
+}
+
+// Modern UI için yardımcı fonksiyonlar
+private fun getCurrentTime(): String {
+    val calendar = Calendar.getInstance()
+    val hour = calendar.get(Calendar.HOUR_OF_DAY)
+    val minute = calendar.get(Calendar.MINUTE)
+    return String.format("%02d:%02d", hour, minute)
+}
+
+private fun getCategoryName(category: ReminderCategory): String {
+    return when (category) {
+        ReminderCategory.GENERAL -> "Genel"
+        ReminderCategory.WORK -> "İş"
+        ReminderCategory.HEALTH -> "Sağlık"
+        ReminderCategory.PERSONAL -> "Kişisel"
+        ReminderCategory.STUDY -> "Çalışma"
+        ReminderCategory.FITNESS -> "Spor"
+    }
+}
+
+private fun getTypeName(type: ReminderType): String {
+    return when (type) {
+        ReminderType.SINGLE -> "Tek Seferlik"
+        ReminderType.DAILY -> "Günlük"
+        ReminderType.WEEKLY -> "Haftalık"
+        ReminderType.MONTHLY -> "Aylık"
+    }
+}
+
+private fun getCategoryIcon(category: ReminderCategory): ImageVector {
+    return when (category) {
+        ReminderCategory.GENERAL -> Icons.Default.Notifications
+        ReminderCategory.WORK -> Icons.Default.Work
+        ReminderCategory.HEALTH -> Icons.Default.Favorite
+        ReminderCategory.PERSONAL -> Icons.Default.Person
+        ReminderCategory.STUDY -> Icons.Default.School
+        ReminderCategory.FITNESS -> Icons.Default.FitnessCenter
+    }
+}
+
+private fun getTypeIcon(type: ReminderType): ImageVector {
+    return when (type) {
+        ReminderType.SINGLE -> Icons.Default.Alarm
+        ReminderType.DAILY -> Icons.Default.Today
+        ReminderType.WEEKLY -> Icons.Default.DateRange
+        ReminderType.MONTHLY -> Icons.Default.Event
+    }
+}
+
+
+private fun getCategoryChipColor(category: ReminderCategory): Color {
+    return when (category) {
+        ReminderCategory.GENERAL -> Color(0xFF1976D2)  // Blue
+        ReminderCategory.WORK -> Color(0xFFE91E63)     // Pink
+        ReminderCategory.HEALTH -> Color(0xFFE53935)   // Red
+        ReminderCategory.PERSONAL -> Color(0xFF9C27B0) // Purple
+        ReminderCategory.STUDY -> Color(0xFF00897B)    // Teal
+        ReminderCategory.FITNESS -> Color(0xFF7CB342)  // Green
+    }
 }
 
 @Composable
-fun EmptyRemindersView(
-    onAddClick: () -> Unit
+fun ReminderCard(
+    reminder: Reminder,
+    onToggleEnabled: (Boolean) -> Unit,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    var expanded by remember { mutableStateOf(false) }
+
+    // Card animation properties
+    val cardColor = animateColorAsState(
+        targetValue = if (expanded)
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
+        else
+            MaterialTheme.colorScheme.surface,
+        label = "cardColor"
+    )
+
+    val elevation = animateDpAsState(
+        targetValue = if (expanded) 8.dp else 4.dp,
+        label = "elevation"
+    )
+
+    val roundedCornerShape = RoundedCornerShape(16.dp)
+
+    // Category color
+    val categoryColor = getCategoryChipColor(reminder.category)
+
+    // Modern card design
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .shadow(
+                elevation = elevation.value,
+                shape = roundedCornerShape,
+                spotColor = if (reminder.isImportant) MaterialTheme.colorScheme.error.copy(0.2f) else categoryColor.copy(alpha = 0.2f)
+            )
+            .clickable { expanded = !expanded },
+        shape = roundedCornerShape,
+        colors = CardDefaults.cardColors(
+            containerColor = cardColor.value
+        )
     ) {
-        Box(
+        Column(
             modifier = Modifier
-                .size(120.dp)
-                .clip(CircleShape)
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            // Header with title, time and category indicator
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Time indicator with category color
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            color = categoryColor.copy(alpha = 0.15f)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = reminder.time,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = categoryColor
                         )
+
+                        // Show small icon for repeat type if not single
+                        if (reminder.type != ReminderType.SINGLE) {
+                            Icon(
+                                imageVector = getTypeIcon(reminder.type),
+                                contentDescription = null,
+                                tint = categoryColor.copy(alpha = 0.7f),
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // Title and category
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    // Title with importance indicator
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (reminder.isImportant) {
+                            Icon(
+                                imageVector = Icons.Default.PriorityHigh,
+                                contentDescription = "Önemli",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .padding(end = 4.dp)
+                            )
+                        }
+
+                        Text(
+                            text = reminder.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (reminder.isEnabled)
+                                MaterialTheme.colorScheme.onSurface
+                            else
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    // Category and type
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Category indicator
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(categoryColor)
+                        )
+
+                        Spacer(modifier = Modifier.width(4.dp))
+
+                        Text(
+                            text = getCategoryName(reminder.category),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+
+                        Text(
+                            text = " • ${getTypeName(reminder.type)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+
+                // Enable/disable switch
+                Switch(
+                    checked = reminder.isEnabled,
+                    onCheckedChange = onToggleEnabled,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = categoryColor,
+                        checkedTrackColor = categoryColor.copy(alpha = 0.5f),
+                        checkedBorderColor = categoryColor.copy(alpha = 0.7f),
+                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        uncheckedBorderColor = MaterialTheme.colorScheme.outline
                     )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Notifications,
-                contentDescription = stringResource(R.string.reminders),
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(64.dp)
-            )
-        }
+                )
+            }
 
-        Spacer(modifier = Modifier.height(24.dp))
+            // Expanded content
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp)
+                ) {
+                    // Description section
+                    if (reminder.description.isNotEmpty()) {
+                        Divider(
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                        )
 
-        Text(
-            stringResource(R.string.no_reminders),
-            color = MaterialTheme.colorScheme.onBackground,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold
-        )
+                        // Description title
+                        Text(
+                            text = "Açıklama",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            fontWeight = FontWeight.Medium
+                        )
 
-        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
 
-        Text(
-            text = "Yeni bir hatırlatıcı ekleyerek başlayın",
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-            fontSize = 16.sp
-        )
+                        // Description content
+                        Text(
+                            text = reminder.description,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                        )
+                    }
 
-        Spacer(modifier = Modifier.height(32.dp))
+                    Divider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                    )
 
-        Button(
-            onClick = onAddClick,
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary
-            )
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = "Ekle"
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(stringResource(R.string.add_reminder))
+                    // Action buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // Edit button
+                        OutlinedButton(
+                            onClick = onEditClick,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.primary
+                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.edit))
+                        }
+
+                        // Delete button
+                        Button(
+                            onClick = onDeleteClick,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.delete))
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
-// Saat seçme diyaloğu göster - İyileştirilmiş sürüm
-private fun showTimePickerDialog(context: Context, onTimeSelected: (String) -> Unit) {
-    val calendar = Calendar.getInstance()
-    val hour = calendar.get(Calendar.HOUR_OF_DAY)
-    val minute = calendar.get(Calendar.MINUTE)
+@Composable
+fun EmptyRemindersView(
+    onAddClick: () -> Unit,
+    isFiltered: Boolean = false
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        // Empty state icon with animation
+        var isAnimating by remember { mutableStateOf(false) }
+        val scale by animateFloatAsState(
+            targetValue = if (isAnimating) 1.1f else 0.9f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1000, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "emptyIconScale"
+        )
 
-    TimePickerDialog(
-        context,
-        { _, selectedHour, selectedMinute ->
-            val formattedTime = String.format("%02d:%02d", selectedHour, selectedMinute)
-            Log.d("TimePickerDialog", "Saat seçildi: $formattedTime")
-            onTimeSelected(formattedTime)
-        },
-        hour,
-        minute,
-        true // 24 saatlik format
-    ).show()
+        LaunchedEffect(Unit) {
+            isAnimating = true
+        }
+
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer,
+            modifier = Modifier
+                .size(120.dp)
+                .scale(scale)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = if (isFiltered)
+                        Icons.Default.FilterAlt
+                    else
+                        Icons.Default.Notifications,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(56.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Text(
+            text = if (isFiltered)
+                "Filtrelere uygun hatırlatıcı bulunamadı"
+            else
+                stringResource(R.string.no_reminders),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = if (isFiltered)
+                "Farklı filtre ayarları deneyebilir veya yeni bir hatırlatıcı ekleyebilirsiniz"
+            else
+                stringResource(R.string.add_first_reminder),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        if (!isFiltered) {
+            Button(
+                onClick = onAddClick,
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                ),
+                modifier = Modifier
+                    .height(56.dp)
+                    .padding(horizontal = 16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = stringResource(R.string.add_reminder),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        } else {
+            OutlinedButton(
+                onClick = {
+                    // Clear filters
+                },
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                modifier = Modifier
+                    .height(56.dp)
+                    .padding(horizontal = 16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FilterAltOff,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Filtreleri Temizle",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
 }
-
-// Toast mesajı göster

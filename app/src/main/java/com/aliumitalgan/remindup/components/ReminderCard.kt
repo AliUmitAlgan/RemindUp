@@ -1,47 +1,430 @@
 package com.aliumitalgan.remindup.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aliumitalgan.remindup.ui.theme.RemindUpTheme
 import com.aliumitalgan.remindup.R
+import com.aliumitalgan.remindup.models.Reminder
+import com.aliumitalgan.remindup.models.ReminderCategory
+import com.aliumitalgan.remindup.models.ReminderType
+import kotlinx.coroutines.delay
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReminderCard(reminderTitle: String, reminderTime: String) {
+fun ReminderCard(
+    reminder: Reminder,
+    onToggleEnabled: (Boolean) -> Unit,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    // Calculate colors based on reminder category
+    val (primaryColor, secondaryColor) = getCategoryColors(reminder.category)
+    val cardColor = animateColorAsState(
+        targetValue = if (expanded)
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
+        else
+            MaterialTheme.colorScheme.surface,
+        label = "cardColor"
+    )
+
+    val elevation = animateDpAsState(
+        targetValue = if (expanded) 8.dp else 4.dp,
+        label = "elevation"
+    )
+
+    val iconScale = animateFloatAsState(
+        targetValue = if (reminder.isEnabled) 1f else 0.8f,
+        label = "iconScale"
+    )
+
+    // Main card
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        elevation = CardDefaults.cardElevation(8.dp)
+            .padding(vertical = 4.dp)
+            .shadow(
+                elevation = elevation.value,
+                shape = RoundedCornerShape(16.dp),
+                spotColor = primaryColor.copy(alpha = 0.3f)
+            )
+            .clickable { expanded = !expanded },
+        colors = CardDefaults.cardColors(
+            containerColor = cardColor.value
+        ),
+        shape = RoundedCornerShape(16.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.Start
+                .padding(16.dp)
         ) {
-            Text(text = reminderTitle, style = MaterialTheme.typography.bodyLarge, fontSize = 20.sp)
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Category icon with gradient background
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .shadow(
+                            elevation = 4.dp,
+                            shape = CircleShape,
+                            spotColor = primaryColor.copy(alpha = 0.2f)
+                        )
+                        .clip(CircleShape)
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    primaryColor.copy(alpha = 0.2f),
+                                    secondaryColor.copy(alpha = 0.2f)
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = getCategoryIcon(reminder.category),
+                        contentDescription = null,
+                        tint = primaryColor,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .scale(iconScale.value)
+                    )
+                }
 
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.width(16.dp))
 
-            Text(
-                text = stringResource(R.string.time, reminderTime),
-                style = MaterialTheme.typography.bodyMedium
-            )
+                // Title and time
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = reminder.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (reminder.isEnabled)
+                            MaterialTheme.colorScheme.onSurface
+                        else
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.AccessTime,
+                            contentDescription = null,
+                            tint = primaryColor,
+                            modifier = Modifier.size(16.dp)
+                        )
+
+                        Spacer(modifier = Modifier.width(4.dp))
+
+                        Text(
+                            text = reminder.time,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        // Repeat type indicator
+                        Icon(
+                            imageVector = getTypeIcon(reminder.type),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            modifier = Modifier.size(16.dp)
+                        )
+
+                        Spacer(modifier = Modifier.width(4.dp))
+
+                        Text(
+                            text = when(reminder.type) {
+                                ReminderType.SINGLE -> stringResource(R.string.type_single)
+                                ReminderType.DAILY -> stringResource(R.string.type_daily)
+                                ReminderType.WEEKLY -> stringResource(R.string.type_weekly)
+                                ReminderType.MONTHLY -> stringResource(R.string.type_monthly)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+
+                // Enable/disable switch
+                Switch(
+                    checked = reminder.isEnabled,
+                    onCheckedChange = onToggleEnabled,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = primaryColor,
+                        checkedTrackColor = primaryColor.copy(alpha = 0.2f)
+                    )
+                )
+            }
+
+            // Expanded content
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp)
+                ) {
+                    // Only show description if it's not empty
+                    if (reminder.description.isNotEmpty()) {
+                        Divider(
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                        )
+
+                        Text(
+                            text = stringResource(R.string.description),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            fontWeight = FontWeight.Medium
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text(
+                            text = reminder.description,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                        )
+                    }
+
+                    Divider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                    )
+
+                    // Action buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        OutlinedButton(
+                            onClick = onEditClick,
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.primary
+                            ),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.edit))
+                        }
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        Button(
+                            onClick = onDeleteClick,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.delete))
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
-@Preview(showBackground = true)
+// Helper function to get category colors
+private fun getCategoryColors(category: ReminderCategory): Pair<Color, Color> {
+    return when (category) {
+        ReminderCategory.GENERAL -> Pair(Color(0xFF1A73E8), Color(0xFF65A2F6))  // Blue
+        ReminderCategory.WORK -> Pair(Color(0xFFE91E63), Color(0xFFF06292))     // Pink
+        ReminderCategory.HEALTH -> Pair(Color(0xFFE53935), Color(0xFFEF5350))   // Red
+        ReminderCategory.PERSONAL -> Pair(Color(0xFF9C27B0), Color(0xFFBA68C8)) // Purple
+        ReminderCategory.STUDY -> Pair(Color(0xFF00897B), Color(0xFF26A69A))    // Teal
+        ReminderCategory.FITNESS -> Pair(Color(0xFF7CB342), Color(0xFF9CCC65))  // Green
+    }
+}
+
+// Helper function to get category icon
+private fun getCategoryIcon(category: ReminderCategory): ImageVector {
+    return when (category) {
+        ReminderCategory.GENERAL -> Icons.Default.Notifications
+        ReminderCategory.WORK -> Icons.Default.Work
+        ReminderCategory.HEALTH -> Icons.Default.Favorite
+        ReminderCategory.PERSONAL -> Icons.Default.Person
+        ReminderCategory.STUDY -> Icons.Default.School
+        ReminderCategory.FITNESS -> Icons.Default.FitnessCenter
+    }
+}
+
+// Helper function to get reminder type icon
+private fun getTypeIcon(type: ReminderType): ImageVector {
+    return when (type) {
+        ReminderType.SINGLE -> Icons.Default.Alarm
+        ReminderType.DAILY -> Icons.Default.Today
+        ReminderType.WEEKLY -> Icons.Default.DateRange
+        ReminderType.MONTHLY -> Icons.Default.Event
+    }
+}
+
 @Composable
-fun ReminderCardPreview() {
-    RemindUpTheme {
-        ReminderCard(reminderTitle = "Take your Medicine", reminderTime = "08:00 AM")
+fun EmptyRemindersView(
+    onAddClick: () -> Unit,
+    isFiltered: Boolean = false
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        // Animated icon
+        Box(
+            modifier = Modifier
+                .size(120.dp)
+                .shadow(
+                    elevation = 8.dp,
+                    shape = CircleShape,
+                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                )
+                .clip(CircleShape)
+                .background(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
+                        )
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            var scaled by remember { mutableStateOf(false) }
+            val scale by animateFloatAsState(
+                targetValue = if (scaled) 1.1f else 0.95f,
+                label = "notificationIconScale"
+            )
+
+            LaunchedEffect(Unit) {
+                // Create a pulsing animation
+                while (true) {
+                    delay(800)
+                    scaled = !scaled
+                }
+            }
+
+            Icon(
+                imageVector = Icons.Default.Notifications,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .size(64.dp)
+                    .scale(scale)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Text(
+            text = if (isFiltered)
+                "Filtrelenmiş sonuç bulunamadı"
+            else
+                stringResource(R.string.no_reminders),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = if (isFiltered)
+                "Lütfen farklı filtre kriterleri deneyin"
+            else
+                stringResource(R.string.add_first_reminder),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        if (!isFiltered) {
+            Button(
+                onClick = onAddClick,
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                ),
+                modifier = Modifier
+                    .height(56.dp)
+                    .shadow(8.dp, RoundedCornerShape(12.dp))
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = stringResource(R.string.add_reminder),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
     }
 }

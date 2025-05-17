@@ -10,7 +10,8 @@ data class Reminder(
     val type: ReminderType = ReminderType.SINGLE,
     val description: String = "",
     val userId: String = "",
-    val isEnabled: Boolean = true
+    val isEnabled: Boolean = true,
+    val isImportant: Boolean = false // Yeni eklenen alan
 )
 
 enum class ReminderCategory {

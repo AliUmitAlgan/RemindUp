@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
         Log.d(TAG, "onCreate started")
 
         // Bildirim kanalını oluştur
-        NotificationUtils.createNotificationChannel(this)
+        NotificationUtils.createNotificationChannels(this)
 
         // Uygulama başlatıldığında bildirim durumunu yükle
         NotificationUtils.loadNotificationState(this)

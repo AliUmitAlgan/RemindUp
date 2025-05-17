@@ -6,79 +6,37 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import com.aliumitalgan.remindup.utils.NotificationUtils
-import com.aliumitalgan.remindup.utils.ReminderUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
- * Cihaz yeniden başlatıldığında tüm hatırlatıcıları yeniden zamanlamak için kullanılan BroadcastReceiver
- * AndroidManifest.xml'de BOOT_COMPLETED action'ı ile kaydedilmelidir
+ * This BroadcastReceiver is triggered when the device boots up.
+ * It ensures all scheduled notifications are restored after a device restart.
  */
 class BootReceiver : BroadcastReceiver() {
     private val TAG = "BootReceiver"
 
     override fun onReceive(context: Context, intent: Intent) {
+        Log.d(TAG, "BootReceiver triggered, action: ${intent.action}")
+
         if (intent.action == Intent.ACTION_BOOT_COMPLETED ||
             intent.action == "android.intent.action.QUICKBOOT_POWERON" ||
             intent.action == "com.htc.intent.action.QUICKBOOT_POWERON") {
 
-            Log.d(TAG, "Cihaz yeniden başlatıldı. Hatırlatıcılar yeniden yükleniyor.")
+            Log.d(TAG, "Device rebooted, restoring reminders")
 
-            // NotificationUtils'in başlatılması
-            NotificationUtils.createNotificationChannel(context)
+            // First create notification channels
+            NotificationUtils.createNotificationChannels(context)
 
-            // Bildirim durumunu hafızaya yükle
-            val areNotificationsEnabled = NotificationUtils.loadNotificationState(context)
-            if (!areNotificationsEnabled) {
-                Log.d(TAG, "Bildirimler devre dışı, hatırlatıcılar yüklenmeyecek")
-                return
-            }
-
-            // Hatırlatıcıları yeniden zamanla - sadece bildirimler etkinse
+            // Restore notifications in background
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val remindersResult = ReminderUtils.getUserReminders()
-
-                    if (remindersResult.isSuccess) {
-                        val reminders = remindersResult.getOrDefault(emptyList())
-                        Log.d(TAG, "Toplam ${reminders.size} hatırlatıcı yeniden yüklenecek")
-
-                        // Dispatchers.Main yerine Dispatchers.Default kullan - Main thread UI'ye bağlı
-                        // ve boot sırasında UI olmayabilir
-                        withContext(Dispatchers.Default) {
-                            for ((id, reminder) in reminders) {
-                                if (reminder.isEnabled) {
-                                    NotificationUtils.scheduleReminder(
-                                        context,
-                                        reminder,
-                                        id.hashCode()
-                                    )
-                                    Log.d(TAG, "Hatırlatıcı yeniden zamanlandı: ${reminder.title}")
-                                } else {
-                                    Log.d(TAG, "Devre dışı hatırlatıcı atlandı: ${reminder.title}")
-                                }
-                            }
-                        }
-                    } else {
-                        Log.e(TAG, "Hatırlatıcılar alınamadı: ${remindersResult.exceptionOrNull()?.message}")
-                    }
+                    // This will handle both notifications settings check and restoration
+                    NotificationUtils.restoreRemindersAfterReboot(context)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Hatırlatıcıları yeniden yükleme hatası: ${e.message}", e)
+                    Log.e(TAG, "Error restoring reminders after reboot", e)
                 }
-            }
-
-            // Kullanıcının son girişini güncellemek için
-            try {
-                val currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
-                if (currentUser != null) {
-                    // Kullanıcı giriş yapmışsa, bilgilerini güncelle
-                    // Bu, uygulama ilk açıldığında Firebase Auth'un doğru durumda olmasını sağlar
-                    Log.d(TAG, "Kullanıcı giriş durumu güncelleniyor: ${currentUser.uid}")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Kullanıcı durumunu güncelleme hatası: ${e.message}", e)
             }
         }
     }

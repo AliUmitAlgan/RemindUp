@@ -1,18 +1,16 @@
+
 package com.aliumitalgan.remindup.screens
 
 import android.util.Log
-import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import com.aliumitalgan.remindup.R
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -21,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -28,29 +27,23 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
-import com.aliumitalgan.remindup.components.BottomNavigationBar
-import com.aliumitalgan.remindup.components.GoalCard
-import com.aliumitalgan.remindup.components.ModernCard
-import com.aliumitalgan.remindup.components.MotivationalMessage
+import com.aliumitalgan.remindup.R
+import com.aliumitalgan.remindup.components.*
 import com.aliumitalgan.remindup.models.Goal
 import com.aliumitalgan.remindup.models.Reminder
-import com.aliumitalgan.remindup.ui.theme.*
+import com.aliumitalgan.remindup.models.ReminderCategory
+import com.aliumitalgan.remindup.ui.theme.AppColors
 import com.aliumitalgan.remindup.utils.LanguageManager
+import com.aliumitalgan.remindup.utils.ProgressUtils
 import com.aliumitalgan.remindup.utils.ReminderUtils
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
-
-data class BottomNavItem(
-    val title: String,
-    val selectedIcon: ImageVector,
-    val unselectedIcon: ImageVector,
-    val route: String
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,13 +56,16 @@ fun HomeScreenContent(
     val currentLanguage by LanguageManager.currentLanguage
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+
     var goals by remember { mutableStateOf<List<Goal>>(emptyList()) }
     var reminders by remember { mutableStateOf<List<Reminder>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var motivationalMessage by remember { mutableStateOf("") }
+    var overallProgress by remember { mutableStateOf(0f) }
 
     // Current time and date
     val currentTime = remember { mutableStateOf(System.currentTimeMillis()) }
+    val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
     val dateFormat = remember { SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()) }
 
     // Update time every minute
@@ -82,128 +78,80 @@ fun HomeScreenContent(
 
     // Bottom Navigation Items
     val bottomNavItems = listOf(
-        BottomNavItem("Ana Sayfa", Icons.Filled.Home, Icons.Outlined.Home, "home"),
-        BottomNavItem("Hedefler", Icons.Filled.CheckCircle, Icons.Outlined.CheckCircle, "goals"),
-        BottomNavItem("Hatırlatıcılar", Icons.Filled.Notifications, Icons.Outlined.Notifications, "reminders"),
-        BottomNavItem("İlerleme", Icons.Filled.ShowChart, Icons.Outlined.ShowChart, "progress"),
-        BottomNavItem("Profil", Icons.Filled.Person, Icons.Outlined.Person, "profile")
+        BottomNavItem(stringResource(R.string.home), Icons.Filled.Home, Icons.Outlined.Home, "home"),
+        BottomNavItem(stringResource(R.string.goals), Icons.Filled.CheckCircle, Icons.Outlined.CheckCircle, "goals"),
+        BottomNavItem(stringResource(R.string.reminders), Icons.Filled.Notifications, Icons.Outlined.Notifications, "reminders"),
+        BottomNavItem(stringResource(R.string.progress), Icons.Filled.ShowChart, Icons.Outlined.ShowChart, "progress"),
+        BottomNavItem(stringResource(R.string.profile), Icons.Filled.Person, Icons.Outlined.Person, "profile")
     )
     var selectedNavItem by remember { mutableStateOf(bottomNavItems[0].route) }
     val currentUser = FirebaseAuth.getInstance().currentUser
     val displayName = currentUser?.displayName ?: currentUser?.email?.substringBefore('@') ?: "Misafir"
 
-    // Verileri yükle
-    LaunchedEffect(key1 = true,key2=currentLanguage) {
+    // Load data
+    LaunchedEffect(key1 = Unit, key2 = currentLanguage) {
         try {
-            // Context'i al
-            val appContext = context
-
-            // Motivasyonel mesaj - Şimdi context ile çağırılıyor
+            // Get motivational message
             motivationalMessage = ReminderUtils.getRandomMotivationalMessage(context)
 
-            // Hedefleri yükle
-            com.aliumitalgan.remindup.utils.ProgressUtils.getUserGoals()
-                .onSuccess { goalsList ->
-                    // Liste eşleştirmesi için Map-Pair çevrimi
-                    goals = goalsList.map { it.second }
-                    isLoading = false
-                }
-                .onFailure { error ->
-                    Log.e("HomeScreen", "Hedefleri yükleme hatası: ${error.message}", error)
-                    goals = emptyList()
-                    isLoading = false
-                    Toast.makeText(context, "Hedefleri yüklerken hata: ${error.message}", Toast.LENGTH_SHORT).show()
-                }
+            // Load goals
+            val goalsResult = ProgressUtils.getUserGoals()
+            if (goalsResult.isSuccess) {
+                goals = goalsResult.getOrDefault(emptyList()).map { it.second }
+            }
 
-            // Hatırlatıcıları yükle
+            // Load reminders
             val remindersResult = ReminderUtils.getUserReminders()
             if (remindersResult.isSuccess) {
                 reminders = remindersResult.getOrDefault(emptyList()).map { it.second }
+                // Sort reminders by time
+                reminders = reminders.sortedBy { it.time }
             }
-        } catch (e: Exception) {
-            // Hata durumunda yüklemeyi durdurun
+
+            // Get overall progress
+            val progressResult = ProgressUtils.getOverallProgress()
+            if (progressResult.isSuccess) {
+                overallProgress = progressResult.getOrDefault(0f)
+            }
+
             isLoading = false
-            // Hata mesajını göster
-            Toast.makeText(context, "Veri yüklenirken bir hata oluştu: ${e.message}", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Log.e("HomeScreen", "Error loading data: ${e.message}", e)
+            isLoading = false
         }
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // App Icon with animation
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .shadow(
-                                    elevation = 4.dp,
-                                    shape = RoundedCornerShape(10.dp),
-                                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                                )
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(
-                                    brush = Brush.horizontalGradient(
-                                        colors = listOf(
-                                            BluePrimary,
-                                            GreenSecondary
-                                        )
-                                    )
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CheckCircle,
-                                contentDescription = "Logo",
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        Column {
-                            Text(
-                                text = "RemindUp",
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-
-                            Text(
-                                text = dateFormat.format(Date(currentTime.value)),
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                )
-            )
-        },
         bottomBar = {
             BottomNavigationBar(
                 items = bottomNavItems,
                 currentRoute = selectedNavItem,
                 onItemSelected = { route ->
-                    // Şu anki route ile aynı route'a tıklanırsa bir şey yapma
-                    if (route != selectedNavItem) {
-                        selectedNavItem = route
-                        when (route) {
-                            "home" -> {}  // Zaten ana sayfadayız
-                            "goals" -> onNavigateToGoals()
-                            "reminders" -> onNavigateToReminders()
-                            "progress" -> onNavigateToProgress()
-                            "profile" -> onNavigateToSettings()
-                        }
+                    selectedNavItem = route
+                    when (route) {
+                        "home" -> {} // Already on home
+                        "goals" -> onNavigateToGoals()
+                        "reminders" -> onNavigateToReminders()
+                        "progress" -> onNavigateToProgress()
+                        "profile" -> onNavigateToSettings()
                     }
                 }
+            )
+        },
+        floatingActionButton = {
+            AnimatedFloatingActionButton(
+                onClick = {
+                    // Determine where to navigate based on the user's context
+                    if (goals.isEmpty()) {
+                        onNavigateToGoals()
+                    } else if (reminders.isEmpty()) {
+                        onNavigateToReminders()
+                    } else {
+                        // Show a menu or dialog to choose where to navigate
+                        onNavigateToGoals()
+                    }
+                },
+                icon = Icons.Filled.Add
             )
         }
     ) { innerPadding ->
@@ -211,202 +159,248 @@ fun HomeScreenContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(
-                    MaterialTheme.colorScheme.background
-                )
+                .background(MaterialTheme.colorScheme.background)
         ) {
             if (isLoading) {
-                LoadingIndicator()
+                // Loading state with animation
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            strokeWidth = 3.dp,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = stringResource(R.string.loading),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                        )
+                    }
+                }
             } else {
-                HomeContent(
-                    displayName = displayName,
-                    motivationalMessage = motivationalMessage,
-                    goals = goals,
-                    reminders = reminders,
-                    onNavigateToGoals = onNavigateToGoals,
-                    onNavigateToReminders = onNavigateToReminders
-                )
+                // Main content with scroll
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp)
+                ) {
+                    // Modern top profile section
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                text = stringResource(R.string.welcome_user),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                            )
+
+                            Text(
+                                text = displayName,
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+
+                        // Profile icon button with notification indicator
+                        IconButton(
+                            onClick = onNavigateToSettings,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .shadow(4.dp, CircleShape)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            Box {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "Profile",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+
+                                // Notification indicator
+                                if (reminders.isNotEmpty()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(12.dp)
+                                            .background(MaterialTheme.colorScheme.tertiary, CircleShape)
+                                            .align(Alignment.TopEnd)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Date & Time chip
+                    EnhancedCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        cornerRadius = 16.dp,
+                        elevation = 2.dp
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DateRange,
+                                contentDescription = "Date",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = dateFormat.format(Date(currentTime.value)),
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontWeight = FontWeight.Medium
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+
+                                Text(
+                                    text = timeFormat.format(Date(currentTime.value)),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    // Motivational card
+                    HeaderCard(
+                        title = stringResource(R.string.user_greeting),
+                        subtitle = motivationalMessage,
+                        icon = Icons.Default.EmojiEmotions,
+                        primaryColor = MaterialTheme.colorScheme.tertiary
+                    )
+
+                    // Progress summary card
+                    ProgressSummaryCard(
+                        progress = overallProgress,
+                        onCardClick = onNavigateToProgress
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Upcoming Reminders Section
+                    SectionHeader(
+                        title = stringResource(R.string.upcoming_reminders),
+                        actionButton = {
+                            TextButton(onClick = onNavigateToReminders) {
+                                Text(stringResource(R.string.see_all))
+                            }
+                        }
+                    )
+
+                    // Top 3 upcoming reminders or empty state
+                    if (reminders.isNotEmpty()) {
+                        val upcomingReminders = reminders.filter { it.isEnabled }.take(3)
+
+                        upcomingReminders.forEach { reminder ->
+                            ReminderListItem(
+                                reminder = reminder,
+                                onClick = onNavigateToReminders
+                            )
+                        }
+                    } else {
+                        EmptyStateCard(
+                            title = stringResource(R.string.no_reminders),
+                            subtitle = stringResource(R.string.add_first_reminder),
+                            icon = Icons.Default.Notifications,
+                            primaryColor = MaterialTheme.colorScheme.primary,
+                            onActionClick = onNavigateToReminders,
+                            actionText = stringResource(R.string.add_reminder)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Active Goals Section
+                    SectionHeader(
+                        title = stringResource(R.string.active_goals),
+                        actionButton = {
+                            TextButton(onClick = onNavigateToGoals) {
+                                Text(stringResource(R.string.see_all))
+                            }
+                        }
+                    )
+
+                    // Top 3 active goals or empty state
+                    if (goals.isNotEmpty()) {
+                        val activeGoals = goals.filter { it.progress < 100 }.take(3)
+
+                        if (activeGoals.isNotEmpty()) {
+                            activeGoals.forEach { goal ->
+                                GoalListItem(
+                                    goal = goal,
+                                    onCardClick = onNavigateToGoals
+                                )
+                            }
+                        } else {
+                            // All goals are completed
+                            AllGoalsCompletedCard(onActionClick = onNavigateToGoals)
+                        }
+                    } else {
+                        EmptyStateCard(
+                            title = stringResource(R.string.no_goals),
+                            subtitle = stringResource(R.string.add_first_goal),
+                            icon = Icons.Default.Flag,
+                            primaryColor = MaterialTheme.colorScheme.secondary,
+                            onActionClick = onNavigateToGoals,
+                            actionText = stringResource(R.string.add_goal)
+                        )
+                    }
+
+                    // Extra space at bottom for FAB
+                    Spacer(modifier = Modifier.height(80.dp))
+                }
             }
         }
     }
 }
 
 @Composable
-fun LoadingIndicator() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        val infiniteTransition = rememberInfiniteTransition(label = "loading")
-        val scale by infiniteTransition.animateFloat(
-            initialValue = 0.8f,
-            targetValue = 1.2f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1000),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "pulse"
-        )
-
-        Box(
-            modifier = Modifier
-                .size(60.dp * scale)
-                .clip(CircleShape)
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary,
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                        )
-                    )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(30.dp),
-                color = Color.White,
-                strokeWidth = 3.dp
-            )
-        }
-    }
-}
-
-@Composable
-fun HomeContent(
-    displayName: String,
-    motivationalMessage: String,
-    goals: List<Goal>,
-    reminders: List<Reminder>,
-    onNavigateToGoals: () -> Unit,
-    onNavigateToReminders: () -> Unit
+fun ProgressSummaryCard(
+    progress: Float,
+    onCardClick: () -> Unit
 ) {
-    LazyColumn(
+    val animatedProgress = animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
+        label = "progress"
+    )
+
+    EnhancedCard(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Kullanıcı karşılama mesajı
-        item {
-            AnimatedVisibility(
-                visible = true,
-                enter = fadeIn(animationSpec = tween(1000)) +
-                        slideInHorizontally(
-                            animationSpec = tween(1000),
-                            initialOffsetX = { -it }
-                        )
-            ) {
-                WelcomeCard(displayName)
-            }
-        }
-
-        // Motivasyon mesajı
-        item {
-            AnimatedVisibility(
-                visible = true,
-                enter = fadeIn(animationSpec = tween(1200, delayMillis = 300))
-            ) {
-                MotivationalMessage(message = motivationalMessage)
-            }
-        }
-
-        // Hedefler Başlık
-        item {
-            AnimatedVisibility(
-                visible = true,
-                enter = fadeIn(animationSpec = tween(1000, delayMillis = 600))
-            ) {
-                SectionTitle(stringResource(R.string.goals), stringResource(R.string.see_all)) {
-                    onNavigateToGoals()
-                }
-            }
-        }
-
-        // Hedefler
-        if (goals.isEmpty()) {
-            item {
-                AnimatedVisibility(
-                    visible = true,
-                    enter = fadeIn(animationSpec = tween(1000, delayMillis = 900))
-                ) {
-                    EmptyStateCard(
-                        stringResource(R.string.no_goals),
-                        stringResource(R.string.add_first_goal),
-                        stringResource(R.string.add_goal),
-                        onClick = onNavigateToGoals
-                    )
-                }
-            }
-        } else {
-            items(goals.take(3)) { goal ->
-                AnimatedVisibility(
-                    visible = true,
-                    enter = fadeIn(animationSpec = tween(1000, delayMillis = 900)) +
-                            slideInHorizontally(
-                                animationSpec = tween(1000, delayMillis = 900),
-                                initialOffsetX = { it }
-                            )
-                ) {
-                    GoalCard(
-                        goalTitle = goal.title,
-                        goalProgress = goal.progress
-                    )
-                }
-            }
-        }
-
-        // Yaklaşan Hatırlatıcılar Başlık
-        item {
-            AnimatedVisibility(
-                visible = true,
-                enter = fadeIn(animationSpec = tween(1000, delayMillis = 1200))
-            ) {
-                SectionTitle(stringResource(R.string.upcoming_reminders), stringResource(R.string.see_all)) {
-                    onNavigateToReminders()
-                }
-            }
-        }
-
-        // Yaklaşan Hatırlatıcılar
-        if (reminders.isEmpty()) {
-            item {
-                AnimatedVisibility(
-                    visible = true,
-                    enter = fadeIn(animationSpec = tween(1000, delayMillis = 1500))
-                ) {
-                    EmptyStateCard(
-                        title = "Henüz hatırlatıcı eklenmemiş",
-                        description = "İlk hatırlatıcını ekleyerek başla",
-                        buttonText = "Hatırlatıcı Ekle",
-                        onClick = onNavigateToReminders
-                    )
-                }
-            }
-        } else {
-            items(reminders.take(3)) { reminder ->
-                AnimatedVisibility(
-                    visible = true,
-                    enter = fadeIn(animationSpec = tween(1000, delayMillis = 1500)) +
-                            slideInHorizontally(
-                                animationSpec = tween(1000, delayMillis = 1500),
-                                initialOffsetX = { it }
-                            )
-                ) {
-                    ReminderListItem(reminder)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun WelcomeCard(userName: String) {
-    ModernCard(
-        modifier = Modifier.fillMaxWidth()
+            .fillMaxWidth()
+            .height(160.dp)
+            .padding(vertical = 8.dp)
+            .clickable(onClick = onCardClick),
+        cornerRadius = 24.dp,
+        elevation = 4.dp,
+        primaryColor = MaterialTheme.colorScheme.primary
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
@@ -418,59 +412,73 @@ fun WelcomeCard(userName: String) {
                 .padding(20.dp)
         ) {
             Row(
+                modifier = Modifier.fillMaxSize(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Avatar
+                // Progress circle
                 Box(
                     modifier = Modifier
-                        .size(50.dp)
-                        .shadow(
-                            elevation = 4.dp,
-                            shape = CircleShape,
-                            spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                        )
-                        .clip(CircleShape)
-                        .background(
-                            brush = Brush.linearGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)
-                                )
-                            )
-                        ),
+                        .size(110.dp)
+                        .padding(8.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        // Boş string kontrolü
-                        text = if (userName.isNotEmpty()) userName.first().toString().uppercase() else "?",
+                    CircularProgressIndicator(
+                        progress = { animatedProgress.value },
+                        modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.primary,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        strokeWidth = 12.dp
                     )
+
+                    // Center text showing percentage
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "${(animatedProgress.value * 100).toInt()}%",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        Text(
+                            text = stringResource(R.string.completed_label),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
-
-                Column {
+                // Right side text
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 16.dp)
+                ) {
                     Text(
-                        stringResource(R.string.welcome_user),
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-                    )
-                    Text(
-                        // Boş userName durumunda varsayılan değer
-                        text = if (userName.isNotEmpty()) userName else "Misafir",
-                        fontSize = 20.sp,
+                        text = stringResource(R.string.overall_progress),
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        stringResource(R.string.user_greeting),
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                        text = stringResource(R.string.goals_status),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Call to action button
+                    EnhancedButton(
+                        text = stringResource(R.string.see_all),
+                        onClick = onCardClick,
+                        icon = Icons.Default.ShowChart,
+                        backgroundColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
             }
@@ -479,25 +487,172 @@ fun WelcomeCard(userName: String) {
 }
 
 @Composable
-fun SectionTitle(title: String, actionText: String, onAction: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = title,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
+fun ReminderListItem(
+    reminder: Reminder,
+    onClick: () -> Unit
+) {
+    // Get colors based on category
+    val categoryColor = getCategoryColor(reminder.category)
 
-        TextButton(onClick = onAction) {
-            Text(
-                text = actionText,
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.primary
+    EnhancedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .clickable(onClick = onClick),
+        cornerRadius = 16.dp,
+        primaryColor = categoryColor,
+        elevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp, horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Time indicator
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(categoryColor.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = reminder.time,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = categoryColor
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // Title and optional description
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = reminder.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                if (reminder.description.isNotEmpty()) {
+                    Text(
+                        text = reminder.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            // Category indicator
+            Icon(
+                imageVector = getCategoryIcon(reminder.category),
+                contentDescription = null,
+                tint = categoryColor,
+                modifier = Modifier.size(24.dp)
             )
+        }
+    }
+}
+
+@Composable
+fun GoalListItem(
+    goal: Goal,
+    onCardClick: () -> Unit
+) {
+    val animatedProgress = animateFloatAsState(
+        targetValue = goal.progress / 100f,
+        animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+        label = "goalProgress"
+    )
+
+    val progressColor = when {
+        goal.progress >= 100 -> MaterialTheme.colorScheme.tertiary
+        goal.progress >= 75 -> MaterialTheme.colorScheme.secondary
+        goal.progress >= 50 -> MaterialTheme.colorScheme.primary
+        goal.progress >= 25 -> MaterialTheme.colorScheme.primaryContainer
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
+
+    EnhancedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .clickable(onClick = onCardClick),
+        cornerRadius = 16.dp,
+        primaryColor = progressColor,
+        elevation = 2.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            // Title and progress
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Flag,
+                        contentDescription = null,
+                        tint = progressColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Text(
+                        text = goal.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Text(
+                    text = "${goal.progress}%",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = progressColor
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Progress bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(animatedProgress.value)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    progressColor,
+                                    progressColor.copy(alpha = 0.7f)
+                                )
+                            )
+                        )
+                )
+            }
         }
     }
 }
@@ -505,14 +660,33 @@ fun SectionTitle(title: String, actionText: String, onAction: () -> Unit) {
 @Composable
 fun EmptyStateCard(
     title: String,
-    description: String,
-    buttonText: String,
-    onClick: () -> Unit
+    subtitle: String,
+    icon: ImageVector,
+    primaryColor: Color,
+    onActionClick: () -> Unit,
+    actionText: String
 ) {
-    ModernCard(
+    var isAnimating by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isAnimating) 1.1f else 0.95f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "emptyScale"
+    )
+
+    LaunchedEffect(Unit) {
+        isAnimating = true
+    }
+
+    EnhancedCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = 8.dp),
+        cornerRadius = 16.dp,
+        primaryColor = primaryColor,
+        elevation = 2.dp
     ) {
         Column(
             modifier = Modifier
@@ -520,107 +694,135 @@ fun EmptyStateCard(
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(primaryColor.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = primaryColor,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .scale(scale)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             Text(
                 text = title,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = description,
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Button(
-                onClick = onClick,
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                ),
-                elevation = ButtonDefaults.buttonElevation(4.dp)
-            ) {
-                Text(buttonText)
-            }
+            EnhancedButton(
+                text = actionText,
+                onClick = onActionClick,
+                icon = Icons.Default.Add,
+                backgroundColor = primaryColor
+            )
         }
     }
 }
 
 @Composable
-fun ReminderListItem(reminder: Reminder) {
-    val currentLanguage by LanguageManager.currentLanguage
-
-    ModernCard(
+fun AllGoalsCompletedCard(onActionClick: () -> Unit) {
+    EnhancedCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = 8.dp),
+        cornerRadius = 16.dp,
+        primaryColor = AppColors.success,
+        elevation = 2.dp
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Saat ikonu
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .shadow(
-                        elevation = 4.dp,
-                        shape = RoundedCornerShape(12.dp),
-                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                    )
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                BluePrimary.copy(alpha = 0.2f),
-                                GreenSecondary.copy(alpha = 0.2f)
-                            )
-                        )
-                    ),
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(AppColors.success.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.AccessTime,
-                    contentDescription = "Saat",
-                    tint = BluePrimary,
-                    modifier = Modifier.size(24.dp)
+                    imageVector = Icons.Default.Celebration,
+                    contentDescription = null,
+                    tint = AppColors.success,
+                    modifier = Modifier.size(32.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = reminder.title,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+            Text(
+                text = stringResource(R.string.congratulations),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
 
-                Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-                // Saat bilgisini dil desteği ile göster
-                Text(
-                    text = if (currentLanguage == LanguageManager.LANGUAGE_ENGLISH) {
-                        "Time: ${reminder.time}"
-                    } else {
-                        "Saat: ${reminder.time}"
-                    },
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                )
-            }
+            Text(
+                text = "Tüm hedeflerinizi tamamladınız!",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            EnhancedButton(
+                text = "Yeni Hedef Ekle",
+                onClick = onActionClick,
+                icon = Icons.Default.Add,
+                backgroundColor = AppColors.success
+            )
         }
+    }
+}
+
+// Helper function to get category color
+@Composable
+private fun getCategoryColor(category: ReminderCategory): Color {
+    return when (category) {
+        ReminderCategory.GENERAL -> MaterialTheme.colorScheme.primary
+        ReminderCategory.WORK -> Color(0xFFE91E63)     // Pink
+        ReminderCategory.HEALTH -> Color(0xFFE53935)   // Red
+        ReminderCategory.PERSONAL -> Color(0xFF9C27B0) // Purple
+        ReminderCategory.STUDY -> Color(0xFF00897B)    // Teal
+        ReminderCategory.FITNESS -> Color(0xFF7CB342)  // Green
+    }
+}
+
+// Helper function to get category icon
+private fun getCategoryIcon(category: ReminderCategory): ImageVector {
+    return when (category) {
+        ReminderCategory.GENERAL -> Icons.Default.Notifications
+        ReminderCategory.WORK -> Icons.Default.Work
+        ReminderCategory.HEALTH -> Icons.Default.Favorite
+        ReminderCategory.PERSONAL -> Icons.Default.Person
+        ReminderCategory.STUDY -> Icons.Default.School
+        ReminderCategory.FITNESS -> Icons.Default.FitnessCenter
     }
 }

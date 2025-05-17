@@ -1,44 +1,60 @@
 package com.aliumitalgan.remindup.screens
 
+import android.content.Context
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import com.aliumitalgan.remindup.R
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aliumitalgan.remindup.components.BottomNavigationBar
-import com.aliumitalgan.remindup.components.NestedGoalCard
+import androidx.compose.ui.window.Dialog
+import com.aliumitalgan.remindup.R
+import com.aliumitalgan.remindup.components.*
 import com.aliumitalgan.remindup.models.Goal
+import com.aliumitalgan.remindup.ui.theme.AppDimensions
+import com.aliumitalgan.remindup.ui.theme.SuccessGreen
 import com.aliumitalgan.remindup.utils.ProgressUtils
-import com.aliumitalgan.remindup.utils.StringResourcesProvider
 import com.aliumitalgan.remindup.utils.SubGoal
 import com.aliumitalgan.remindup.utils.SubGoalUtils
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GoalsScreenContent(
     onNavigateBack: () -> Unit,
     onNavigateToHome: () -> Unit = {},
+    onNavigateToGoals: () -> Unit = {},
     onNavigateToReminders: () -> Unit = {},
     onNavigateToProgress: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {}
@@ -51,11 +67,15 @@ fun GoalsScreenContent(
     var isLoading by remember { mutableStateOf(true) }
     var showAddDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf<Pair<String, Goal>?>(null) }
-
     var editingGoal by remember { mutableStateOf<Pair<String, Goal>?>(null) }
 
     // Alt hedefleri saklayacak Map (GoalId -> List<SubGoal>)
     var subGoalsMap by remember { mutableStateOf<Map<String, List<Pair<String, SubGoal>>>>(emptyMap()) }
+
+    // Animasyon durumları
+    var headerVisible by remember { mutableStateOf(false) }
+    var contentVisible by remember { mutableStateOf(false) }
+    var fabVisible by remember { mutableStateOf(false) }
 
     // Bottom Navigation Items
     val bottomNavItems = listOf(
@@ -67,52 +87,46 @@ fun GoalsScreenContent(
     )
     var selectedNavItem by remember { mutableStateOf(bottomNavItems[1].route) }
 
+    // Animasyonları başlat
+    LaunchedEffect(Unit) {
+        headerVisible = true
+        delay(300)
+        contentVisible = true
+        delay(600)
+        fabVisible = true
+    }
+
     // Tüm hedefleri ve alt hedefleri yükle
-    // When loading sub-goals
     LaunchedEffect(key1 = true) {
-        coroutineScope.launch {
-            try {
-                // Load goals
-                val goalsResult = ProgressUtils.getUserGoals()
-                if (goalsResult.isSuccess) {
-                    val goalsList = goalsResult.getOrDefault(emptyList())
-                    activeGoals = goalsList.filter { it.second.progress < 100 }
-                    completedGoals = goalsList.filter { it.second.progress >= 100 }
+        try {
+            // Hedefleri yükle
+            val goalsResult = ProgressUtils.getUserGoals()
+            if (goalsResult.isSuccess) {
+                val goalsList = goalsResult.getOrDefault(emptyList())
+                activeGoals = goalsList.filter { it.second.progress < 100 }
+                completedGoals = goalsList.filter { it.second.progress >= 100 }
 
-                    // Load sub-goals for each goal
-                    val subGoalsMapTemp = mutableMapOf<String, List<Pair<String, SubGoal>>>()
-                    goalsList.forEach { (goalId, _) ->
-                        try {
-                            Log.d("GoalsScreen", "Fetching sub-goals for goal: $goalId")
-                            val subGoalsResult = SubGoalUtils.getSubGoalsForParent(goalId)
-
-                            Log.d("GoalsScreen", "Sub-goals fetch result for $goalId: ${subGoalsResult.isSuccess}")
-
-                            if (subGoalsResult.isSuccess) {
-                                val subGoals = subGoalsResult.getOrDefault(emptyList())
-                                Log.d("GoalsScreen", "Sub-goals for $goalId: $subGoals")
-
-                                if (subGoals.isNotEmpty()) {
-                                    subGoalsMapTemp[goalId] = subGoals
-                                }
-                            } else {
-                                Log.e("GoalsScreen", "Failed to fetch sub-goals for goal: $goalId")
+                // Alt hedefleri yükle
+                val subGoalsMapTemp = mutableMapOf<String, List<Pair<String, SubGoal>>>()
+                goalsList.forEach { (goalId, _) ->
+                    try {
+                        val subGoalsResult = SubGoalUtils.getSubGoalsForParent(goalId)
+                        if (subGoalsResult.isSuccess) {
+                            val subGoals = subGoalsResult.getOrDefault(emptyList())
+                            if (subGoals.isNotEmpty()) {
+                                subGoalsMapTemp[goalId] = subGoals
                             }
-                        } catch (e: Exception) {
-                            Log.e("GoalsScreen", "Error fetching sub-goals for goal: $goalId", e)
                         }
+                    } catch (e: Exception) {
+                        Log.e("GoalsScreen", "Error fetching sub-goals for goal: $goalId", e)
                     }
-
-                    subGoalsMap = subGoalsMapTemp
-                    Log.d("GoalsScreen", "Final sub-goals map: $subGoalsMap")
-                } else {
-                    Log.e("GoalsScreen", "Failed to load goals")
                 }
-            } catch (e: Exception) {
-                Log.e("GoalsScreen", "Unexpected error loading goals", e)
-            } finally {
-                isLoading = false
+                subGoalsMap = subGoalsMapTemp
             }
+        } catch (e: Exception) {
+            Log.e("GoalsScreen", "Unexpected error loading goals", e)
+        } finally {
+            isLoading = false
         }
     }
 
@@ -123,12 +137,6 @@ fun GoalsScreenContent(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Geri")
-                    }
-                },
-                actions = {
-                    // Ekleme butonu üst kısımda
-                    IconButton(onClick = { showAddDialog = true }) {
-                        Icon(Icons.Default.Add, contentDescription = "Hedef Ekle")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -151,7 +159,25 @@ fun GoalsScreenContent(
                     }
                 }
             )
-        }
+        },
+        floatingActionButton = {
+            AnimatedVisibility(
+                visible = fabVisible,
+                enter = fadeIn() + scaleIn(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
+                )
+            ) {
+                AnimatedFloatingActionButton(
+                    onClick = { showAddDialog = true },
+                    icon = Icons.Default.Add,
+                    backgroundColor = MaterialTheme.colorScheme.primary
+                )
+            }
+        },
+        floatingActionButtonPosition = FabPosition.End
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -159,601 +185,353 @@ fun GoalsScreenContent(
                 .padding(innerPadding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // İçerik
+            // Loading state
             if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center),
-                    color = MaterialTheme.colorScheme.primary
-                )
-            } else if (activeGoals.isEmpty() && completedGoals.isEmpty()) {
-                EmptyGoalsView(
-                    onAddClick = { showAddDialog = true }
-                )
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(48.dp),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             } else {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)  // Elemanlar arasında eşit boşluk
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Aktif Hedefler Başlığı
-                    if (activeGoals.isNotEmpty()) {
-                        item {
-                            Text(
-                                stringResource(R.string.in_progress),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(vertical = 10.dp)
+                    // Header Card
+                    item {
+                        AnimatedVisibility(
+                            visible = headerVisible,
+                            enter = fadeIn() + expandVertically(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessLow
+                                )
                             )
+                        ) {
+                            HeaderCard(
+                                title = stringResource(R.string.my_goals),
+                                subtitle = if (activeGoals.isEmpty() && completedGoals.isEmpty())
+                                    stringResource(R.string.start_by_adding_goal)
+                                else
+                                    "Hedeflerinizi takip edin ve başarıya ulaşın!",
+                                icon = Icons.Default.Flag,
+                                primaryColor = MaterialTheme.colorScheme.primary,
+                                secondaryColor = MaterialTheme.colorScheme.secondary
+                            ) {
+                                // İçerik kısmı - İstatistikler
+                                if (activeGoals.isNotEmpty() || completedGoals.isNotEmpty()) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceEvenly
+                                    ) {
+                                        // Aktif hedefler
+                                        StatBadge(
+                                            value = activeGoals.size.toString(),
+                                            label = "Aktif",
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+
+                                        // Tamamlanan hedefler
+                                        StatBadge(
+                                            value = completedGoals.size.toString(),
+                                            label = "Tamamlanan",
+                                            color = SuccessGreen
+                                        )
+
+                                        // Toplam hedefler
+                                        StatBadge(
+                                            value = (activeGoals.size + completedGoals.size).toString(),
+                                            label = "Toplam",
+                                            color = MaterialTheme.colorScheme.tertiary
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
 
-                    // Aktif Hedefler
-                    items(activeGoals.size) { index ->
-                        val (id, goal) = activeGoals[index]
-                        val subGoals = subGoalsMap[id]?.map { it.second } ?: emptyList()
-
-                        NestedGoalCard(
-                            goalTitle = goal.title,
-                            goalProgress = goal.progress,
-                            subGoals = subGoals,
-                            onProgressUpdate = { newProgress ->
-                                coroutineScope.launch {
-                                    updateGoalProgress(
-                                        goalId = id,
-                                        newProgress = newProgress,
-                                        onSuccess = {
-                                            // Hedefi aktif veya tamamlanmış listesine taşı
-                                            val updatedGoal = goal.copy(progress = newProgress)
-                                            if (newProgress >= 100) {
-                                                activeGoals = activeGoals.filterNot { it.first == id }
-                                                completedGoals = completedGoals + (id to updatedGoal)
-                                                showToast(context, StringResourcesProvider.getString(context, R.string.goal_completed))
-                                            } else {
-                                                activeGoals = activeGoals.map {
-                                                    if (it.first == id) id to updatedGoal
-                                                    else it
-                                                }
-                                                showToast(context, StringResourcesProvider.getString(context, R.string.progress_updated, newProgress))
-                                            }
-                                        },
-                                        onError = { error ->
-                                            showToast(context, StringResourcesProvider.getString(context, R.string.edit_progress, error))
-                                        }
+                    // Boş durum
+                    if (activeGoals.isEmpty() && completedGoals.isEmpty()) {
+                        item {
+                            AnimatedVisibility(
+                                visible = contentVisible,
+                                enter = fadeIn() + expandVertically()
+                            ) {
+                                EmptyGoalsView(onAddClick = { showAddDialog = true })
+                            }
+                        }
+                    } else {
+                        // Aktif Hedefler Başlığı
+                        if (activeGoals.isNotEmpty()) {
+                            item {
+                                AnimatedVisibility(
+                                    visible = contentVisible,
+                                    enter = fadeIn() + slideInVertically { it / 2 }
+                                ) {
+                                    SectionHeader(
+                                        title = stringResource(R.string.active_goals),
+                                        subtitle = "Devam eden hedefleriniz"
                                     )
                                 }
-                            },
-                            // Add Sub Goal
-                            onAddSubGoal = { subGoalTitle ->
-                                coroutineScope.launch {
-                                    try {
-                                        // Kullanıcı kontrolü
-                                        val currentUser = FirebaseAuth.getInstance().currentUser
-                                        if (currentUser == null) {
-                                            Log.e("GoalsScreen", "User not logged in")
-                                            Toast.makeText(context, "Kullanıcı girişi yapılmamış", Toast.LENGTH_SHORT).show()
-                                            return@launch
-                                        }
+                            }
+                        }
 
-                                        // Subgoal oluştur
-                                        val newSubGoalId = UUID.randomUUID().toString()
-                                        val newSubGoal = SubGoal(
-                                            id = newSubGoalId,
-                                            title = subGoalTitle,
-                                            parentGoalId = id, // id, for döngüsünden gelen goal id'si
-                                            userId = currentUser.uid,
-                                            completed = false
+                        // Aktif Hedefler
+                        items(activeGoals) { (id, goal) ->
+                            key(id) {
+                                AnimatedVisibility(
+                                    visible = contentVisible,
+                                    enter = fadeIn() + expandVertically(
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessLow
                                         )
-
-                                        Log.d("GoalsScreen", "Adding new subgoal: $newSubGoal")
-
-                                        // SubGoal'ı Firestore'a ekle
-                                        val result = SubGoalUtils.addSubGoal(newSubGoal)
-
-                                        if (result.isSuccess) {
-                                            Log.d("GoalsScreen", "Subgoal successfully added with ID: ${result.getOrNull()}")
-                                            Toast.makeText(context, "Alt hedef eklendi", Toast.LENGTH_SHORT).show()
-
-                                            // Eklenen alt hedefi mevcut listeye ekle (UI'yi hemen güncellemek için)
-                                            val currentSubGoals = subGoalsMap[id]?.toMutableList() ?: mutableListOf()
-                                            currentSubGoals.add(Pair(newSubGoalId, newSubGoal))
-
-                                            // Map'i güncelleyerek state'i değiştir
-                                            subGoalsMap = subGoalsMap.toMutableMap().apply {
-                                                put(id, currentSubGoals)
-                                            }
-
-                                            // Yeni ilerleme durumunu hesapla
-                                            val updatedSubGoals = currentSubGoals.map { it.second }
-                                            val newProgress = SubGoalUtils.calculateProgressFromSubGoals(updatedSubGoals)
-
-                                            // Hedefin ilerleme durumunu güncelle
-                                            updateGoalProgress(
-                                                goalId = id,
-                                                newProgress = newProgress,
-                                                onSuccess = {
-                                                    Log.d("GoalsScreen", "Goal progress updated to $newProgress%")
-
-                                                    // UI'yi güncelle - active ve completed listelerini güncelle
-                                                    if (newProgress >= 100) {
-                                                        // Hedef tamamlandı, active'den remove et, completed'e ekle
-                                                        val goalToUpdate = activeGoals.find { it.first == id }?.second
-                                                        if (goalToUpdate != null) {
-                                                            val updatedGoal = goalToUpdate.copy(progress = newProgress)
-                                                            activeGoals = activeGoals.filter { it.first != id }
+                                    )
+                                ) {
+                                    GoalItem(
+                                        goalId = id,
+                                        goal = goal,
+                                        subGoals = subGoalsMap[id]?.map { it.second } ?: emptyList(),
+                                        onUpdateProgress = { newProgress ->
+                                            coroutineScope.launch {
+                                                updateGoalProgress(
+                                                    goalId = id,
+                                                    newProgress = newProgress,
+                                                    onSuccess = {
+                                                        // Hedefi aktif veya tamamlanmış listesine taşı
+                                                        val updatedGoal = goal.copy(progress = newProgress)
+                                                        if (newProgress >= 100) {
+                                                            activeGoals = activeGoals.filterNot { it.first == id }
                                                             completedGoals = completedGoals + (id to updatedGoal)
+                                                            showToast(context, StringResourcesProvider.getString(context, R.string.goal_completed))
+                                                        } else {
+                                                            activeGoals = activeGoals.map {
+                                                                if (it.first == id) id to updatedGoal
+                                                                else it
+                                                            }
+                                                            showToast(context, "İlerleme güncellendi: $newProgress%")
                                                         }
+                                                    },
+                                                    onError = { error ->
+                                                        showToast(context, "Hata: $error")
+                                                    }
+                                                )
+                                            }
+                                        },
+                                        onAddSubGoal = { subGoalTitle ->
+                                            coroutineScope.launch {
+                                                val currentUser = FirebaseAuth.getInstance().currentUser
+                                                if (currentUser != null) {
+                                                    val newSubGoalId = UUID.randomUUID().toString()
+                                                    val newSubGoal = SubGoal(
+                                                        id = newSubGoalId,
+                                                        title = subGoalTitle,
+                                                        parentGoalId = id,
+                                                        userId = currentUser.uid,
+                                                        completed = false
+                                                    )
+
+                                                    val result = SubGoalUtils.addSubGoal(newSubGoal)
+                                                    if (result.isSuccess) {
+                                                        showToast(context, "Alt hedef eklendi")
+
+                                                        // UI'yi güncelle
+                                                        val currentSubGoals = subGoalsMap[id]?.toMutableList() ?: mutableListOf()
+                                                        currentSubGoals.add(Pair(newSubGoalId, newSubGoal))
+
+                                                        subGoalsMap = subGoalsMap.toMutableMap().apply {
+                                                            put(id, currentSubGoals)
+                                                        }
+
+                                                        // İlerleme yüzdesini yeniden hesapla
+                                                        val updatedSubGoals = currentSubGoals.map { it.second }
+                                                        val newProgress = SubGoalUtils.calculateProgressFromSubGoals(updatedSubGoals)
+
+                                                        updateGoalProgress(
+                                                            goalId = id,
+                                                            newProgress = newProgress,
+                                                            onSuccess = {
+                                                                // Hedefi aktif veya tamamlanmış listesine taşı
+                                                                val updatedGoal = goal.copy(progress = newProgress)
+                                                                if (newProgress >= 100) {
+                                                                    activeGoals = activeGoals.filterNot { it.first == id }
+                                                                    completedGoals = completedGoals + (id to updatedGoal)
+                                                                } else {
+                                                                    activeGoals = activeGoals.map {
+                                                                        if (it.first == id) id to updatedGoal
+                                                                        else it
+                                                                    }
+                                                                }
+                                                            },
+                                                            onError = { error ->
+                                                                Log.e("GoalsScreen", "Failed to update goal progress: $error")
+                                                            }
+                                                        )
                                                     } else {
-                                                        // Hedef hala aktif, ilerlemesini güncelle
-                                                        activeGoals = activeGoals.map {
-                                                            if (it.first == id) id to it.second.copy(progress = newProgress)
-                                                            else it
+                                                        showToast(context, "Alt hedef eklenemedi: ${result.exceptionOrNull()?.message}")
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        onToggleSubGoal = { subGoal, isCompleted ->
+                                            coroutineScope.launch {
+                                                val result = SubGoalUtils.updateSubGoalStatus(subGoal.id, isCompleted)
+                                                if (result.isSuccess) {
+                                                    // UI'yi güncelle
+                                                    val currentSubGoals = subGoalsMap[id]?.toMutableList() ?: mutableListOf()
+                                                    val updatedSubGoals = currentSubGoals.map {
+                                                        if (it.second.id == subGoal.id) {
+                                                            Pair(it.first, it.second.copy(completed = isCompleted))
+                                                        } else {
+                                                            it
                                                         }
                                                     }
-                                                },
-                                                onError = { error ->
-                                                    Log.e("GoalsScreen", "Failed to update goal progress: $error")
-                                                    Toast.makeText(context, "Hedef ilerlemesi güncellenirken hata oluştu", Toast.LENGTH_SHORT).show()
-                                                }
-                                            )
-                                        } else {
-                                            // Alt hedef ekleme hatası
-                                            Log.e("GoalsScreen", "Error adding subgoal: ${result.exceptionOrNull()?.message}")
-                                            Toast.makeText(context, "Alt hedef eklenemedi: ${result.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
-                                        }
-                                    } catch (e: Exception) {
-                                        // Genel hata
-                                        Log.e("GoalsScreen", "Unexpected error adding subgoal", e)
-                                        Toast.makeText(context, "Beklenmeyen hata: ${e.message}", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            },
-                            // Alt hedef silme işlemi
-                            onDeleteSubGoal = { subGoal ->
-                                coroutineScope.launch {
-                                    try {
-                                        // Alt hedefi sil
-                                        val result = SubGoalUtils.deleteSubGoal(subGoal.id)
 
-                                        if (result.isSuccess) {
-                                            Toast.makeText(context, context.getString(R.string.sub_goal_deleted), Toast.LENGTH_SHORT).show()
-
-                                            // UI'yi güncelle
-                                            val updatedSubGoals = subGoalsMap[id]?.filter { it.second.id != subGoal.id } ?: emptyList()
-
-                                            // Map'i güncelle
-                                            subGoalsMap = subGoalsMap.toMutableMap().apply {
-                                                put(id, updatedSubGoals)
-                                            }
-
-                                            // Hedefin ilerleme yüzdesini güncelle
-                                            val newProgress = SubGoalUtils.calculateProgressFromSubGoals(updatedSubGoals.map { it.second })
-
-                                            updateGoalProgress(
-                                                goalId = id,
-                                                newProgress = newProgress,
-                                                onSuccess = {
-                                                    // Hedefin ilerleme durumunu güncelle
-                                                    if (newProgress >= 100) {
-                                                        val goalToUpdate = activeGoals.find { it.first == id }?.second
-                                                        if (goalToUpdate != null) {
-                                                            val updatedGoal = goalToUpdate.copy(progress = newProgress)
-                                                            activeGoals = activeGoals.filter { it.first != id }
-                                                            completedGoals = completedGoals + (id to updatedGoal)
-                                                        }
-                                                    } else {
-                                                        // Hedef hala aktif, ilerlemesini güncelle
-                                                        activeGoals = activeGoals.map {
-                                                            if (it.first == id) id to it.second.copy(progress = newProgress)
-                                                            else it
-                                                        }
-                                                    }
-                                                },
-                                                onError = { error ->
-                                                    Log.e("GoalsScreen", "Failed to update goal progress: $error")
-                                                }
-                                            )
-                                        } else {
-                                            Toast.makeText(
-                                                context,
-                                                "Alt hedef silinemedi: ${result.exceptionOrNull()?.message}",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                        }
-                                    } catch (e: Exception) {
-                                        Log.e("GoalsScreen", "Error deleting subgoal", e)
-                                        Toast.makeText(
-                                            context,
-                                            "Alt hedef silinirken hata oluştu: ${e.message}",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
-                                }
-                            },
-                            // Toggle sub goal
-                            onToggleSubGoal = { subGoal, isCompleted ->
-                                // Use a callback approach or move coroutine logic outside of composable
-                                val toggleSubGoal: (SubGoal, Boolean) -> Unit = { goal, completed ->
-                                    coroutineScope.launch {
-                                        try {
-                                            // Alt hedefin tamamlanma durumunu güncelle
-                                            val result = SubGoalUtils.updateSubGoalStatus(goal.id, completed)
-
-                                            if (result.isSuccess) {
-                                                // Alt hedef durumu başarıyla güncellendi
-                                                // Alt hedefleri yeniden yükle
-                                                val updatedSubGoalsResult = SubGoalUtils.getSubGoalsForParent(id)
-
-                                                if (updatedSubGoalsResult.isSuccess) {
-                                                    // Alt hedef listesini güncelle
                                                     subGoalsMap = subGoalsMap.toMutableMap().apply {
-                                                        put(id, updatedSubGoalsResult.getOrDefault(emptyList()))
+                                                        put(id, updatedSubGoals)
                                                     }
 
-                                                    // Alt hedeflere göre hedefin ilerlemesini hesapla
-                                                    val subGoals = updatedSubGoalsResult.getOrDefault(emptyList())
-                                                    val newProgress = SubGoalUtils.calculateProgressFromSubGoals(subGoals.map { it.second })
+                                                    // İlerleme yüzdesini yeniden hesapla
+                                                    val newProgress = SubGoalUtils.calculateProgressFromSubGoals(updatedSubGoals.map { it.second })
 
-                                                    // Hedef ilerlemesini güncelle
                                                     updateGoalProgress(
                                                         goalId = id,
                                                         newProgress = newProgress,
                                                         onSuccess = {
-                                                            // Başarılı güncelleme
-                                                            Toast.makeText(
-                                                                context,
-                                                                if (completed)
-                                                                    context.getString(R.string.sub_goal_completed)
-                                                                else
-                                                                    "Alt hedef güncellendi",
-                                                                Toast.LENGTH_SHORT
-                                                            ).show()
-
-                                                            // Arayüzü güncelle - active ve completed listelerini güncelle
+                                                            val updatedGoal = goal.copy(progress = newProgress)
                                                             if (newProgress >= 100) {
-                                                                // Hedef tamamlandı, active'den remove et, completed'e ekle
-                                                                val goalToUpdate = activeGoals.find { it.first == id }?.second
-                                                                if (goalToUpdate != null) {
-                                                                    val updatedGoal = goalToUpdate.copy(progress = newProgress)
-                                                                    activeGoals = activeGoals.filter { it.first != id }
-                                                                    completedGoals = completedGoals + (id to updatedGoal)
-                                                                }
+                                                                activeGoals = activeGoals.filterNot { it.first == id }
+                                                                completedGoals = completedGoals + (id to updatedGoal)
+                                                                showToast(context, StringResourcesProvider.getString(context, R.string.goal_completed))
                                                             } else {
-                                                                // Hedef hala aktif, ilerlemesini güncelle
                                                                 activeGoals = activeGoals.map {
-                                                                    if (it.first == id) id to it.second.copy(progress = newProgress)
+                                                                    if (it.first == id) id to updatedGoal
                                                                     else it
                                                                 }
                                                             }
                                                         },
                                                         onError = { error ->
-                                                            // Güncelleme hatası
-                                                            Toast.makeText(
-                                                                context,
-                                                                "Hedef güncellenemedi: $error",
-                                                                Toast.LENGTH_SHORT
-                                                            ).show()
+                                                            Log.e("GoalsScreen", "Failed to update goal progress: $error")
                                                         }
                                                     )
                                                 } else {
-                                                    // Alt hedefleri yüklerken hata
-                                                    Toast.makeText(
-                                                        context,
-                                                        "Alt hedefler yüklenemedi",
-                                                        Toast.LENGTH_SHORT
-                                                    ).show()
+                                                    showToast(context, "Alt hedef güncellenemedi: ${result.exceptionOrNull()?.message}")
                                                 }
-                                            } else {
-                                                // Alt hedef durumu güncellenirken hata
-                                                Toast.makeText(
-                                                    context,
-                                                    "Alt hedef güncellenemedi: ${result.exceptionOrNull()?.message}",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                            }
-                                        } catch (e: Exception) {
-                                            // Beklenmeyen hata
-                                            Toast.makeText(
-                                                context,
-                                                "Beklenmeyen bir hata oluştu: ${e.message}",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                            Log.e("GoalsScreen", "Sub-goal toggle error", e)
-                                        }
-                                    }
-                                }
-
-                                // Call the function
-                                toggleSubGoal(subGoal, isCompleted)
-                            },
-                            // Hedefi silme fonksiyonu
-                            onDeleteGoal = {
-                                // Hedefi silmek için doğrulama dialog'u göster
-                                showDeleteConfirmDialog = id to goal
-                            }
-                        )
-                    }
-
-                    // Tamamlanmış Hedefler Başlığı
-                    if (completedGoals.isNotEmpty()) {
-                        item {
-                            Text(
-                                stringResource(R.string.completed_goals),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
-                        }
-                    }
-
-                    // Tamamlanmış Hedefler
-                    items(completedGoals.size) { index ->
-                        val (id, goal) = completedGoals[index]
-                        val subGoals = subGoalsMap[id]?.map { it.second } ?: emptyList()
-
-                        NestedGoalCard(
-                            goalTitle = goal.title,
-                            goalProgress = goal.progress,
-                            subGoals = subGoals,
-                            onProgressUpdate = { newProgress ->
-                                // Gerekirse düzenleme yapılabilir
-                                coroutineScope.launch {
-                                    updateGoalProgress(
-                                        goalId = id,
-                                        newProgress = newProgress,
-                                        onSuccess = {
-                                            // Hedefi aktif veya tamamlanmış listesine taşı
-                                            val updatedGoal = goal.copy(progress = newProgress)
-                                            if (newProgress < 100) {
-                                                completedGoals = completedGoals.filterNot { it.first == id }
-                                                activeGoals = activeGoals + (id to updatedGoal)
-                                                showToast(context, "Hedef aktif duruma getirildi")
-                                            } else {
-                                                completedGoals = completedGoals.map {
-                                                    if (it.first == id) id to updatedGoal
-                                                    else it
-                                                }
-                                                showToast(context, "Hedef güncellendi")
                                             }
                                         },
-                                        onError = { error ->
-                                            showToast(context, "Hedef güncellenemedi: $error")
+                                        onDeleteSubGoal = { subGoal ->
+                                            coroutineScope.launch {
+                                                val result = SubGoalUtils.deleteSubGoal(subGoal.id)
+                                                if (result.isSuccess) {
+                                                    showToast(context, "Alt hedef silindi")
+
+                                                    // UI'yi güncelle
+                                                    val updatedSubGoals = subGoalsMap[id]?.filter { it.second.id != subGoal.id } ?: emptyList()
+
+                                                    // Map'i güncelle
+                                                    subGoalsMap = subGoalsMap.toMutableMap().apply {
+                                                        put(id, updatedSubGoals)
+                                                    }
+
+                                                    // İlerleme yüzdesini yeniden hesapla
+                                                    val newProgress = SubGoalUtils.calculateProgressFromSubGoals(updatedSubGoals.map { it.second })
+
+                                                    updateGoalProgress(
+                                                        goalId = id,
+                                                        newProgress = newProgress,
+                                                        onSuccess = {
+                                                            val updatedGoal = goal.copy(progress = newProgress)
+                                                            if (newProgress >= 100) {
+                                                                activeGoals = activeGoals.filterNot { it.first == id }
+                                                                completedGoals = completedGoals + (id to updatedGoal)
+                                                            } else {
+                                                                activeGoals = activeGoals.map {
+                                                                    if (it.first == id) id to updatedGoal
+                                                                    else it
+                                                                }
+                                                            }
+                                                        },
+                                                        onError = { error ->
+                                                            Log.e("GoalsScreen", "Failed to update goal progress: $error")
+                                                        }
+                                                    )
+                                                } else {
+                                                    showToast(context, "Alt hedef silinemedi: ${result.exceptionOrNull()?.message}")
+                                                }
+                                            }
+                                        },
+                                        onDeleteGoal = {
+                                            showDeleteConfirmDialog = id to goal
                                         }
                                     )
                                 }
-                            },
-                            // Alt hedef ekleme
-                            onAddSubGoal = { subGoalTitle ->
-                                coroutineScope.launch {
-                                    try {
-                                        // Kullanıcı kontrolü
-                                        val currentUser = FirebaseAuth.getInstance().currentUser
-                                        if (currentUser == null) {
-                                            Log.e("GoalsScreen", "User not logged in")
-                                            Toast.makeText(context, "Kullanıcı girişi yapılmamış", Toast.LENGTH_SHORT).show()
-                                            return@launch
-                                        }
-
-                                        // Subgoal oluştur
-                                        val newSubGoalId = UUID.randomUUID().toString()
-                                        val newSubGoal = SubGoal(
-                                            id = newSubGoalId,
-                                            title = subGoalTitle,
-                                            parentGoalId = id,
-                                            userId = currentUser.uid,
-                                            completed = false
-                                        )
-
-                                        // SubGoal'ı Firestore'a ekle
-                                        val result = SubGoalUtils.addSubGoal(newSubGoal)
-
-                                        if (result.isSuccess) {
-                                            Toast.makeText(context, "Alt hedef eklendi", Toast.LENGTH_SHORT).show()
-
-                                            // UI'yi güncelle
-                                            val currentSubGoals = subGoalsMap[id]?.toMutableList() ?: mutableListOf()
-                                            currentSubGoals.add(Pair(newSubGoalId, newSubGoal))
-
-                                            subGoalsMap = subGoalsMap.toMutableMap().apply {
-                                                put(id, currentSubGoals)
-                                            }
-
-                                            // Progress yüzdesini yeniden hesapla
-                                            val updatedSubGoals = currentSubGoals.map { it.second }
-                                            val newProgress = SubGoalUtils.calculateProgressFromSubGoals(updatedSubGoals)
-
-                                            updateGoalProgress(
-                                                goalId = id,
-                                                newProgress = newProgress,
-                                                onSuccess = {
-                                                    // UI'yi güncelle
-                                                    if (newProgress < 100) {
-                                                        // Hedef artık tamamlanmamış, completed'den active'e taşı
-                                                        val goalToUpdate = completedGoals.find { it.first == id }?.second
-                                                        if (goalToUpdate != null) {
-                                                            val updatedGoal = goalToUpdate.copy(progress = newProgress)
-                                                            completedGoals = completedGoals.filter { it.first != id }
-                                                            activeGoals = activeGoals + (id to updatedGoal)
-                                                        }
-                                                    } else {
-                                                        // Hedef hala tamamlanmış, progress'i güncelle
-                                                        completedGoals = completedGoals.map {
-                                                            if (it.first == id) id to it.second.copy(progress = newProgress)
-                                                            else it
-                                                        }
-                                                    }
-                                                },
-                                                onError = { error ->
-                                                    Log.e("GoalsScreen", "Failed to update goal progress: $error")
-                                                }
-                                            )
-                                        } else {
-                                            Toast.makeText(context, "Alt hedef eklenemedi: ${result.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
-                                        }
-                                    } catch (e: Exception) {
-                                        Log.e("GoalsScreen", "Unexpected error adding subgoal", e)
-                                        Toast.makeText(context, "Beklenmeyen hata: ${e.message}", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            },
-                            // Alt hedef silme
-                            onDeleteSubGoal = { subGoal ->
-                                coroutineScope.launch {
-                                    try {
-                                        // Alt hedefi sil
-                                        val result = SubGoalUtils.deleteSubGoal(subGoal.id)
-
-                                        if (result.isSuccess) {
-                                            Toast.makeText(context, context.getString(R.string.sub_goal_deleted), Toast.LENGTH_SHORT).show()
-
-                                            // UI'yi güncelle
-                                            val updatedSubGoals = subGoalsMap[id]?.filter { it.second.id != subGoal.id } ?: emptyList()
-
-                                            // Map'i güncelle
-                                            subGoalsMap = subGoalsMap.toMutableMap().apply {
-                                                put(id, updatedSubGoals)
-                                            }
-
-                                            // Hedefin ilerleme yüzdesini güncelle
-                                            val newProgress = SubGoalUtils.calculateProgressFromSubGoals(updatedSubGoals.map { it.second })
-
-                                            updateGoalProgress(
-                                                goalId = id,
-                                                newProgress = newProgress,
-                                                onSuccess = {
-                                                    // Hedefin durumunu güncelle
-                                                    if (newProgress < 100) {
-                                                        val goalToUpdate = completedGoals.find { it.first == id }?.second
-                                                        if (goalToUpdate != null) {
-                                                            val updatedGoal = goalToUpdate.copy(progress = newProgress)
-                                                            completedGoals = completedGoals.filter { it.first != id }
-                                                            activeGoals = activeGoals + (id to updatedGoal)
-                                                        }
-                                                    } else {
-                                                        // Hedef hala tamamlanmış, progress'i güncelle
-                                                        completedGoals = completedGoals.map {
-                                                            if (it.first == id) id to it.second.copy(progress = newProgress)
-                                                            else it
-                                                        }
-                                                    }
-                                                },
-                                                onError = { error ->
-                                                    Log.e("GoalsScreen", "Failed to update goal progress: $error")
-                                                }
-                                            )
-                                        } else {
-                                            Toast.makeText(
-                                                context,
-                                                "Alt hedef silinemedi: ${result.exceptionOrNull()?.message}",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                        }
-                                    } catch (e: Exception) {
-                                        Log.e("GoalsScreen", "Error deleting subgoal", e)
-                                        Toast.makeText(
-                                            context,
-                                            "Alt hedef silinirken hata oluştu: ${e.message}",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
-                                }
-                            },
-                            // Toggle sub goal
-                            onToggleSubGoal = { subGoal, isCompleted ->
-                                coroutineScope.launch {
-                                    try {
-                                        // Alt hedefin tamamlanma durumunu güncelle
-                                        val result = SubGoalUtils.updateSubGoalStatus(subGoal.id, isCompleted)
-
-                                        if (result.isSuccess) {
-                                            // UI'yi güncelle
-                                            val currentSubGoals = subGoalsMap[id]?.toMutableList() ?: mutableListOf()
-                                            val updatedSubGoals = currentSubGoals.map {
-                                                if (it.second.id == subGoal.id) {
-                                                    Pair(it.first, it.second.copy(completed = isCompleted))
-                                                } else {
-                                                    it
-                                                }
-                                            }
-
-                                            // Map'i güncelle
-                                            subGoalsMap = subGoalsMap.toMutableMap().apply {
-                                                put(id, updatedSubGoals)
-                                            }
-
-                                            // Hedefin ilerleme yüzdesini güncelle
-                                            val newProgress = SubGoalUtils.calculateProgressFromSubGoals(updatedSubGoals.map { it.second })
-
-                                            updateGoalProgress(
-                                                goalId = id,
-                                                newProgress = newProgress,
-                                                onSuccess = {
-                                                    // UI'yi güncelle
-                                                    if (newProgress < 100 && goal.progress >= 100) {
-                                                        // Hedef tamamlanmış durumdan çıktı
-                                                        completedGoals = completedGoals.filter { it.first != id }
-                                                        activeGoals = activeGoals + (id to goal.copy(progress = newProgress))
-                                                    } else if (newProgress >= 100 && goal.progress < 100) {
-                                                        // Hedef tamamlandı
-                                                        activeGoals = activeGoals.filter { it.first != id }
-                                                        completedGoals = completedGoals + (id to goal.copy(progress = newProgress))
-                                                    } else {
-                                                        // Sadece progress güncellendi
-                                                        completedGoals = completedGoals.map {
-                                                            if (it.first == id) id to it.second.copy(progress = newProgress)
-                                                            else it
-                                                        }
-                                                    }
-
-                                                    Toast.makeText(
-                                                        context,
-                                                        if (isCompleted) "Alt hedef tamamlandı" else "Alt hedef güncellendi",
-                                                        Toast.LENGTH_SHORT
-                                                    ).show()
-                                                },
-                                                onError = { error ->
-                                                    Log.e("GoalsScreen", "Failed to update goal progress: $error")
-                                                }
-                                            )
-                                        } else {
-                                            Toast.makeText(
-                                                context,
-                                                "Alt hedef güncellenemedi: ${result.exceptionOrNull()?.message}",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                        }
-                                    } catch (e: Exception) {
-                                        Log.e("GoalsScreen", "Error updating subgoal", e)
-                                        Toast.makeText(
-                                            context,
-                                            "Alt hedef güncellenirken hata oluştu: ${e.message}",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
-                                }
-                            },
-                            // Hedefi silme fonksiyonu
-                            onDeleteGoal = {
-                                // Hedefi silmek için doğrulama dialog'u göster
-                                showDeleteConfirmDialog = id to goal
                             }
-                        )
+                        }
+
+                        // Tamamlanan Hedefler Başlığı
+                        if (completedGoals.isNotEmpty()) {
+                            item {
+                                AnimatedVisibility(
+                                    visible = contentVisible,
+                                    enter = fadeIn() + slideInVertically(
+                                        initialOffsetY = { it / 2 },
+                                        animationSpec = tween(durationMillis = 300, delayMillis = 150)
+                                    )
+                                ) {
+                                    SectionHeader(
+                                        title = stringResource(R.string.completed_goals),
+                                        subtitle = "Tebrikler! Tamamladığınız hedefler"
+                                    )
+                                }
+                            }
+                        }
+
+                        // Tamamlanan Hedefler
+                        items(completedGoals) { (id, goal) ->
+                            key(id) {
+                                AnimatedVisibility(
+                                    visible = contentVisible,
+                                    enter = fadeIn() + expandVertically(
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessLow
+                                        )
+                                    )
+                                ) {
+                                    CompletedGoalItem(
+                                        goal = goal,
+                                        onDeleteGoal = {
+                                            showDeleteConfirmDialog = id to goal
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Add extra space at bottom
+                    item {
+                        Spacer(modifier = Modifier.height(80.dp))
                     }
                 }
             }
 
             // Hedef Ekleme Diyaloğu
             if (showAddDialog) {
-                ModernGoalDialog(
+                AddGoalBottomSheet(
                     onDismiss = { showAddDialog = false },
-                    onSave = { title, progress ->
+                    onSave = { newGoal ->
                         coroutineScope.launch {
-                            val newGoal = Goal(title = title, progress = progress)
                             addGoal(
                                 goal = newGoal,
                                 onSuccess = { id ->
                                     activeGoals = activeGoals + (id to newGoal)
-                                    // Yeni hedef için boş alt hedef listesi oluştur
                                     subGoalsMap = subGoalsMap.toMutableMap().apply {
                                         put(id, emptyList())
                                     }
@@ -764,44 +542,6 @@ fun GoalsScreenContent(
                                 }
                             )
                         }
-                        showAddDialog = false
-                    }
-                )
-            }
-
-            // Hedef Düzenleme Diyaloğu
-            editingGoal?.let { (id, goal) ->
-                ModernGoalDialog(
-                    title = "Hedefi Düzenle",
-                    initialTitle = goal.title,
-                    initialProgress = goal.progress,
-                    onDismiss = { editingGoal = null },
-                    onSave = { title, progress ->
-                        coroutineScope.launch {
-                            val updatedGoal = Goal(title = title, progress = progress, userId = goal.userId)
-                            updateGoal(
-                                goalId = id,
-                                goal = updatedGoal,
-                                onSuccess = {
-                                    // Hedefi aktif veya tamamlanmış listesine taşı
-                                    if (progress >= 100) {
-                                        activeGoals = activeGoals.filterNot { it.first == id }
-                                        completedGoals = completedGoals + (id to updatedGoal)
-                                    } else {
-                                        activeGoals = activeGoals.map {
-                                            if (it.first == id) id to updatedGoal
-                                            else it
-                                        }
-                                        completedGoals = completedGoals.filterNot { it.first == id }
-                                    }
-                                    showToast(context, "Hedef güncellendi")
-                                },
-                                onError = { error ->
-                                    showToast(context, "Hedef güncellenemedi: $error")
-                                }
-                            )
-                        }
-                        editingGoal = null
                     }
                 )
             }
@@ -856,16 +596,21 @@ fun GoalsScreenContent(
                             },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.error
-                            )
+                            ),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
                             Text(stringResource(R.string.yes_delete))
                         }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showDeleteConfirmDialog = null }) {
+                        OutlinedButton(
+                            onClick = { showDeleteConfirmDialog = null },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
                             Text(stringResource(R.string.cancel))
                         }
-                    }
+                    },
+                    shape = RoundedCornerShape(24.dp)
                 )
             }
         }
@@ -873,151 +618,634 @@ fun GoalsScreenContent(
 }
 
 @Composable
-fun ModernGoalDialog(
-    onDismiss: () -> Unit,
-    onSave: (String, Int) -> Unit,
-    title: String = stringResource(R.string.add_goal),
-    initialTitle: String = "",
-    initialProgress: Int = 0
+fun StatBadge(
+    value: String,
+    label: String,
+    color: Color
 ) {
-    var goalTitle by remember { mutableStateOf(initialTitle) }
-    var goalProgress by remember { mutableStateOf(initialProgress) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = Icons.Default.AddTask,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
-            )
-        },
-        title = {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(color.copy(alpha = 0.1f)),
+            contentAlignment = Alignment.Center
+        ) {
             Text(
-                title,
-                style = MaterialTheme.typography.headlineSmall
+                text = value,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = color
             )
-        },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Hedef Başlığı
-                OutlinedTextField(
-                    value = goalTitle,
-                    onValueChange = { goalTitle = it },
-                    label = { Text(stringResource(R.string.goal_title)) },
-                    placeholder = { Text(stringResource(R.string.sub_goal_hint)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
+        }
 
-                // İlerleme Slider
-                Text(
-                    text = stringResource(R.string.current_progress, goalProgress),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        Spacer(modifier = Modifier.height(4.dp))
 
-                Slider(
-                    value = goalProgress.toFloat(),
-                    onValueChange = { goalProgress = it.toInt() },
-                    valueRange = 0f..100f,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary,
-                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+fun GoalItem(
+    goalId: String,
+    goal: Goal,
+    subGoals: List<SubGoal>,
+    onUpdateProgress: (Int) -> Unit,
+    onAddSubGoal: (String) -> Unit,
+    onToggleSubGoal: (SubGoal, Boolean) -> Unit,
+    onDeleteSubGoal: (SubGoal) -> Unit,
+    onDeleteGoal: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var showSubGoalDialog by remember { mutableStateOf(false) }
+    var showProgressDialog by remember { mutableStateOf(false) }
+
+    val progressColor = when {
+        goal.progress >= 100 -> SuccessGreen
+        goal.progress >= 75 -> MaterialTheme.colorScheme.secondary
+        goal.progress >= 50 -> MaterialTheme.colorScheme.primary
+        goal.progress >= 25 -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+    }
+
+    EnhancedCard(
+        primaryColor = progressColor,
+        cornerRadius = 20.dp,
+        elevation = if (expanded) 8.dp else 4.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .animateContentSize(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
                     )
                 )
+        ) {
+            // Header with toggle
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Icon in circle
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(progressColor.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Flag,
+                        contentDescription = null,
+                        tint = progressColor,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // Title and progress
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = goal.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "${goal.progress}% ${stringResource(R.string.in_progress)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // Expand arrow
+                IconButton(onClick = { expanded = !expanded }) {
+                    Icon(
+                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (expanded) "Daralt" else "Genişlet",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (goalTitle.isNotBlank()) {
-                        onSave(goalTitle, goalProgress)
-                        onDismiss()
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Progress bar
+            ProgressCard(
+                title = "İlerleme",
+                progress = goal.progress.toFloat(),
+                maxProgress = 100f,
+                primaryColor = progressColor,
+                animationDuration = 800
+            )
+
+            // Expanded content
+            if (expanded) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                EnhancedDivider()
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Sub-goals section
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "${stringResource(R.string.sub_goals)} (${subGoals.count { it.completed }}/${subGoals.size})",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    EnhancedButton(
+                        text = stringResource(R.string.add_sub_goal),
+                        onClick = { showSubGoalDialog = true },
+                        icon = Icons.Default.Add,
+                        backgroundColor = progressColor,
+                        cornerRadius = 8.dp,
+                        modifier = Modifier.height(36.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Sub-goals list
+                if (subGoals.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(R.string.no_sub_goals),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        subGoals.forEach { subGoal ->
+                            SubGoalItem(
+                                subGoal = subGoal,
+                                onToggle = { isCompleted -> onToggleSubGoal(subGoal, isCompleted) },
+                                onDelete = { onDeleteSubGoal(subGoal) }
+                            )
+                        }
                     }
                 }
-            ) {
-                Text(stringResource(R.string.save))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                EnhancedDivider()
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Actions
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Progress Update Button
+                    EnhancedButton(
+                        text = stringResource(R.string.update),
+                        onClick = { showProgressDialog = true },
+                        icon = Icons.Default.Update,
+                        backgroundColor = progressColor,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    // Delete Button
+                    EnhancedButton(
+                        text = stringResource(R.string.delete),
+                        onClick = onDeleteGoal,
+                        icon = Icons.Default.Delete,
+                        backgroundColor = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
-    )
+    }
+
+    // Add Sub-Goal Dialog
+    if (showSubGoalDialog) {
+        var newSubGoalTitle by remember { mutableStateOf("") }
+
+        AlertDialog(
+            onDismissRequest = { showSubGoalDialog = false },
+            title = { Text(stringResource(R.string.add_sub_goal)) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = newSubGoalTitle,
+                        onValueChange = { newSubGoalTitle = it },
+                        label = { Text("Alt Hedef Başlığı") },
+                        placeholder = { Text(stringResource(R.string.sub_goal_hint)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = progressColor,
+                            focusedLabelColor = progressColor
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newSubGoalTitle.isNotBlank()) {
+                            onAddSubGoal(newSubGoalTitle)
+                            showSubGoalDialog = false
+                        }
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = progressColor
+                    ),
+                    enabled = newSubGoalTitle.isNotBlank()
+                ) {
+                    Text(stringResource(R.string.add_sub_goal))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showSubGoalDialog = false }
+                ) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+            shape = RoundedCornerShape(20.dp)
+        )
+    }
+
+    // Progress Update Dialog
+    if (showProgressDialog) {
+        var newProgress by remember { mutableStateOf(goal.progress) }
+
+        AlertDialog(
+            onDismissRequest = { showProgressDialog = false },
+            title = { Text(stringResource(R.string.edit_progress)) },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Current progress
+                    Text(
+                        text = stringResource(R.string.current_progress, goal.progress),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Progress value display
+                    Text(
+                        text = "$newProgress%",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = when {
+                            newProgress >= 100 -> SuccessGreen
+                            newProgress >= 75 -> MaterialTheme.colorScheme.secondary
+                            newProgress >= 50 -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.onSurface
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Slider
+                    Slider(
+                        value = newProgress.toFloat(),
+                        onValueChange = { newProgress = it.toInt() },
+                        valueRange = 0f..100f,
+                        steps = 20,
+                        colors = SliderDefaults.colors(
+                            thumbColor = progressColor,
+                            activeTrackColor = progressColor,
+                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Slider labels
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "0%",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Text(
+                            text = "100%",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // Completion notice
+                    if (newProgress == 100) {
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Surface(
+                            color = SuccessGreen.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = SuccessGreen
+                                )
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                Text(
+                                    text = stringResource(R.string.completing_goal),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = SuccessGreen,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onUpdateProgress(newProgress)
+                        showProgressDialog = false
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = progressColor
+                    )
+                ) {
+                    Text(stringResource(R.string.update))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showProgressDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+            shape = RoundedCornerShape(20.dp)
+        )
+    }
+}
+
+@Composable
+fun SubGoalItem(
+    subGoal: SubGoal,
+    onToggle: (Boolean) -> Unit,
+    onDelete: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = if (subGoal.completed)
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+        else
+            MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(
+                checked = subGoal.completed,
+                onCheckedChange = onToggle,
+                colors = CheckboxDefaults.colors(
+                    checkedColor = MaterialTheme.colorScheme.primary,
+                    uncheckedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            )
+
+            Text(
+                text = subGoal.title,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (subGoal.completed)
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                else
+                    MaterialTheme.colorScheme.onSurface,
+                textDecoration = if (subGoal.completed)
+                    androidx.compose.ui.text.style.TextDecoration.LineThrough
+                else
+                    null,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp)
+            )
+
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Sil",
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CompletedGoalItem(
+    goal: Goal,
+    onDeleteGoal: () -> Unit
+) {
+    EnhancedCard(
+        primaryColor = SuccessGreen,
+        cornerRadius = 20.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Success indicator
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(SuccessGreen.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = SuccessGreen,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // Title and status
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = goal.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Verified,
+                        contentDescription = null,
+                        tint = SuccessGreen,
+                        modifier = Modifier.size(16.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    Text(
+                        text = stringResource(R.string.completed),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = SuccessGreen,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
+            // Delete button
+            IconButton(onClick = onDeleteGoal) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Sil",
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                )
+            }
+        }
+    }
 }
 
 @Composable
 fun EmptyGoalsView(
     onAddClick: () -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 32.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .size(120.dp)
-                .clip(CircleShape)
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                        )
-                    )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Animation for the empty state icon
+            val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+            val scale by infiniteTransition.animateFloat(
+                initialValue = 0.9f,
+                targetValue = 1.1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1000, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
                 ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Flag,
-                contentDescription = "Hedefler",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(64.dp)
+                label = "scale"
             )
-        }
 
-        Spacer(modifier = Modifier.height(24.dp))
+            Box(
+                modifier = Modifier
+                    .size(140.dp)
+                    .scale(scale)
+                    .clip(CircleShape)
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Lightbulb,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(64.dp)
+                )
+            }
 
-        Text(
-            text = stringResource(R.string.no_goals),
-            color = MaterialTheme.colorScheme.onBackground,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold
-        )
+            Spacer(modifier = Modifier.height(8.dp))
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = stringResource(R.string.start_by_adding_goal),
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-            fontSize = 16.sp
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Button(
-            onClick = onAddClick,
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary
+            Text(
+                text = stringResource(R.string.no_goals),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground
             )
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = "Ekle"
+
+            Text(
+                text = stringResource(R.string.start_by_adding_goal),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(stringResource(R.string.add_goal))
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            EnhancedButton(
+                text = stringResource(R.string.add_goal),
+                onClick = onAddClick,
+                icon = Icons.Default.Add,
+                cornerRadius = 16.dp
+            )
         }
     }
 }
+
+
 
 // Hedefleri yükle
 private suspend fun loadGoals(
@@ -1109,3 +1337,14 @@ private suspend fun updateGoalProgress(
 }
 
 
+
+// StringResourcesProvider nesnesi, R.string.* değerlerini context ile kullanmak için
+object StringResourcesProvider {
+    fun getString(context: Context, resId: Int): String {
+        return context.getString(resId)
+    }
+
+    fun getString(context: Context, resId: Int, vararg formatArgs: Any): String {
+        return context.getString(resId, *formatArgs)
+    }
+}

@@ -14,8 +14,8 @@
             applicationId = "com.aliumitalgan.remindup"
             minSdk = 25
             targetSdk = 35
-            versionCode = 3
-            versionName = "1.0.2"
+            versionCode = 4
+            versionName = "1.0.3"
 
             testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
             manifestPlaceholders["web_client_id"] = "117825801795-d70srog7cr7m6hjengcjrl411har5u63.apps.googleusercontent.com"
@@ -61,7 +61,8 @@
     dependencies {
         // Material Icons
         implementation(libs.androidx.datastore.preferences)
-
+        implementation("com.google.code.gson:gson:2.10.1")
+        implementation("androidx.work:work-runtime-ktx:2.8.1")
         // Coroutines (DataStore akışını kullanmak için)
         implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
         implementation("androidx.datastore:datastore-preferences:1.1.5")

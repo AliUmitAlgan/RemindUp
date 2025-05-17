@@ -128,6 +128,8 @@
     <string name="type_daily">Her Gün</string>
     <string name="type_weekly">Haftalık</string>
     <string name="type_monthly">Aylık</string>
+    <string name="description">Açıklama</string>
+
 
     <!-- İlerleme Ekranı -->
     <string name="overall_progress">Genel İlerleme</string>
