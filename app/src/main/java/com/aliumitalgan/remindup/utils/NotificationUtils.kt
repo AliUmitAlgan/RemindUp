@@ -240,7 +240,7 @@ object NotificationUtils {
                 Log.d(TAG, "Scheduling reminder '${reminder.title}' with initial delay: ${initialDelay/1000/60} mins")
 
                 // Tekrarlama tipine göre WorkRequest oluştur
-                val workRequest = when (reminder.type) {
+                val workRequest: WorkRequest = when (reminder.type) {
                     ReminderType.SINGLE -> {
                         // Tek seferlik OneTimeWorkRequest
                         OneTimeWorkRequestBuilder<ReminderWorker>()
@@ -279,12 +279,23 @@ object NotificationUtils {
                 }
 
                 // Work'u zamanla
-                WorkManager.getInstance(context)
-                    .enqueueUniqueWork(
-                        reminder.id,
-                        ExistingWorkPolicy.REPLACE,
-                        workRequest as OneTimeWorkRequest
-                    )
+                val workManager = WorkManager.getInstance(context)
+                when (workRequest) {
+                    is OneTimeWorkRequest -> {
+                        workManager.enqueueUniqueWork(
+                            reminder.id,
+                            ExistingWorkPolicy.REPLACE,
+                            workRequest
+                        )
+                    }
+                    is PeriodicWorkRequest -> {
+                        workManager.enqueueUniquePeriodicWork(
+                            reminder.id,
+                            ExistingPeriodicWorkPolicy.REPLACE,
+                            workRequest
+                        )
+                    }
+                }
 
                 Log.d(TAG, "Reminder scheduled successfully with WorkManager: ${reminder.title} at ${reminder.time}")
 

@@ -55,6 +55,7 @@ fun SettingsScreenContent(
     onNavigateToGoals: () -> Unit = {},
     onNavigateToReminders: () -> Unit = {},
     onNavigateToProgress: () -> Unit = {},
+    onNavigateToPremium: () -> Unit = {},
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
@@ -308,6 +309,19 @@ fun SettingsScreenContent(
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
+                            }
+                        )
+
+                        SettingsSection(
+                            title = stringResource(R.string.settings_premium),
+                            icon = Icons.Default.Star,
+                            onClick = onNavigateToPremium,
+                            trailingContent = {
+                                Icon(
+                                    Icons.Default.ArrowForward,
+                                    contentDescription = stringResource(R.string.settings_premium),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
                             }
                         )
 

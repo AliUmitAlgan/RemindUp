@@ -211,4 +211,30 @@
     <string name="grant_permission">Grant Permission</string>
     <string name="permission_denied">Permission Denied</string>
     <string name="open_settings">Open Settings</string>
+    <!-- Assistant -->
+    <string name="assistant_title">Smart Assistant</string>
+    <string name="assistant_subtitle">Break large goals into smaller steps</string>
+    <string name="assistant_input_label">Type your goal (e.g. Study for finals)</string>
+    <string name="assistant_generate">Break It Down</string>
+    <string name="assistant_source_ai">Source: AI</string>
+    <string name="assistant_source_fallback">Source: Rule-Based Fallback</string>
+    <string name="assistant_fallback_notice">Fallback mode is active because AI quota is disabled.</string>
+    <string name="assistant_upgrade_cta">Go Premium</string>
+    <string name="assistant_empty_hint">Suggested steps will appear here.</string>
+
+    <!-- Premium -->
+    <string name="settings_premium">Premium</string>
+    <string name="premium_title">RemindUp Premium</string>
+    <string name="premium_subtitle">Location + Wi-Fi triggers and smarter suggestions</string>
+    <string name="premium_monthly">Monthly Premium</string>
+    <string name="premium_yearly">Yearly Premium (30% off)</string>
+    <string name="premium_current_plan">Current plan: %1$s</string>
+    <string name="premium_plan_free">Free</string>
+    <string name="premium_plan_premium">Premium</string>
+    <string name="premium_subscribe">Subscribe</string>
+    <string name="premium_restore">Restore purchases</string>
+    <string name="premium_purchase_success">Premium activated.</string>
+    <string name="premium_purchase_failed">Purchase verification failed.</string>
+    <string name="premium_waitlist_ai">AI features are in waitlist mode due free-tier limits.</string>
+    <string name="entitlement_message_beta">AI is currently in closed beta mode.</string>
 </resources>

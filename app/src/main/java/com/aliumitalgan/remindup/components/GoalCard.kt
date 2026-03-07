@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aliumitalgan.remindup.ui.theme.*
@@ -37,8 +38,19 @@ import com.aliumitalgan.remindup.R
 fun GoalCard(
     goalTitle: String,
     goalProgress: Int,
+    modifier: Modifier = Modifier,
     onProgressUpdate: ((Int) -> Unit)? = null
 ) {
+    // Compute vibrant colors based on progress
+    val progressColor = when {
+        goalProgress >= 100 -> SuccessGreen
+        goalProgress >= 75 -> GreenSecondary
+        goalProgress >= 50 -> BluePrimary
+        goalProgress >= 25 -> AccentAmber
+        else -> AccentOrange
+    }
+
+    // Animated values
     val animatedProgress = animateFloatAsState(
         targetValue = goalProgress / 100f,
         animationSpec = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
@@ -48,37 +60,37 @@ fun GoalCard(
     val isCompleted = goalProgress >= 100
     var showUpdateDialog by remember { mutableStateOf(false) }
 
-    // Dinamik renk ayarlamaları
-    val progressColor = when {
-        goalProgress >= 100 -> MaterialTheme.colorScheme.tertiary
-        goalProgress >= 75 -> MaterialTheme.colorScheme.secondary
-        goalProgress >= 50 -> MaterialTheme.colorScheme.primary
-        goalProgress >= 25 -> MaterialTheme.colorScheme.primaryContainer
-        else -> MaterialTheme.colorScheme.surfaceVariant
-    }
-
-    val progressGradient = Brush.horizontalGradient(
-        colors = listOf(
-            progressColor,
-            progressColor.copy(alpha = 0.7f)
-        )
-    )
-
+    // Enhanced card with shadow and gradient highlight
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
-            .clickable { showUpdateDialog = true }
             .shadow(
-                elevation = 4.dp,
-                shape = RoundedCornerShape(16.dp),
-                spotColor = progressColor.copy(alpha = 0.1f)
-            ),
-        shape = RoundedCornerShape(16.dp),
+                elevation = 6.dp,
+                shape = RoundedCornerShape(20.dp),
+                spotColor = progressColor.copy(alpha = 0.2f)
+            )
+            .clickable { showUpdateDialog = true },
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
+        // Add a subtle gradient accent at the top
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .background(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            progressColor.copy(alpha = 0.8f),
+                            progressColor.copy(alpha = 0.4f)
+                        )
+                    )
+                )
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -90,97 +102,150 @@ fun GoalCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Title and status
+                // Left side: Icon and title
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(
-                        imageVector = if (isCompleted) Icons.Default.CheckCircle else Icons.Default.Flag,
-                        contentDescription = null,
-                        tint = progressColor,
-                        modifier = Modifier.size(24.dp)
-                    )
+                    // Colorful icon with shadow
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .shadow(
+                                elevation = 3.dp,
+                                shape = CircleShape,
+                                spotColor = progressColor.copy(alpha = 0.2f)
+                            )
+                            .clip(CircleShape)
+                            .background(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(
+                                        progressColor.copy(alpha = 0.2f),
+                                        progressColor.copy(alpha = 0.1f)
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (isCompleted) Icons.Default.CheckCircle else Icons.Default.Flag,
+                            contentDescription = null,
+                            tint = progressColor,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
 
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
 
                     Column {
                         Text(
                             text = goalTitle,
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
+                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
 
-                        Text(
-                            text = if (isCompleted)
-                                stringResource(R.string.completed)
-                            else
-                                stringResource(R.string.in_progress),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (isCompleted)
-                                progressColor
-                            else
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
+                        // Status text with icon
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (isCompleted) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = SuccessGreen,
+                                    modifier = Modifier.size(16.dp)
+                                )
+
+                                Spacer(modifier = Modifier.width(4.dp))
+
+                                Text(
+                                    text = stringResource(R.string.completed),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = SuccessGreen,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            } else {
+                                Text(
+                                    text = "${goalProgress}% ${stringResource(R.string.in_progress)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = progressColor,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
                     }
                 }
 
-                // Progress percentage
-                Text(
-                    text = "$goalProgress%",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = progressColor
+                // Right side: Progress circle
+                CircularProgressDisplay(
+                    progress = goalProgress,
+                    progressColor = progressColor
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Progress bar
+            // Enhanced progress bar with gradient fill
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(10.dp)
                     .clip(RoundedCornerShape(5.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                    .background(
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    )
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(animatedProgress.value)
                         .fillMaxHeight()
                         .clip(RoundedCornerShape(5.dp))
-                        .background(progressGradient)
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    progressColor,
+                                    progressColor.copy(alpha = 0.7f)
+                                )
+                            )
+                        )
                 )
             }
 
             // Only show update button if callback provided
             if (onProgressUpdate != null) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Update button - only visible when onProgressUpdate is provided
-                FilledTonalButton(
+                // Update button with animation
+                Button(
                     onClick = { showUpdateDialog = true },
-                    modifier = Modifier.align(Alignment.End),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = progressColor.copy(alpha = 0.1f),
-                        contentColor = progressColor
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .shadow(
+                            elevation = 2.dp,
+                            shape = RoundedCornerShape(12.dp),
+                            spotColor = progressColor.copy(alpha = 0.2f)
+                        ),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = progressColor,
+                        contentColor = Color.White
                     )
                 ) {
                     Icon(
                         imageVector = if (isCompleted) Icons.Default.Edit else Icons.Default.Update,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(18.dp)
                     )
 
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
 
                     Text(
                         text = stringResource(if (isCompleted) R.string.edit else R.string.advance),
-                        style = MaterialTheme.typography.labelMedium
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
@@ -195,7 +260,53 @@ fun GoalCard(
             onConfirm = {
                 onProgressUpdate(it)
                 showUpdateDialog = false
-            }
+            },
+            accentColor = progressColor
+        )
+    }
+}
+
+@Composable
+fun CircularProgressDisplay(
+    progress: Int,
+    progressColor: Color,
+    size: Dp = 56.dp,
+    strokeWidth: Dp = 4.dp
+) {
+    Box(
+        modifier = Modifier
+            .size(size)
+            .shadow(
+                elevation = 4.dp,
+                shape = CircleShape,
+                spotColor = progressColor.copy(alpha = 0.15f)
+            )
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surface),
+        contentAlignment = Alignment.Center
+    ) {
+        // Background circle
+        CircularProgressIndicator(
+            progress = { 1f },
+            modifier = Modifier.size(size),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+            strokeWidth = strokeWidth
+        )
+
+        // Progress circle
+        CircularProgressIndicator(
+            progress = { progress / 100f },
+            modifier = Modifier.size(size),
+            color = progressColor,
+            strokeWidth = strokeWidth
+        )
+
+        // Center text
+        Text(
+            text = "$progress%",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = progressColor
         )
     }
 }
@@ -204,7 +315,8 @@ fun GoalCard(
 fun ProgressUpdateDialog(
     initialProgress: Int,
     onDismiss: () -> Unit,
-    onConfirm: (Int) -> Unit
+    onConfirm: (Int) -> Unit,
+    accentColor: Color
 ) {
     var progress by remember { mutableStateOf(initialProgress) }
 
@@ -215,15 +327,15 @@ fun ProgressUpdateDialog(
                 Icon(
                     imageVector = Icons.Default.Edit,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = accentColor
                 )
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
                 Text(
                     text = stringResource(R.string.edit_progress),
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.Bold
                 )
             }
         },
@@ -237,29 +349,19 @@ fun ProgressUpdateDialog(
 
                 Divider()
 
-                // Progress slider
-                Text(
-                    text = stringResource(R.string.slide_to_adjust),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                // Progress value display
+                // Progress value display with animation
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "$progress%",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = when {
-                            progress >= 100 -> MaterialTheme.colorScheme.tertiary
-                            progress >= 50 -> MaterialTheme.colorScheme.primary
-                            else -> MaterialTheme.colorScheme.onSurface
-                        }
+                    // Animated progress display
+                    CircularProgressDisplay(
+                        progress = progress,
+                        progressColor = accentColor,
+                        size = 120.dp,
+                        strokeWidth = 8.dp
                     )
                 }
 
@@ -270,34 +372,52 @@ fun ProgressUpdateDialog(
                     valueRange = 0f..100f,
                     steps = 20,
                     colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                        thumbColor = accentColor,
+                        activeTrackColor = accentColor,
                         inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                 )
 
+                // Slider labels
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "0%",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Text(
+                        text = "100%",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
                 // Completed notice
                 if (progress == 100) {
                     Surface(
-                        color = MaterialTheme.colorScheme.tertiaryContainer,
-                        shape = RoundedCornerShape(8.dp),
+                        color = SuccessGreen.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
-                            modifier = Modifier.padding(12.dp),
+                            modifier = Modifier.padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Celebration,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.tertiary
+                                tint = SuccessGreen
                             )
 
                             Spacer(modifier = Modifier.width(12.dp))
 
                             Text(
                                 text = stringResource(R.string.completing_goal),
-                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                color = SuccessGreen,
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium
                             )
@@ -310,24 +430,30 @@ fun ProgressUpdateDialog(
             Button(
                 onClick = { onConfirm(progress) },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
+                    containerColor = accentColor
+                ),
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = null
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.update))
+                Text(stringResource(R.string.update), fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            OutlinedButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
                 Text(stringResource(R.string.cancel))
             }
         },
         shape = RoundedCornerShape(24.dp),
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 6.dp
+        containerColor = MaterialTheme.colorScheme.surface
     )
 }

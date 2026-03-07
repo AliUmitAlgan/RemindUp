@@ -11,16 +11,41 @@ data class Reminder(
     val description: String = "",
     val userId: String = "",
     val isEnabled: Boolean = true,
-    val isImportant: Boolean = false // Yeni eklenen alan
+    val isImportant: Boolean = false,
+    val triggerType: ReminderTriggerType = ReminderTriggerType.TIME,
+    val locationTrigger: LocationTrigger? = null,
+    val wifiTrigger: WifiTrigger? = null
 )
 
 enum class ReminderCategory {
-    GENERAL, WORK, HEALTH, PERSONAL, STUDY, FITNESS
+    GENERAL,
+    WORK,
+    HEALTH,
+    PERSONAL,
+    STUDY,
+    FITNESS
 }
 
 enum class ReminderType {
-    SINGLE,       // Tek seferlik
-    DAILY,        // Her gün
-    WEEKLY,       // Haftada bir
-    MONTHLY       // Ayda bir
+    SINGLE,
+    DAILY,
+    WEEKLY,
+    MONTHLY
 }
+
+enum class ReminderTriggerType {
+    TIME,
+    LOCATION,
+    WIFI
+}
+
+data class LocationTrigger(
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0,
+    val radiusMeters: Float = 200f,
+    val label: String = ""
+)
+
+data class WifiTrigger(
+    val ssid: String = ""
+)

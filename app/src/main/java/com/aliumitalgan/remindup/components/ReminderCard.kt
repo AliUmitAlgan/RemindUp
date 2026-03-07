@@ -36,9 +36,14 @@ import com.aliumitalgan.remindup.R
 import com.aliumitalgan.remindup.models.Reminder
 import com.aliumitalgan.remindup.models.ReminderCategory
 import com.aliumitalgan.remindup.models.ReminderType
+import com.aliumitalgan.remindup.ui.theme.AccentPink
+import com.aliumitalgan.remindup.ui.theme.AccentPurple
+import com.aliumitalgan.remindup.ui.theme.AccentTeal
+import com.aliumitalgan.remindup.ui.theme.BluePrimary
+import com.aliumitalgan.remindup.ui.theme.ErrorRed
+import com.aliumitalgan.remindup.ui.theme.GreenSecondary
 import kotlinx.coroutines.delay
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReminderCard(
     reminder: Reminder,
@@ -48,19 +53,20 @@ fun ReminderCard(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    // Calculate colors based on reminder category
-    val (primaryColor, secondaryColor) = getCategoryColors(reminder.category)
-    val cardColor = animateColorAsState(
-        targetValue = if (expanded)
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
-        else
-            MaterialTheme.colorScheme.surface,
-        label = "cardColor"
-    )
+    // Compute category colors
+    val categoryColor = when(reminder.category) {
+        ReminderCategory.GENERAL -> BluePrimary
+        ReminderCategory.WORK -> AccentPink
+        ReminderCategory.HEALTH -> ErrorRed
+        ReminderCategory.PERSONAL -> AccentPurple
+        ReminderCategory.STUDY -> AccentTeal
+        ReminderCategory.FITNESS -> GreenSecondary
+    }
 
-    val elevation = animateDpAsState(
+    // Animation states
+    val cardElevation = animateDpAsState(
         targetValue = if (expanded) 8.dp else 4.dp,
-        label = "elevation"
+        label = "cardElevation"
     )
 
     val iconScale = animateFloatAsState(
@@ -68,22 +74,37 @@ fun ReminderCard(
         label = "iconScale"
     )
 
-    // Main card
+    // Enhanced card with shadow and gradient accent
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = 8.dp)
             .shadow(
-                elevation = elevation.value,
-                shape = RoundedCornerShape(16.dp),
-                spotColor = primaryColor.copy(alpha = 0.3f)
+                elevation = cardElevation.value,
+                shape = RoundedCornerShape(20.dp),
+                spotColor = categoryColor.copy(alpha = 0.2f)
             )
             .clickable { expanded = !expanded },
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = cardColor.value
-        ),
-        shape = RoundedCornerShape(16.dp)
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
+        // Add a subtle gradient accent at the top
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .background(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            categoryColor.copy(alpha = 0.8f),
+                            categoryColor.copy(alpha = 0.4f)
+                        )
+                    )
+                )
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -94,109 +115,170 @@ fun ReminderCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Category icon with gradient background
+                // Time badge with category color
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(56.dp)
                         .shadow(
-                            elevation = 4.dp,
-                            shape = CircleShape,
-                            spotColor = primaryColor.copy(alpha = 0.2f)
+                            elevation = 3.dp,
+                            shape = RoundedCornerShape(12.dp),
+                            spotColor = categoryColor.copy(alpha = 0.15f)
                         )
-                        .clip(CircleShape)
+                        .clip(RoundedCornerShape(12.dp))
                         .background(
-                            brush = Brush.linearGradient(
+                            brush = Brush.radialGradient(
                                 colors = listOf(
-                                    primaryColor.copy(alpha = 0.2f),
-                                    secondaryColor.copy(alpha = 0.2f)
+                                    categoryColor.copy(alpha = 0.2f),
+                                    categoryColor.copy(alpha = 0.1f)
                                 )
                             )
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = getCategoryIcon(reminder.category),
-                        contentDescription = null,
-                        tint = primaryColor,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .scale(iconScale.value)
-                    )
+                    // Time display
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = reminder.time,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = categoryColor
+                        )
+
+                        // Show small icon for repeat type if not single
+                        if (reminder.type != ReminderType.SINGLE) {
+                            Icon(
+                                imageVector = when(reminder.type) {
+                                    ReminderType.DAILY -> Icons.Default.Today
+                                    ReminderType.WEEKLY -> Icons.Default.DateRange
+                                    ReminderType.MONTHLY -> Icons.Default.Event
+                                    else -> Icons.Default.Alarm
+                                },
+                                contentDescription = null,
+                                tint = categoryColor.copy(alpha = 0.7f),
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(16.dp))
 
-                // Title and time
+                // Title and category
                 Column(
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text(
-                        text = reminder.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (reminder.isEnabled)
-                            MaterialTheme.colorScheme.onSurface
-                        else
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
+                    // Title with importance indicator
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.AccessTime,
-                            contentDescription = null,
-                            tint = primaryColor,
-                            modifier = Modifier.size(16.dp)
-                        )
-
-                        Spacer(modifier = Modifier.width(4.dp))
-
-                        Text(
-                            text = reminder.time,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                        )
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        // Repeat type indicator
-                        Icon(
-                            imageVector = getTypeIcon(reminder.type),
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                            modifier = Modifier.size(16.dp)
-                        )
-
-                        Spacer(modifier = Modifier.width(4.dp))
+                        if (reminder.isImportant) {
+                            Icon(
+                                imageVector = Icons.Default.PriorityHigh,
+                                contentDescription = "Önemli",
+                                tint = ErrorRed,
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .padding(end = 4.dp)
+                            )
+                        }
 
                         Text(
-                            text = when(reminder.type) {
-                                ReminderType.SINGLE -> stringResource(R.string.type_single)
-                                ReminderType.DAILY -> stringResource(R.string.type_daily)
-                                ReminderType.WEEKLY -> stringResource(R.string.type_weekly)
-                                ReminderType.MONTHLY -> stringResource(R.string.type_monthly)
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            text = reminder.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (reminder.isEnabled)
+                                MaterialTheme.colorScheme.onSurface
+                            else
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
+                    }
+
+                    // Category badge
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        Surface(
+                            color = categoryColor.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(4.dp),
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Icon(
+                                    imageVector = when(reminder.category) {
+                                        ReminderCategory.GENERAL -> Icons.Default.Notifications
+                                        ReminderCategory.WORK -> Icons.Default.Work
+                                        ReminderCategory.HEALTH -> Icons.Default.Favorite
+                                        ReminderCategory.PERSONAL -> Icons.Default.Person
+                                        ReminderCategory.STUDY -> Icons.Default.School
+                                        ReminderCategory.FITNESS -> Icons.Default.FitnessCenter
+                                    },
+                                    contentDescription = null,
+                                    tint = categoryColor,
+                                    modifier = Modifier.size(12.dp)
+                                )
+
+                                Spacer(modifier = Modifier.width(4.dp))
+
+                                Text(
+                                    text = when(reminder.category) {
+                                        ReminderCategory.GENERAL -> stringResource(R.string.category_general)
+                                        ReminderCategory.WORK -> stringResource(R.string.category_work)
+                                        ReminderCategory.HEALTH -> stringResource(R.string.category_health)
+                                        ReminderCategory.PERSONAL -> stringResource(R.string.category_personal)
+                                        ReminderCategory.STUDY -> stringResource(R.string.category_study)
+                                        ReminderCategory.FITNESS -> stringResource(R.string.category_fitness)
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = categoryColor
+                                )
+                            }
+                        }
+
+                        // Type badge
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = when(reminder.type) {
+                                    ReminderType.SINGLE -> stringResource(R.string.type_single)
+                                    ReminderType.DAILY -> stringResource(R.string.type_daily)
+                                    ReminderType.WEEKLY -> stringResource(R.string.type_weekly)
+                                    ReminderType.MONTHLY -> stringResource(R.string.type_monthly)
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
 
-                // Enable/disable switch
+                // Enable/disable switch with animation
                 Switch(
                     checked = reminder.isEnabled,
                     onCheckedChange = onToggleEnabled,
+                    modifier = Modifier.scale(iconScale.value),
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = primaryColor,
-                        checkedTrackColor = primaryColor.copy(alpha = 0.2f)
+                        checkedThumbColor = categoryColor,
+                        checkedTrackColor = categoryColor.copy(alpha = 0.2f),
+                        checkedBorderColor = categoryColor.copy(alpha = 0.3f),
+                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        uncheckedBorderColor = MaterialTheme.colorScheme.outline
                     )
                 )
             }
 
-            // Expanded content
+            // Expanded content with animation
             AnimatedVisibility(
                 visible = expanded,
                 enter = expandVertically() + fadeIn(),
@@ -217,40 +299,49 @@ fun ReminderCard(
                         Text(
                             text = stringResource(R.string.description),
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            color = categoryColor,
                             fontWeight = FontWeight.Medium
                         )
 
                         Spacer(modifier = Modifier.height(4.dp))
 
-                        Text(
-                            text = reminder.description,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                        )
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = reminder.description,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
                     }
 
                     Divider(
-                        modifier = Modifier.padding(vertical = 8.dp),
+                        modifier = Modifier.padding(vertical = 16.dp),
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
                     )
 
-                    // Action buttons
+                    // Action buttons with enhanced appearance
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        OutlinedButton(
+                        // Edit button
+                        Button(
                             onClick = onEditClick,
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = MaterialTheme.colorScheme.primary
-                            ),
-                            border = BorderStroke(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                            ),
+                            modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = categoryColor.copy(alpha = 0.1f),
+                                contentColor = categoryColor
+                            ),
+                            elevation = ButtonDefaults.buttonElevation(
+                                defaultElevation = 0.dp,
+                                pressedElevation = 2.dp
+                            )
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Edit,
@@ -258,19 +349,21 @@ fun ReminderCard(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(R.string.edit))
+                            Text(
+                                stringResource(R.string.edit),
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
 
-                        Spacer(modifier = Modifier.width(16.dp))
-
+                        // Delete button
                         Button(
                             onClick = onDeleteClick,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.error,
-                                contentColor = MaterialTheme.colorScheme.onError
-                            ),
+                            modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ErrorRed,
+                                contentColor = Color.White
+                            )
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
@@ -278,7 +371,10 @@ fun ReminderCard(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(R.string.delete))
+                            Text(
+                                stringResource(R.string.delete),
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
                 }

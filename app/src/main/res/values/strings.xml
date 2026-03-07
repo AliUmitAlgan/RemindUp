@@ -213,4 +213,30 @@
     <string name="grant_permission">İzin Ver</string>
     <string name="permission_denied">İzin Reddedildi</string>
     <string name="open_settings">Ayarları Aç</string>
+    <!-- Assistant -->
+    <string name="assistant_title">Akıllı Asistan</string>
+    <string name="assistant_subtitle">Büyük hedefleri küçük adımlara böl</string>
+    <string name="assistant_input_label">Hedefini yaz (ör. Vizelere çalış)</string>
+    <string name="assistant_generate">Parçalara Böl</string>
+    <string name="assistant_source_ai">Kaynak: AI</string>
+    <string name="assistant_source_fallback">Kaynak: Kural Bazlı Fallback</string>
+    <string name="assistant_fallback_notice">AI kotası kapalı olduğu için fallback mod kullanıldı.</string>
+    <string name="assistant_upgrade_cta">Premiuma Geç</string>
+    <string name="assistant_empty_hint">İlk adımlar burada görünecek.</string>
+
+    <!-- Premium -->
+    <string name="settings_premium">Premium</string>
+    <string name="premium_title">RemindUp Premium</string>
+    <string name="premium_subtitle">Konum + Wi-Fi tetikleyicileri ve akıllı öneriler</string>
+    <string name="premium_monthly">Aylık Premium</string>
+    <string name="premium_yearly">Yıllık Premium (%30 avantaj)</string>
+    <string name="premium_current_plan">Mevcut plan: %1$s</string>
+    <string name="premium_plan_free">Free</string>
+    <string name="premium_plan_premium">Premium</string>
+    <string name="premium_subscribe">Abone Ol</string>
+    <string name="premium_restore">Satın alımları geri yükle</string>
+    <string name="premium_purchase_success">Premium etkinleştirildi.</string>
+    <string name="premium_purchase_failed">Satın alma doğrulanamadı.</string>
+    <string name="premium_waitlist_ai">AI özellikleri free tier limitleri nedeniyle bekleme modunda.</string>
+    <string name="entitlement_message_beta">AI özelliği şu an kapalı beta modunda.</string>
 </resources>

@@ -51,7 +51,8 @@ fun HomeScreenContent(
     onNavigateToGoals: () -> Unit,
     onNavigateToReminders: () -> Unit,
     onNavigateToProgress: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToAssistant: () -> Unit = {}
 ) {
     val currentLanguage by LanguageManager.currentLanguage
     val context = LocalContext.current
@@ -213,31 +214,47 @@ fun HomeScreenContent(
                             )
                         }
 
-                        // Profile icon button with notification indicator
-                        IconButton(
-                            onClick = onNavigateToSettings,
-                            modifier = Modifier
-                                .size(48.dp)
-                                .shadow(4.dp, CircleShape)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surface)
-                        ) {
-                            Box {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            IconButton(
+                                onClick = onNavigateToAssistant,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .shadow(4.dp, CircleShape)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surface)
+                            ) {
                                 Icon(
-                                    imageVector = Icons.Default.Person,
-                                    contentDescription = "Profile",
+                                    imageVector = Icons.Default.AutoAwesome,
+                                    contentDescription = "Assistant",
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(22.dp)
                                 )
+                            }
 
-                                // Notification indicator
-                                if (reminders.isNotEmpty()) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(12.dp)
-                                            .background(MaterialTheme.colorScheme.tertiary, CircleShape)
-                                            .align(Alignment.TopEnd)
+                            IconButton(
+                                onClick = onNavigateToSettings,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .shadow(4.dp, CircleShape)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surface)
+                            ) {
+                                Box {
+                                    Icon(
+                                        imageVector = Icons.Default.Person,
+                                        contentDescription = "Profile",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(24.dp)
                                     )
+
+                                    if (reminders.isNotEmpty()) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(12.dp)
+                                                .background(MaterialTheme.colorScheme.tertiary, CircleShape)
+                                                .align(Alignment.TopEnd)
+                                        )
+                                    }
                                 }
                             }
                         }

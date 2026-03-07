@@ -5,9 +5,16 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.aliumitalgan.remindup.screens.*
+import com.aliumitalgan.remindup.screens.GoalsScreenContent
+import com.aliumitalgan.remindup.screens.HomeScreenContent
+import com.aliumitalgan.remindup.screens.LoginScreenContent
+import com.aliumitalgan.remindup.screens.ProgressScreenContent
+import com.aliumitalgan.remindup.screens.RegisterScreenContent
+import com.aliumitalgan.remindup.screens.SettingsScreenContent
+import com.aliumitalgan.remindup.ui.assistant.AiAssistantScreen
+import com.aliumitalgan.remindup.ui.premium.PremiumScreen
+import com.aliumitalgan.remindup.ui.reminders.RemindersScreen
 
-// Navigation rotaları
 sealed class Screen(val route: String) {
     object Login : Screen("login")
     object Register : Screen("register")
@@ -16,6 +23,8 @@ sealed class Screen(val route: String) {
     object Progress : Screen("progress")
     object Reminders : Screen("reminders")
     object Settings : Screen("settings")
+    object Assistant : Screen("assistant")
+    object Premium : Screen("premium")
 }
 
 @Composable
@@ -30,18 +39,22 @@ fun AppNavigation(
         composable(Screen.Login.route) {
             LoginScreenContent(
                 onNavigateToRegister = { navController.navigate(Screen.Register.route) },
-                onLoginSuccess = { navController.navigate(Screen.Home.route) {
-                    popUpTo(Screen.Login.route) { inclusive = true }
-                }}
+                onLoginSuccess = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                }
             )
         }
 
         composable(Screen.Register.route) {
             RegisterScreenContent(
                 onNavigateToLogin = { navController.navigate(Screen.Login.route) },
-                onRegisterSuccess = { navController.navigate(Screen.Home.route) {
-                    popUpTo(Screen.Register.route) { inclusive = true }
-                }}
+                onRegisterSuccess = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Register.route) { inclusive = true }
+                    }
+                }
             )
         }
 
@@ -50,7 +63,8 @@ fun AppNavigation(
                 onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
                 onNavigateToReminders = { navController.navigate(Screen.Reminders.route) },
                 onNavigateToProgress = { navController.navigate(Screen.Progress.route) },
-                onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
+                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
+                onNavigateToAssistant = { navController.navigate(Screen.Assistant.route) }
             )
         }
 
@@ -60,8 +74,7 @@ fun AppNavigation(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToHome = { navController.navigate(Screen.Home.route) },
                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
-                onNavigateToReminders = { navController.navigate(Screen.Reminders.route) },
-
+                onNavigateToReminders = { navController.navigate(Screen.Reminders.route) }
             )
         }
 
@@ -71,33 +84,25 @@ fun AppNavigation(
                 onNavigateToHome = { navController.navigate(Screen.Home.route) },
                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
                 onNavigateToReminders = { navController.navigate(Screen.Reminders.route) },
-                onNavigateBack = { navController.popBackStack() },
-
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
         composable(Screen.Reminders.route) {
-            RemindersScreenContent(
+            RemindersScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToHome = { navController.navigate(Screen.Home.route) },
                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
                 onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
-                onNavigateToProgress = { navController.navigate(Screen.Progress.route) },
+                onNavigateToProgress = { navController.navigate(Screen.Progress.route) }
             )
         }
 
         composable(Screen.Settings.route) {
             SettingsScreenContent(
-                onNavigateBack = {
-                    // geri ok tuşuna basınca Home'a dönsün:
-                    navController.popBackStack(Screen.Home.route, false)
-                },
+                onNavigateBack = { navController.popBackStack(Screen.Home.route, false) },
                 onLogout = {
-                    // Önce Firebase Auth üzerinden logout işlemi yapılmalı (AuthUtils.logout() zaten SettingsScreen'de çağrılıyor)
-
-                    // Çıkış yapınca Login ekranına git ve gezinme geçmişini tamamen temizle
                     navController.navigate(Screen.Login.route) {
-                        // Tüm back stack'i temizle
                         popUpTo(0) { inclusive = true }
                     }
                 },
@@ -105,8 +110,19 @@ fun AppNavigation(
                 onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
                 onNavigateToReminders = { navController.navigate(Screen.Reminders.route) },
                 onNavigateToProgress = { navController.navigate(Screen.Progress.route) },
+                onNavigateToPremium = { navController.navigate(Screen.Premium.route) }
             )
         }
 
+        composable(Screen.Assistant.route) {
+            AiAssistantScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToPremium = { navController.navigate(Screen.Premium.route) }
+            )
+        }
+
+        composable(Screen.Premium.route) {
+            PremiumScreen(onNavigateBack = { navController.popBackStack() })
+        }
     }
 }
