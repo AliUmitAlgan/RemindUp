@@ -2,6 +2,7 @@ import {initializeApp} from "firebase-admin/app";
 import {getFirestore} from "firebase-admin/firestore";
 import {GoogleGenerativeAI} from "@google/generative-ai";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
+import {createHash} from "crypto";
 import {
   enqueueDeferredRequest,
   enforceGlobalBudget,
@@ -191,29 +192,59 @@ export const verifySubscriptionPurchase = onCall(async (request) => {
   const uid = assertAuth(request.auth?.uid);
   const purchaseToken = (request.data?.purchaseToken ?? "").toString();
   const productId = (request.data?.productId ?? "").toString();
+  const allowedProducts = new Set(["premium_monthly", "premium_yearly"]);
 
   if (!purchaseToken || !productId) {
     throw new HttpsError("invalid-argument", "purchaseToken and productId are required.");
   }
+  if (!allowedProducts.has(productId)) {
+    throw new HttpsError("invalid-argument", "Unsupported productId.");
+  }
+  if (purchaseToken.length < 20) {
+    throw new HttpsError("invalid-argument", "purchaseToken is not valid.");
+  }
 
-  // Production validation with Google Play Developer API should be added here.
-  // This default flow marks premium as active when a non-empty token arrives.
   const db = getFirestore();
-  await db
+  const purchaseTokenHash = createHash("sha256").update(purchaseToken).digest("hex");
+  const tokenRef = db.collection("purchase_tokens").doc(purchaseTokenHash);
+  const entitlementRef = db
     .collection("users")
     .doc(uid)
     .collection("entitlements")
-    .doc("current")
-    .set(
+    .doc("current");
+
+  // Production validation with Google Play Developer API should still be added.
+  // Until then, enforce strict product allow-list and token ownership.
+  await db.runTransaction(async (tx) => {
+    const existingToken = await tx.get(tokenRef);
+    if (existingToken.exists) {
+      const existingUid = existingToken.get("uid");
+      if (typeof existingUid === "string" && existingUid !== uid) {
+        throw new HttpsError("permission-denied", "Purchase token belongs to another user.");
+      }
+    }
+
+    tx.set(
+      tokenRef,
       {
-        planType: "PREMIUM",
-        status: "ACTIVE",
+        uid,
         productId,
-        purchaseToken,
         updatedAt: Date.now()
       },
       {merge: true}
     );
+    tx.set(
+      entitlementRef,
+      {
+        planType: "PREMIUM",
+        status: "ACTIVE",
+        productId,
+        purchaseTokenHash,
+        updatedAt: Date.now()
+      },
+      {merge: true}
+    );
+  });
 
   return {success: true};
 });

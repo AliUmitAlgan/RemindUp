@@ -1,51 +1,66 @@
-
 package com.aliumitalgan.remindup.screens
 
-import android.util.Log
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.NotificationsNone
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.SelfImprovement
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.aliumitalgan.remindup.R
-import com.aliumitalgan.remindup.components.*
+import androidx.compose.ui.unit.sp
+import com.aliumitalgan.remindup.components.BottomNavigationBar
+import com.aliumitalgan.remindup.components.mainBottomNavItems
 import com.aliumitalgan.remindup.models.Goal
 import com.aliumitalgan.remindup.models.Reminder
-import com.aliumitalgan.remindup.models.ReminderCategory
-import com.aliumitalgan.remindup.ui.theme.AppColors
-import com.aliumitalgan.remindup.utils.LanguageManager
 import com.aliumitalgan.remindup.utils.ProgressUtils
 import com.aliumitalgan.remindup.utils.ReminderUtils
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+private val SweetBackground = Color(0xFFF6F1EE)
+private val DailyGoalCard = Color(0xFFE8DDF1)
+private val MainTaskCard = Color(0xFFCBEEDD)
+private val LilacCard = Color(0xFFE8DDF9)
+private val SandCard = Color(0xFFF4E3C8)
+private val NavyAction = Color(0xFF0A1C45)
+private val AccentOrange = Color(0xFFF26522)
+
 @Composable
 fun HomeScreenContent(
     onNavigateToGoals: () -> Unit,
@@ -54,792 +69,355 @@ fun HomeScreenContent(
     onNavigateToSettings: () -> Unit,
     onNavigateToAssistant: () -> Unit = {}
 ) {
-    val currentLanguage by LanguageManager.currentLanguage
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-
     var goals by remember { mutableStateOf<List<Goal>>(emptyList()) }
     var reminders by remember { mutableStateOf<List<Reminder>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    var motivationalMessage by remember { mutableStateOf("") }
-    var overallProgress by remember { mutableStateOf(0f) }
 
-    // Current time and date
-    val currentTime = remember { mutableStateOf(System.currentTimeMillis()) }
-    val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
-    val dateFormat = remember { SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()) }
+    val user = FirebaseAuth.getInstance().currentUser
+    val userName = user?.displayName?.substringBefore(" ")?.ifBlank { null }
+        ?: user?.email?.substringBefore("@")
+        ?: "Maya"
 
-    // Update time every minute
+    val navItems = mainBottomNavItems()
+    var currentRoute by remember { mutableStateOf("home") }
+
     LaunchedEffect(Unit) {
-        while(true) {
-            currentTime.value = System.currentTimeMillis()
-            delay(60000) // Update every minute
-        }
+        isLoading = true
+        val goalsResult = ProgressUtils.getUserGoals()
+        val remindersResult = ReminderUtils.getUserReminders()
+        goals = goalsResult.getOrDefault(emptyList()).map { it.second }
+        reminders = remindersResult.getOrDefault(emptyList()).map { it.second }
+        isLoading = false
     }
 
-    // Bottom Navigation Items
-    val bottomNavItems = listOf(
-        BottomNavItem(stringResource(R.string.home), Icons.Filled.Home, Icons.Outlined.Home, "home"),
-        BottomNavItem(stringResource(R.string.goals), Icons.Filled.CheckCircle, Icons.Outlined.CheckCircle, "goals"),
-        BottomNavItem(stringResource(R.string.reminders), Icons.Filled.Notifications, Icons.Outlined.Notifications, "reminders"),
-        BottomNavItem(stringResource(R.string.progress), Icons.Filled.ShowChart, Icons.Outlined.ShowChart, "progress"),
-        BottomNavItem(stringResource(R.string.profile), Icons.Filled.Person, Icons.Outlined.Person, "profile")
-    )
-    var selectedNavItem by remember { mutableStateOf(bottomNavItems[0].route) }
-    val currentUser = FirebaseAuth.getInstance().currentUser
-    val displayName = currentUser?.displayName ?: currentUser?.email?.substringBefore('@') ?: "Misafir"
-
-    // Load data
-    LaunchedEffect(key1 = Unit, key2 = currentLanguage) {
-        try {
-            // Get motivational message
-            motivationalMessage = ReminderUtils.getRandomMotivationalMessage(context)
-
-            // Load goals
-            val goalsResult = ProgressUtils.getUserGoals()
-            if (goalsResult.isSuccess) {
-                goals = goalsResult.getOrDefault(emptyList()).map { it.second }
-            }
-
-            // Load reminders
-            val remindersResult = ReminderUtils.getUserReminders()
-            if (remindersResult.isSuccess) {
-                reminders = remindersResult.getOrDefault(emptyList()).map { it.second }
-                // Sort reminders by time
-                reminders = reminders.sortedBy { it.time }
-            }
-
-            // Get overall progress
-            val progressResult = ProgressUtils.getOverallProgress()
-            if (progressResult.isSuccess) {
-                overallProgress = progressResult.getOrDefault(0f)
-            }
-
-            isLoading = false
-        } catch (e: Exception) {
-            Log.e("HomeScreen", "Error loading data: ${e.message}", e)
-            isLoading = false
-        }
-    }
+    val activeReminders = reminders.filter { it.isEnabled }
+    val completedGoals = goals.count { it.progress >= 100 }
+    val completionPercent = if (goals.isEmpty()) 0 else (completedGoals * 100 / goals.size)
+    val spotlightTask = activeReminders.firstOrNull()
+    val quickCards = activeReminders.drop(1).take(2)
+    val upcoming = activeReminders.take(6)
 
     Scaffold(
+        containerColor = SweetBackground,
         bottomBar = {
             BottomNavigationBar(
-                items = bottomNavItems,
-                currentRoute = selectedNavItem,
+                items = navItems,
+                currentRoute = currentRoute,
                 onItemSelected = { route ->
-                    selectedNavItem = route
+                    currentRoute = route
                     when (route) {
-                        "home" -> {} // Already on home
+                        "home" -> Unit
                         "goals" -> onNavigateToGoals()
-                        "reminders" -> onNavigateToReminders()
                         "progress" -> onNavigateToProgress()
-                        "profile" -> onNavigateToSettings()
-                    }
-                }
-            )
-        },
-        floatingActionButton = {
-            AnimatedFloatingActionButton(
-                onClick = {
-                    // Determine where to navigate based on the user's context
-                    if (goals.isEmpty()) {
-                        onNavigateToGoals()
-                    } else if (reminders.isEmpty()) {
-                        onNavigateToReminders()
-                    } else {
-                        // Show a menu or dialog to choose where to navigate
-                        onNavigateToGoals()
+                        "settings" -> onNavigateToSettings()
                     }
                 },
-                icon = Icons.Filled.Add
+                onCenterActionClick = { onNavigateToGoals() }
             )
         }
     ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            if (isLoading) {
-                // Loading state with animation
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary,
-                            strokeWidth = 3.dp,
-                            modifier = Modifier.size(48.dp)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = stringResource(R.string.loading),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-                        )
-                    }
-                }
-            } else {
-                // Main content with scroll
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp)
-                ) {
-                    // Modern top profile section
+        if (isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = AccentOrange)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 16.dp, bottom = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFF9C5A3)),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text(
-                                text = stringResource(R.string.welcome_user),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-                            )
-
-                            Text(
-                                text = displayName,
-                                style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = MaterialTheme.colorScheme.onBackground
+                                text = userName.firstOrNull()?.uppercase() ?: "U",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
                             )
                         }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Hello, $userName",
+                                fontSize = 13.sp,
+                                color = Color(0xFF7F7F90)
+                            )
+                            Text(
+                                text = "Good Morning!",
+                                fontSize = 30.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color(0xFF0A1C45),
+                                lineHeight = 34.sp
+                            )
+                        }
+                        IconButton(onClick = onNavigateToAssistant) {
+                            Icon(
+                                imageVector = Icons.Filled.NotificationsNone,
+                                contentDescription = "Alerts",
+                                tint = AccentOrange
+                            )
+                        }
+                    }
+                }
 
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            IconButton(
-                                onClick = onNavigateToAssistant,
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .shadow(4.dp, CircleShape)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.surface)
+                item {
+                    Surface(
+                        color = DailyGoalCard,
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.AutoAwesome,
-                                    contentDescription = "Assistant",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(22.dp)
+                                SweetTag("DAILY GOAL")
+                                Text(
+                                    text = "$completionPercent%",
+                                    color = AccentOrange,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
-
-                            IconButton(
-                                onClick = onNavigateToSettings,
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "Almost there!",
+                                fontSize = 30.sp,
+                                lineHeight = 32.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFF15213B)
+                            )
+                            Text(
+                                text = "You have completed $completedGoals of ${goals.size} goals today.",
+                                color = Color(0xFF61627A),
+                                fontSize = 13.sp
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Surface(
                                 modifier = Modifier
-                                    .size(48.dp)
-                                    .shadow(4.dp, CircleShape)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.surface)
+                                    .fillMaxWidth()
+                                    .height(8.dp),
+                                color = Color.White.copy(alpha = 0.7f),
+                                shape = RoundedCornerShape(6.dp)
                             ) {
-                                Box {
-                                    Icon(
-                                        imageVector = Icons.Default.Person,
-                                        contentDescription = "Profile",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-
-                                    if (reminders.isNotEmpty()) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(12.dp)
-                                                .background(MaterialTheme.colorScheme.tertiary, CircleShape)
-                                                .align(Alignment.TopEnd)
-                                        )
-                                    }
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth((completionPercent.coerceIn(0, 100)) / 100f)
+                                        .height(8.dp)
+                                        .background(AccentOrange)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
+                                color = NavyAction,
+                                shape = RoundedCornerShape(20.dp),
+                                onClick = onNavigateToProgress
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text("View Progress Stats", color = Color.White, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
                     }
-
-                    // Date & Time chip
-                    EnhancedCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        cornerRadius = 16.dp,
-                        elevation = 2.dp
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.DateRange,
-                                contentDescription = "Date",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(24.dp)
-                            )
-
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = dateFormat.format(Date(currentTime.value)),
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontWeight = FontWeight.Medium
-                                    ),
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-
-                                Text(
-                                    text = timeFormat.format(Date(currentTime.value)),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-
-                    // Motivational card
-                    HeaderCard(
-                        title = stringResource(R.string.user_greeting),
-                        subtitle = motivationalMessage,
-                        icon = Icons.Default.EmojiEmotions,
-                        primaryColor = MaterialTheme.colorScheme.tertiary
-                    )
-
-                    // Progress summary card
-                    ProgressSummaryCard(
-                        progress = overallProgress,
-                        onCardClick = onNavigateToProgress
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Upcoming Reminders Section
-                    SectionHeader(
-                        title = stringResource(R.string.upcoming_reminders),
-                        actionButton = {
-                            TextButton(onClick = onNavigateToReminders) {
-                                Text(stringResource(R.string.see_all))
-                            }
-                        }
-                    )
-
-                    // Top 3 upcoming reminders or empty state
-                    if (reminders.isNotEmpty()) {
-                        val upcomingReminders = reminders.filter { it.isEnabled }.take(3)
-
-                        upcomingReminders.forEach { reminder ->
-                            ReminderListItem(
-                                reminder = reminder,
-                                onClick = onNavigateToReminders
-                            )
-                        }
-                    } else {
-                        EmptyStateCard(
-                            title = stringResource(R.string.no_reminders),
-                            subtitle = stringResource(R.string.add_first_reminder),
-                            icon = Icons.Default.Notifications,
-                            primaryColor = MaterialTheme.colorScheme.primary,
-                            onActionClick = onNavigateToReminders,
-                            actionText = stringResource(R.string.add_reminder)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Active Goals Section
-                    SectionHeader(
-                        title = stringResource(R.string.active_goals),
-                        actionButton = {
-                            TextButton(onClick = onNavigateToGoals) {
-                                Text(stringResource(R.string.see_all))
-                            }
-                        }
-                    )
-
-                    // Top 3 active goals or empty state
-                    if (goals.isNotEmpty()) {
-                        val activeGoals = goals.filter { it.progress < 100 }.take(3)
-
-                        if (activeGoals.isNotEmpty()) {
-                            activeGoals.forEach { goal ->
-                                GoalListItem(
-                                    goal = goal,
-                                    onCardClick = onNavigateToGoals
-                                )
-                            }
-                        } else {
-                            // All goals are completed
-                            AllGoalsCompletedCard(onActionClick = onNavigateToGoals)
-                        }
-                    } else {
-                        EmptyStateCard(
-                            title = stringResource(R.string.no_goals),
-                            subtitle = stringResource(R.string.add_first_goal),
-                            icon = Icons.Default.Flag,
-                            primaryColor = MaterialTheme.colorScheme.secondary,
-                            onActionClick = onNavigateToGoals,
-                            actionText = stringResource(R.string.add_goal)
-                        )
-                    }
-
-                    // Extra space at bottom for FAB
-                    Spacer(modifier = Modifier.height(80.dp))
                 }
-            }
-        }
-    }
-}
 
-@Composable
-fun ProgressSummaryCard(
-    progress: Float,
-    onCardClick: () -> Unit
-) {
-    val animatedProgress = animateFloatAsState(
-        targetValue = progress,
-        animationSpec = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
-        label = "progress"
-    )
-
-    EnhancedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(160.dp)
-            .padding(vertical = 8.dp)
-            .clickable(onClick = onCardClick),
-        cornerRadius = 24.dp,
-        elevation = 4.dp,
-        primaryColor = MaterialTheme.colorScheme.primary
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                            MaterialTheme.colorScheme.surface
-                        )
-                    )
-                )
-                .padding(20.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Progress circle
-                Box(
-                    modifier = Modifier
-                        .size(110.dp)
-                        .padding(8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        progress = { animatedProgress.value },
-                        modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                        strokeWidth = 12.dp
-                    )
-
-                    // Center text showing percentage
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
+                item {
+                    val title = spotlightTask?.title ?: "Morning Yoga"
+                    val subtitle = spotlightTask?.description?.ifBlank { "Wellness" } ?: "Wellness"
+                    Surface(
+                        color = MainTaskCard,
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onNavigateToReminders
                     ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Filled.SelfImprovement, contentDescription = null, tint = Color(0xFF23A36A))
+                                Text("Now", color = Color(0xFF15985E), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(title, fontWeight = FontWeight.ExtraBold, fontSize = 24.sp, color = Color(0xFF0F2B23))
+                            Text(
+                                text = "${spotlightTask?.time ?: "15 mins"} - $subtitle",
+                                color = Color(0xFF3E7D66),
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        QuickTaskCard(
+                            modifier = Modifier.weight(1f),
+                            title = quickCards.getOrNull(0)?.title ?: "Drink Water",
+                            subtitle = quickCards.getOrNull(0)?.description?.ifBlank { "2.5L / 3L Goal" } ?: "2.5L / 3L Goal",
+                            bg = LilacCard,
+                            icon = Icons.Filled.Check
+                        )
+                        QuickTaskCard(
+                            modifier = Modifier.weight(1f),
+                            title = quickCards.getOrNull(1)?.title ?: "Meal Prep",
+                            subtitle = quickCards.getOrNull(1)?.time?.let { "$it PM Today" } ?: "12:30 PM Today",
+                            bg = SandCard,
+                            icon = Icons.Filled.Restaurant
+                        )
+                    }
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Upcoming", fontWeight = FontWeight.ExtraBold, fontSize = 28.sp, color = Color(0xFF141A34))
                         Text(
-                            text = "${(animatedProgress.value * 100).toInt()}%",
-                            style = MaterialTheme.typography.headlineMedium,
+                            text = "View all",
+                            color = AccentOrange,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-
-                        Text(
-                            text = stringResource(R.string.completed_label),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            modifier = Modifier.padding(top = 4.dp)
                         )
                     }
                 }
 
-                // Right side text
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 16.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.overall_progress),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = stringResource(R.string.goals_status),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Call to action button
-                    EnhancedButton(
-                        text = stringResource(R.string.see_all),
-                        onClick = onCardClick,
-                        icon = Icons.Default.ShowChart,
-                        backgroundColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                items(upcoming.ifEmpty { listOf(Reminder(title = "Read 10 pages", time = "8:00 PM", description = "Every day")) }) { reminder ->
+                    UpcomingTaskItem(
+                        title = reminder.title.ifBlank { "Untitled Task" },
+                        subtitle = reminder.description.ifBlank { "Every day at ${reminder.time}" },
+                        icon = if (reminder.title.contains("read", true)) Icons.Filled.MenuBook else Icons.Filled.Check
                     )
                 }
+
+                item { Spacer(modifier = Modifier.height(8.dp)) }
             }
         }
     }
 }
 
 @Composable
-fun ReminderListItem(
-    reminder: Reminder,
-    onClick: () -> Unit
-) {
-    // Get colors based on category
-    val categoryColor = getCategoryColor(reminder.category)
+private fun SweetTag(text: String) {
+    Surface(
+        color = Color(0xFFFCECDD),
+        shape = RoundedCornerShape(50)
+    ) {
+        Text(
+            text = text,
+            color = AccentOrange,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+        )
+    }
+}
 
-    EnhancedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp)
-            .clickable(onClick = onClick),
-        cornerRadius = 16.dp,
-        primaryColor = categoryColor,
-        elevation = 2.dp
+@Composable
+private fun QuickTaskCard(
+    modifier: Modifier,
+    title: String,
+    subtitle: String,
+    bg: Color,
+    icon: ImageVector
+) {
+    Surface(
+        modifier = modifier,
+        color = bg,
+        shape = RoundedCornerShape(22.dp)
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.9f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = AccentOrange, modifier = Modifier.size(16.dp))
+            }
+            Text(
+                text = title,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color(0xFF20233F),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = subtitle,
+                color = Color(0xFF6D7191),
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun UpcomingTaskItem(
+    title: String,
+    subtitle: String,
+    icon: ImageVector
+) {
+    Surface(
+        color = Color.White.copy(alpha = 0.94f),
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 12.dp, horizontal = 16.dp),
+                .padding(horizontal = 12.dp, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Time indicator
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(categoryColor.copy(alpha = 0.15f)),
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF2F5FB)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = reminder.time,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = categoryColor
-                )
+                Icon(icon, contentDescription = null, tint = Color(0xFF5A7AAE), modifier = Modifier.size(18.dp))
             }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            // Title and optional description
+            Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = reminder.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                if (reminder.description.isNotEmpty()) {
-                    Text(
-                        text = reminder.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+                Text(title, fontWeight = FontWeight.ExtraBold, color = Color(0xFF1D233F))
+                Text(subtitle, color = Color(0xFF7E869E), fontSize = 12.sp)
             }
-
-            // Category indicator
-            Icon(
-                imageVector = getCategoryIcon(reminder.category),
-                contentDescription = null,
-                tint = categoryColor,
-                modifier = Modifier.size(24.dp)
-            )
-        }
-    }
-}
-
-@Composable
-fun GoalListItem(
-    goal: Goal,
-    onCardClick: () -> Unit
-) {
-    val animatedProgress = animateFloatAsState(
-        targetValue = goal.progress / 100f,
-        animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
-        label = "goalProgress"
-    )
-
-    val progressColor = when {
-        goal.progress >= 100 -> MaterialTheme.colorScheme.tertiary
-        goal.progress >= 75 -> MaterialTheme.colorScheme.secondary
-        goal.progress >= 50 -> MaterialTheme.colorScheme.primary
-        goal.progress >= 25 -> MaterialTheme.colorScheme.primaryContainer
-        else -> MaterialTheme.colorScheme.surfaceVariant
-    }
-
-    EnhancedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp)
-            .clickable(onClick = onCardClick),
-        cornerRadius = 16.dp,
-        primaryColor = progressColor,
-        elevation = 2.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            // Title and progress
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Flag,
-                        contentDescription = null,
-                        tint = progressColor,
-                        modifier = Modifier.size(20.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Text(
-                        text = goal.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                Text(
-                    text = "${goal.progress}%",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = progressColor
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Progress bar
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(animatedProgress.value)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(
-                                    progressColor,
-                                    progressColor.copy(alpha = 0.7f)
-                                )
-                            )
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFFFF4ED))
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color(0xFFFFD5BF), Color(0xFFFFF4ED))
                         )
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun EmptyStateCard(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    primaryColor: Color,
-    onActionClick: () -> Unit,
-    actionText: String
-) {
-    var isAnimating by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(
-        targetValue = if (isAnimating) 1.1f else 0.95f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "emptyScale"
-    )
-
-    LaunchedEffect(Unit) {
-        isAnimating = true
-    }
-
-    EnhancedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        cornerRadius = 16.dp,
-        primaryColor = primaryColor,
-        elevation = 2.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(primaryColor.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = primaryColor,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .scale(scale)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            EnhancedButton(
-                text = actionText,
-                onClick = onActionClick,
-                icon = Icons.Default.Add,
-                backgroundColor = primaryColor
+                    )
             )
         }
-    }
-}
-
-@Composable
-fun AllGoalsCompletedCard(onActionClick: () -> Unit) {
-    EnhancedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        cornerRadius = 16.dp,
-        primaryColor = AppColors.success,
-        elevation = 2.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(AppColors.success.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Celebration,
-                    contentDescription = null,
-                    tint = AppColors.success,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = stringResource(R.string.congratulations),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = "Tüm hedeflerinizi tamamladınız!",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            EnhancedButton(
-                text = "Yeni Hedef Ekle",
-                onClick = onActionClick,
-                icon = Icons.Default.Add,
-                backgroundColor = AppColors.success
-            )
-        }
-    }
-}
-
-// Helper function to get category color
-@Composable
-private fun getCategoryColor(category: ReminderCategory): Color {
-    return when (category) {
-        ReminderCategory.GENERAL -> MaterialTheme.colorScheme.primary
-        ReminderCategory.WORK -> Color(0xFFE91E63)     // Pink
-        ReminderCategory.HEALTH -> Color(0xFFE53935)   // Red
-        ReminderCategory.PERSONAL -> Color(0xFF9C27B0) // Purple
-        ReminderCategory.STUDY -> Color(0xFF00897B)    // Teal
-        ReminderCategory.FITNESS -> Color(0xFF7CB342)  // Green
-    }
-}
-
-// Helper function to get category icon
-private fun getCategoryIcon(category: ReminderCategory): ImageVector {
-    return when (category) {
-        ReminderCategory.GENERAL -> Icons.Default.Notifications
-        ReminderCategory.WORK -> Icons.Default.Work
-        ReminderCategory.HEALTH -> Icons.Default.Favorite
-        ReminderCategory.PERSONAL -> Icons.Default.Person
-        ReminderCategory.STUDY -> Icons.Default.School
-        ReminderCategory.FITNESS -> Icons.Default.FitnessCenter
     }
 }

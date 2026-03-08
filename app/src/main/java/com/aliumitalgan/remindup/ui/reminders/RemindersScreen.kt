@@ -24,24 +24,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.ShowChart
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.ShowChart
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -71,10 +59,10 @@ import com.aliumitalgan.remindup.R
 import com.aliumitalgan.remindup.components.BottomNavigationBar
 import com.aliumitalgan.remindup.components.EmptyRemindersView
 import com.aliumitalgan.remindup.components.ReminderCard
+import com.aliumitalgan.remindup.components.mainBottomNavItems
 import com.aliumitalgan.remindup.core.di.LocalAppContainer
 import com.aliumitalgan.remindup.models.ReminderCategory
 import com.aliumitalgan.remindup.models.ReminderType
-import com.aliumitalgan.remindup.screens.BottomNavItem
 import com.aliumitalgan.remindup.screens.FilterChips
 import com.aliumitalgan.remindup.screens.ModernReminderDialog
 
@@ -92,15 +80,9 @@ fun RemindersScreen(
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsState()
-    var selectedNavItem by remember { mutableStateOf("reminders") }
+    var selectedNavItem by remember { mutableStateOf("goals") }
 
-    val bottomNavItems = listOf(
-        BottomNavItem(stringResource(R.string.home), Icons.Filled.Home, Icons.Outlined.Home, "home"),
-        BottomNavItem(stringResource(R.string.goals), Icons.Filled.CheckCircle, Icons.Outlined.CheckCircle, "goals"),
-        BottomNavItem(stringResource(R.string.reminders), Icons.Filled.Notifications, Icons.Outlined.Notifications, "reminders"),
-        BottomNavItem(stringResource(R.string.progress), Icons.Filled.ShowChart, Icons.Outlined.ShowChart, "progress"),
-        BottomNavItem(stringResource(R.string.profile), Icons.Filled.Person, Icons.Outlined.Person, "profile")
-    )
+    val bottomNavItems = mainBottomNavItems()
 
     val editingReminder = state.editingReminderId?.let { id ->
         state.allReminders.firstOrNull { it.id == id }?.reminder
@@ -260,29 +242,11 @@ fun RemindersScreen(
                         "home" -> onNavigateToHome()
                         "goals" -> onNavigateToGoals()
                         "progress" -> onNavigateToProgress()
-                        "profile" -> onNavigateToSettings()
+                        "settings" -> onNavigateToSettings()
                     }
-                }
+                },
+                onCenterActionClick = { viewModel.onEvent(RemindersUiEvent.ShowAddDialog) }
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { viewModel.onEvent(RemindersUiEvent.ShowAddDialog) },
-                modifier = Modifier.size(56.dp),
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = RoundedCornerShape(16.dp),
-                elevation = FloatingActionButtonDefaults.elevation(
-                    defaultElevation = 6.dp,
-                    pressedElevation = 8.dp
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
         }
     ) { innerPadding ->
         Box(
@@ -373,3 +337,4 @@ private fun typeLabel(type: ReminderType): String {
         ReminderType.MONTHLY -> "Aylık"
     }
 }
+

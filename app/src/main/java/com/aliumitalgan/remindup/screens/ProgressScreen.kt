@@ -1,136 +1,112 @@
 package com.aliumitalgan.remindup.screens
 
-import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Celebration
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aliumitalgan.remindup.R
 import com.aliumitalgan.remindup.components.BottomNavigationBar
-import com.aliumitalgan.remindup.components.GoalCard
+import com.aliumitalgan.remindup.components.mainBottomNavItems
 import com.aliumitalgan.remindup.models.Goal
-import com.aliumitalgan.remindup.utils.LanguageManager
+import com.aliumitalgan.remindup.models.Reminder
 import com.aliumitalgan.remindup.utils.ProgressUtils
 import com.aliumitalgan.remindup.utils.ReminderUtils
-import kotlinx.coroutines.launch
-import android.util.Log
+import com.google.firebase.auth.FirebaseAuth
 
-@OptIn(ExperimentalMaterial3Api::class)
+private val AnalyticsBg = Color(0xFFF6F2F1)
+private val Orange = Color(0xFFF26522)
+private val DeepText = Color(0xFF1A1E3F)
+
 @Composable
 fun ProgressScreenContent(
     onNavigateBack: () -> Unit,
     onNavigateToHome: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
     onNavigateToGoals: () -> Unit = {},
-    onNavigateToReminders: () -> Unit = {},
-    onNavigateToSettings: () -> Unit = {}
+    onNavigateToReminders: () -> Unit = {}
 ) {
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-
-    var overallProgress by remember { mutableStateOf(0f) }
-    var goals by remember { mutableStateOf<List<Pair<String, Goal>>>(emptyList()) }
-    var completedGoalsCount by remember { mutableStateOf(0) }
+    var goals by remember { mutableStateOf<List<Goal>>(emptyList()) }
+    var reminders by remember { mutableStateOf<List<Reminder>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    var showAllGoals by remember { mutableStateOf(false) }
+    var currentRoute by remember { mutableStateOf("progress") }
+    val navItems = mainBottomNavItems()
 
-    // Güncel dil durumunu takip et
-    val currentLanguage by LanguageManager.currentLanguage
-
-    // Motivasyon mesajını dil durumuna göre al
-    val motivationalMessage = remember(currentLanguage) {
-        ReminderUtils.getRandomMotivationalMessage(context)
+    LaunchedEffect(Unit) {
+        isLoading = true
+        goals = ProgressUtils.getUserGoals().getOrDefault(emptyList()).map { it.second }
+        reminders = ReminderUtils.getUserReminders().getOrDefault(emptyList()).map { it.second }
+        isLoading = false
     }
 
-    // Dil değişikliğini logla
-    LaunchedEffect(currentLanguage) {
-        Log.d("ProgressScreen", "Current language for motivational messages: $currentLanguage")
-    }
-
-    // Bottom Navigation Items
-    val bottomNavItems = listOf(
-        BottomNavItem("Ana Sayfa", Icons.Filled.Home, Icons.Outlined.Home, "home"),
-        BottomNavItem("Hedefler", Icons.Filled.CheckCircle, Icons.Outlined.CheckCircle, "goals"),
-        BottomNavItem("Hatırlatıcılar", Icons.Filled.Notifications, Icons.Outlined.Notifications, "reminders"),
-        BottomNavItem("İlerleme", Icons.Filled.ShowChart, Icons.Outlined.ShowChart, "progress"),
-        BottomNavItem("Profil", Icons.Filled.Person, Icons.Outlined.Person, "profile")
+    val userName = FirebaseAuth.getInstance().currentUser?.displayName?.substringBefore(" ") ?: "Alex"
+    val totalGoals = goals.size
+    val avgProgress = if (goals.isEmpty()) 0 else goals.sumOf { it.progress } / goals.size
+    val activePlans = reminders.count { it.isEnabled }
+    val streakDays = goals.count { it.progress >= 50 } * 3
+    val weeklyBars = buildWeeklyBars(goals)
+    val badges = listOf(
+        BadgeUi("Fast Finisher", Icons.Filled.Bolt, streakDays >= 7),
+        BadgeUi("Deep Work", Icons.Filled.WorkspacePremium, avgProgress >= 60),
+        BadgeUi("Self Care", Icons.Filled.FavoriteBorder, activePlans >= 3),
+        BadgeUi("???", Icons.Filled.Lock, false)
     )
-    var selectedNavItem by remember { mutableStateOf(bottomNavItems[3].route) }
-
-    // Verileri yükle
-    LaunchedEffect(key1 = true) {
-        coroutineScope.launch {
-            try {
-                // Genel ilerleme
-                val progressResult = ProgressUtils.getOverallProgress()
-                if (progressResult.isSuccess) {
-                    overallProgress = progressResult.getOrDefault(0f)
-                }
-
-                // Tamamlanan hedef sayısı
-                val completedResult = ProgressUtils.getCompletedGoalsCount()
-                if (completedResult.isSuccess) {
-                    completedGoalsCount = completedResult.getOrDefault(0)
-                }
-
-                // Tüm hedefleri getir
-                val goalsResult = ProgressUtils.getUserGoals()
-                if (goalsResult.isSuccess) {
-                    goals = goalsResult.getOrDefault(emptyList())
-                }
-
-                isLoading = false
-            } catch (e: Exception) {
-                Toast.makeText(context, "Veriler yüklenirken hata: ${e.message}", Toast.LENGTH_SHORT).show()
-                isLoading = false
-            }
-        }
-    }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.progress)) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Geri")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        },
+        containerColor = AnalyticsBg,
         bottomBar = {
             BottomNavigationBar(
-                items = bottomNavItems,
-                currentRoute = selectedNavItem,
+                items = navItems,
+                currentRoute = currentRoute,
                 onItemSelected = { route ->
-                    selectedNavItem = route
+                    currentRoute = route
                     when (route) {
                         "home" -> onNavigateToHome()
                         "goals" -> onNavigateToGoals()
-                        "reminders" -> onNavigateToReminders()
-                        "progress" -> {} // Zaten progress ekranındayız
-                        "profile" -> onNavigateToSettings()
+                        "progress" -> Unit
+                        "settings" -> onNavigateToSettings()
                     }
-                }
+                },
+                onCenterActionClick = onNavigateToGoals
             )
         }
     ) { innerPadding ->
@@ -141,353 +117,209 @@ fun ProgressScreenContent(
                     .padding(innerPadding),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(color = Orange)
             }
         } else {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(horizontal = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Motivasyon mesajı - ReminderUtils ile alınıyor (dil duyarlı)
-                item {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        ),
-                        elevation = CardDefaults.cardElevation(2.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Star,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(24.dp)
-                            )
-
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            Text(
-                                text = motivationalMessage,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    }
-                }
-
-                // Genel İlerleme
-                item {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 24.dp),
-                        shape = RoundedCornerShape(20.dp),
-                        elevation = CardDefaults.cardElevation(4.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                stringResource(R.string.overall_progress),
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            Spacer(modifier = Modifier.height(24.dp))
-
-                            // Dairesel ilerleme göstergesi
-                            Box(
-                                modifier = Modifier.size(200.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                // Arka plan daire
-                                CircularProgressIndicator(
-                                    progress = { 1f },
-                                    modifier = Modifier.size(200.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
-                                    strokeWidth = 16.dp
-                                )
-
-                                // İlerleme dairesi
-                                CircularProgressIndicator(
-                                    progress = { overallProgress },
-                                    modifier = Modifier.size(200.dp),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    strokeWidth = 16.dp
-                                )
-
-                                // İç içe daire
-                                Box(
-                                    modifier = Modifier
-                                        .size(160.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.surface)
-                                        .border(
-                                            width = 2.dp,
-                                            color = MaterialTheme.colorScheme.surfaceVariant,
-                                            shape = CircleShape
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Text(
-                                            text = "${(overallProgress * 100).toInt()}%",
-                                            style = MaterialTheme.typography.headlineLarge,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-
-                                        Text(
-                                            stringResource(R.string.completed_label),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(24.dp))
-
-                            // İstatistikler
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                // Toplam Hedefler
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = "${goals.size}",
-                                        style = MaterialTheme.typography.headlineMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-
-                                    Text(
-                                        stringResource(R.string.total_goals),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                    )
-                                }
-
-                                // Tamamlanan Hedefler
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = "$completedGoalsCount",
-                                        style = MaterialTheme.typography.headlineMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-
-                                    Text(
-                                        stringResource(R.string.completed_goals),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Hedef Başlığı
                 item {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            stringResource(R.string.goals_status),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.Filled.ArrowBack, contentDescription = null, tint = DeepText)
+                        }
+                        Text("RemindUp Sweet Analytics", fontWeight = FontWeight.Bold, color = DeepText)
+                        IconButton(onClick = onNavigateToReminders) {
+                            Icon(Icons.Filled.Share, contentDescription = null, tint = DeepText)
+                        }
+                    }
+                }
 
-                        TextButton(onClick = { showAllGoals = !showAllGoals }) {
-                            Text(
-                                if (showAllGoals) stringResource(R.string.brief) else stringResource(R.string.see_all),
-                                color = MaterialTheme.colorScheme.primary
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(24.dp),
+                        color = Color.White,
+                        tonalElevation = 1.dp
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFFFD7C4)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Filled.Celebration, contentDescription = null, tint = Orange, modifier = Modifier.size(36.dp))
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("Great job, $userName!", fontWeight = FontWeight.ExtraBold, fontSize = 24.sp, color = DeepText)
+                            Text("You completed $totalGoals tasks this week", color = Color(0xFF757C95), fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StatCard("CURRENT STREAK", "$streakDays Days", "Next Milestone 15 Days", Modifier.weight(1f))
+                        StatCard("Total Wins", "$totalGoals", "avg +12%", Modifier.weight(1f))
+                        StatCard("Focus Hours", "${activePlans * 2}", "avg +8%", Modifier.weight(1f))
+                    }
+                }
+
+                item {
+                    Surface(
+                        color = Color.White,
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Weekly Progress", fontWeight = FontWeight.ExtraBold, color = DeepText)
+                                Text("SUGAR LEVEL HIGH", color = Orange, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.Bottom
+                            ) {
+                                weeklyBars.forEachIndexed { index, value ->
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height((20 + value * 56).dp)
+                                                .clip(RoundedCornerShape(20.dp))
+                                                .background(if (index == 3) Orange else Color(0xFFCFD6E7))
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(dayLabel(index), fontSize = 10.sp, color = Color(0xFF7E84A1))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Text("Achievement Stickers", fontWeight = FontWeight.ExtraBold, color = DeepText, fontSize = 18.sp)
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        badges.forEach { badge ->
+                            BadgeItem(
+                                badge = badge,
+                                modifier = Modifier.weight(1f)
                             )
                         }
                     }
                 }
 
-                // Hedef listesi - gösterim şeklini değiştir
-                if (!showAllGoals) {
-                    // İlk 3 hedefi göster
-                    items(goals.take(3)){ (id, goal) ->
-                        GoalCard(
-                            goalTitle = goal.title,
-                            goalProgress = goal.progress
-                        )
-                    }
-                } else {
-                    // Tüm hedefleri göster - kategorize edilen liste
-                    val activeGoals = goals.filter { it.second.progress < 100 }
-                    val completedGoals = goals.filter { it.second.progress >= 100 }
-
-                    // Aktif Hedefler Başlığı
-                    if (activeGoals.isNotEmpty()) {
-                        item {
-                            Text(
-                                stringResource(R.string.active_goals),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(vertical = 12.dp)
-                            )
-                        }
-                    }
-
-                    // Aktif Hedefler
-                    items(activeGoals) { (id, goal) ->
-                        GoalCard(
-                            goalTitle = goal.title,
-                            goalProgress = goal.progress
-                        )
-                    }
-
-                    // Tamamlanmış Hedefler Başlığı
-                    if (completedGoals.isNotEmpty()) {
-                        item {
-                            Text(
-                                stringResource(R.string.completed_goals),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(vertical = 12.dp)
-                            )
-                        }
-                    }
-
-                    // Tamamlanmış Hedefler
-                    items(completedGoals) { (id, goal) ->
-                        GoalCard(
-                            goalTitle = goal.title,
-                            goalProgress = goal.progress
-                        )
-                    }
-                }
+                item { Spacer(modifier = Modifier.height(4.dp)) }
             }
         }
     }
 }
-@Composable
-fun ModernProgressItem(goal: Goal) {
-    val progressColor = when {
-        goal.progress >= 100 -> MaterialTheme.colorScheme.primary
-        goal.progress >= 75 -> MaterialTheme.colorScheme.primary
-        goal.progress >= 50 -> MaterialTheme.colorScheme.tertiary
-        goal.progress >= 25 -> MaterialTheme.colorScheme.secondary
-        else -> MaterialTheme.colorScheme.error
-    }
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(2.dp)
+@Composable
+private fun StatCard(
+    title: String,
+    value: String,
+    subtitle: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        color = Color.White,
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, fontSize = 10.sp, color = Orange, fontWeight = FontWeight.Bold)
+            Text(value, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = DeepText)
+            Text(subtitle, fontSize = 10.sp, color = Color(0xFF7B8098))
+        }
+    }
+}
+
+private data class BadgeUi(
+    val title: String,
+    val icon: ImageVector,
+    val unlocked: Boolean
+)
+
+@Composable
+private fun BadgeItem(
+    badge: BadgeUi,
+    modifier: Modifier = Modifier
+) {
+    val bg = if (badge.unlocked) Color(0xFFEAF1FF) else Color(0xFFEDEFF4)
+    val tint = if (badge.unlocked) Orange else Color(0xFF9BA3B9)
+    Surface(
+        modifier = modifier,
+        color = bg,
+        shape = RoundedCornerShape(16.dp)
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
+            modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = goal.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Text(
-                    text = "${goal.progress}%",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = progressColor
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Özel tasarımlı ilerleme çubuğu
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(12.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color.White),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(goal.progress / 100f)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(
-                                    progressColor,
-                                    progressColor.copy(alpha = 0.7f)
-                                )
-                            )
-                        )
-                )
+                Icon(badge.icon, contentDescription = null, tint = tint)
             }
-
-            // Tamamlandı işareti
-            if (goal.progress >= 100) {
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Tamamlandı",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Text(
-                        text = stringResource(R.string.completed),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = badge.title,
+                fontSize = 10.sp,
+                color = if (badge.unlocked) DeepText else Color(0xFF9BA3B9),
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
 
+private fun buildWeeklyBars(goals: List<Goal>): List<Float> {
+    if (goals.isEmpty()) return listOf(0.35f, 0.45f, 0.38f, 0.66f, 0.22f, 0.25f, 0.24f)
+    val sum = goals.sumOf { it.progress }
+    return List(7) { index ->
+        (((sum + (index * 17)) % 100) / 100f).coerceIn(0.18f, 0.9f)
+    }
+}
 
-// Toast mesajı göster
-fun showToast(context: android.content.Context, message: String) {
-    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+private fun dayLabel(index: Int): String {
+    return when (index) {
+        0 -> "Mon"
+        1 -> "Tue"
+        2 -> "Wed"
+        3 -> "Thu"
+        4 -> "Fri"
+        5 -> "Sat"
+        else -> "Sun"
+    }
 }

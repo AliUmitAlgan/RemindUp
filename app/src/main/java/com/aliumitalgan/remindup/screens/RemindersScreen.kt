@@ -49,6 +49,9 @@ import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Deprecated(
+    message = "Legacy screen. Active reminders flow is ui/reminders/RemindersScreen."
+)
 fun RemindersScreenContent(
     onNavigateBack: () -> Unit,
     onNavigateToHome: () -> Unit = {},
@@ -360,7 +363,7 @@ fun RemindersScreenContent(
                                     if (result.isSuccess) {
                                         // Update local list
                                         reminders = reminders.map {
-                                            if (it.first == id) id to updatedReminder
+                                            if (it.first == id) Pair(id, updatedReminder)
                                             else it
                                         }
                                         showToast(context, "Hatırlatıcı durumu güncellendi")
@@ -402,7 +405,7 @@ fun RemindersScreenContent(
                     },
                     onSave = { newReminderData ->
                         coroutineScope.launch {
-                            val currentEditingReminder = editingReminder
+                            val currentEditingReminder: Pair<String, Reminder>? = editingReminder
 
                             if (currentEditingReminder != null) {
                                 // Update existing reminder
@@ -420,7 +423,7 @@ fun RemindersScreenContent(
                                 val result = ReminderUtils.updateReminder(id, updatedReminder, context)
                                 if (result.isSuccess) {
                                     reminders = reminders.map {
-                                        if (it.first == id) id to updatedReminder else it
+                                        if (it.first == id) Pair(id, updatedReminder) else it
                                     }
                                     showToast(context, "Hatırlatıcı güncellendi")
                                 } else {
@@ -433,8 +436,8 @@ fun RemindersScreenContent(
                                 )
                                 val result = ReminderUtils.addReminder(newReminder, context)
                                 if (result.isSuccess) {
-                                    val newId = result.getOrDefault("")
-                                    reminders = reminders + (newId to newReminder)
+                                    val newId: String = result.getOrDefault("")
+                                    reminders = reminders + Pair(newId, newReminder)
                                     showToast(context, "Hatırlatıcı eklendi")
                                 } else {
                                     showToast(context, "Ekleme başarısız: ${result.exceptionOrNull()?.message}")
@@ -959,4 +962,8 @@ private fun getCategoryChipColor(category: ReminderCategory): Color {
         ReminderCategory.STUDY -> Color(0xFF00897B)    // Teal
         ReminderCategory.FITNESS -> Color(0xFF7CB342)  // Green
     }
+}
+
+private fun showToast(context: android.content.Context, message: String) {
+    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
 }

@@ -776,3 +776,7 @@ private fun validateInput(email: String, password: String): Boolean {
     return email.contains("@") && email.isNotEmpty() && password.length >= 6
 }
 
+private fun showToast(context: android.content.Context, message: String) {
+    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+}
+

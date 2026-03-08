@@ -1,554 +1,245 @@
 package com.aliumitalgan.remindup.screens
 
-import android.annotation.SuppressLint
-import androidx.compose.ui.res.stringResource
-import android.widget.Toast
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import com.aliumitalgan.remindup.R
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.PersonOutline
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.aliumitalgan.remindup.components.BottomNavigationBar
+import com.aliumitalgan.remindup.components.mainBottomNavItems
+import com.aliumitalgan.remindup.data.repository.FirestoreEntitlementRepository
+import com.aliumitalgan.remindup.domain.model.EntitlementStatus
+import com.aliumitalgan.remindup.domain.model.PlanType
 import com.aliumitalgan.remindup.utils.AuthUtils
-import com.aliumitalgan.remindup.utils.NotificationUtils
-import com.aliumitalgan.remindup.utils.ThemeManager
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.Dispatchers
-import android.content.Context
-import android.util.Log
-import com.aliumitalgan.remindup.components.LanguageSelectionDialog
-import com.aliumitalgan.remindup.utils.LanguageManager
-import com.google.firebase.auth.UserProfileChangeRequest
 
+private val ProfileBg = Color(0xFFF5F2F2)
+private val Orange = Color(0xFFF26522)
+private val Deep = Color(0xFF161B38)
 
-
-@SuppressLint("StateFlowValueCalledInComposition")
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreenContent(
     onNavigateBack: () -> Unit,
+    onLogout: () -> Unit,
     onNavigateToHome: () -> Unit = {},
     onNavigateToGoals: () -> Unit = {},
     onNavigateToReminders: () -> Unit = {},
     onNavigateToProgress: () -> Unit = {},
-    onNavigateToPremium: () -> Unit = {},
-    onLogout: () -> Unit
+    onNavigateToPremium: () -> Unit = {}
 ) {
-    val context = LocalContext.current
-    val currentUser = FirebaseAuth.getInstance().currentUser
-    var isProcessing by remember { mutableStateOf(false) }
+    var currentRoute by remember { mutableStateOf("settings") }
+    val navItems = mainBottomNavItems()
 
-    var userName by remember { mutableStateOf(currentUser?.displayName ?: "Kullanıcı") }
-    var showEditNameDialog by remember { mutableStateOf(false) }
-    var showLogoutDialog by remember { mutableStateOf(false) }
-    var showLanguageDialog by remember { mutableStateOf(false) }
-    // Tema durumu
-    val isDarkTheme by ThemeManager.isDarkTheme
-    val coroutineScope = rememberCoroutineScope()
-    val currentLanguage by LanguageManager.currentLanguage
+    val user = FirebaseAuth.getInstance().currentUser
+    val name = user?.displayName?.ifBlank { null } ?: "Sweet Reminder"
+    val email = user?.email ?: "remindup.user@sweet.com"
+    val initials = name.split(" ").mapNotNull { it.firstOrNull()?.uppercase() }.take(2).joinToString("").ifBlank { "SR" }
 
-    // İsim düzenleme için geçici değişken
-    var newUserName by remember { mutableStateOf("") }
-    var isUpdatingName by remember { mutableStateOf(false) }
-
-    // Bildirim durumu
-    var notificationsEnabled by remember {
-        mutableStateOf(NotificationUtils.loadNotificationState(context))
+    var isPremium by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        runCatching {
+            val entitlement = FirestoreEntitlementRepository().getEntitlement()
+            isPremium = entitlement.planType == PlanType.PREMIUM &&
+                (entitlement.status == EntitlementStatus.ACTIVE || entitlement.status == EntitlementStatus.GRACE)
+        }
     }
 
-    // Bottom Navigation Items
-    val bottomNavItems = listOf(
-        BottomNavItem("Ana Sayfa", Icons.Filled.Home, Icons.Filled.Home, "home"),
-        BottomNavItem("Hedefler", Icons.Filled.CheckCircle, Icons.Filled.CheckCircle, "goals"),
-        BottomNavItem("Hatırlatıcılar", Icons.Filled.Notifications, Icons.Filled.Notifications, "reminders"),
-        BottomNavItem("İlerleme", Icons.Filled.ShowChart, Icons.Filled.ShowChart, "progress"),
-        BottomNavItem("Profil", Icons.Filled.Person, Icons.Filled.Person, "profile")
-    )
-    var selectedNavItem by remember { mutableStateOf(bottomNavItems[4].route) }
-
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(R.string.settings_title),
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Geri",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        },
+        containerColor = ProfileBg,
         bottomBar = {
             BottomNavigationBar(
-                items = bottomNavItems,
-                currentRoute = selectedNavItem,
+                items = navItems,
+                currentRoute = currentRoute,
                 onItemSelected = { route ->
-                    selectedNavItem = route
+                    currentRoute = route
                     when (route) {
                         "home" -> onNavigateToHome()
                         "goals" -> onNavigateToGoals()
-                        "reminders" -> onNavigateToReminders()
                         "progress" -> onNavigateToProgress()
-                        "profile" -> {} // Zaten profil ekranındayız
+                        "settings" -> Unit
                     }
-                }
+                },
+                onCenterActionClick = onNavigateToGoals
             )
         }
     ) { innerPadding ->
-        // Dil Seçim Dialog
-        if (showLanguageDialog) {
-            LanguageSelectionDialog(
-                onDismiss = {
-                    Log.d("SettingsScreen", "Dialog dismissed")
-                    showLanguageDialog = false
-                },
-                onLanguageSelected = { languageCode ->
-                    Log.d("SettingsScreen", "Language selected: $languageCode")
-                    try {
-                        // Başlangıçtaki dil değerini kaydet
-                        val initialLanguage = LanguageManager.currentLanguage.value
-
-                        // Dili değiştir
-                        LanguageManager.setLanguage(context, languageCode)
-
-                        // Dil değişiminin gerçekleştiğinden emin olmak için kontrol et
-                        val newLanguage = LanguageManager.currentLanguage.value
-                        Log.d("SettingsScreen", "Language change result: $initialLanguage -> $newLanguage")
-
-                        // Dil değişimini UI arayüzünde göster - toast mesajı
-                        val message = if (languageCode == LanguageManager.LANGUAGE_TURKISH) {
-                            context.getString(R.string.language_changed_to_turkish)
-                        } else {
-                            context.getString(R.string.language_changed_to_english)
-                        }
-                        showToast(context, message)
-
-                        // Dialog'u kapat
-                        showLanguageDialog = false
-                    } catch (e: Exception) {
-                        Log.e("SettingsScreen", "Dil değiştirme hatası", e)
-                        showToast(context, "Dil değiştirme sırasında hata oluştu: ${e.message}")
-                    }
-                }
-            )
-        }
-
-        // LazyColumn yerine verticalScroll kullanıyoruz
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState()), // Scroll özelliği ekliyoruz
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Profil Kartı
-                AnimatedVisibility(
-                    visible = true,
-                    enter = fadeIn(animationSpec = tween(1000)) +
-                            slideInHorizontally(
-                                animationSpec = tween(1000),
-                                initialOffsetX = { -it }
-                            )
-                ) {
-                    ProfileSection(
-                        userName = userName,
-                        userEmail = currentUser?.email ?: "",
-                        onEditProfile = {
-                            newUserName = userName // Mevcut ismi başlangıç değeri olarak ata
-                            showEditNameDialog = true
-                        }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Ayarlar Bölümleri
-                AnimatedVisibility(
-                    visible = true,
-                    enter = fadeIn(animationSpec = tween(1200, delayMillis = 300))
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        // Bildirim Ayarları
-                        SettingsSection(
-                            stringResource(R.string.notifications),
-                            icon = Icons.Default.Notifications,
-                            trailingContent = {
-                                if (isProcessing) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(24.dp),
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                } else {
-                                    Switch(
-                                        checked = notificationsEnabled,
-                                        onCheckedChange = { newState ->
-                                            // İşlem devam ederken kullanıcının başka bir işlem yapmasını engelle
-                                            isProcessing = true
-
-                                            coroutineScope.launch {
-                                                try {
-                                                    // NotificationUtils'in saveNotificationState metodunu çağır
-                                                    NotificationUtils.saveNotificationState(context, newState)
-
-                                                    // UI thread'inde state'i güncelle
-                                                    withContext(Dispatchers.Main) {
-                                                        notificationsEnabled = newState
-                                                        showToast(
-                                                            context,
-                                                            if (newState) "Bildirimler açıldı" else "Bildirimler kapatıldı"
-                                                        )
-                                                    }
-                                                } catch (e: Exception) {
-                                                    // Hata durumunda kullanıcıya bilgi ver
-                                                    showToast(context, "İşlem sırasında hata oluştu: ${e.message}")
-                                                    Log.e("SettingsScreen", "Bildirim durumu güncelleme hatası", e)
-                                                } finally {
-                                                    // İşlem bittiğinde işlemi sonlandır
-                                                    isProcessing = false
-                                                }
-                                            }
-                                        },
-                                        colors = SwitchDefaults.colors(
-                                            checkedThumbColor = MaterialTheme.colorScheme.primary,
-                                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
-                                        ),
-                                        // İşlem devam ederken switch'i devre dışı bırak
-                                        enabled = !isProcessing
-                                    )
-                                }
-                            }
-                        )
-
-                        // Tema Ayarları
-                        SettingsSection(
-                            stringResource(R.string.dark_mode),
-                            icon = Icons.Default.DarkMode,
-                            trailingContent = {
-                                Switch(
-                                    checked = isDarkTheme,
-                                    onCheckedChange = {
-                                        ThemeManager.saveDarkThemeState(context, it)
-                                    },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = MaterialTheme.colorScheme.primary,
-                                        checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
-                                    )
-                                )
-                            }
-                        )
-
-                        // Dil Ayarları
-                        SettingsSection(
-                            title = stringResource(R.string.language),
-                            icon = Icons.Default.Language,
-                            onClick = {
-                                Log.d("SettingsScreen", "Language section clicked")
-                                showLanguageDialog = true
-                            },
-                            trailingContent = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        LanguageManager.getLanguageName(),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                    )
-
-                                    Spacer(modifier = Modifier.width(4.dp))
-
-                                    Icon(
-                                        Icons.Default.ArrowForward,
-                                        contentDescription = stringResource(R.string.language),
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-                        )
-
-                        SettingsSection(
-                            title = stringResource(R.string.settings_premium),
-                            icon = Icons.Default.Star,
-                            onClick = onNavigateToPremium,
-                            trailingContent = {
-                                Icon(
-                                    Icons.Default.ArrowForward,
-                                    contentDescription = stringResource(R.string.settings_premium),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        )
-
-                        // Hesap Yönetimi
-                        SettingsSection(
-                            stringResource(R.string.logout),
-                            icon = Icons.Default.Logout,
-                            onClick = { showLogoutDialog = true },
-                            trailingContent = {
-                                Icon(
-                                    Icons.Default.ArrowForward,
-                                    contentDescription = "Çıkış",
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        )
-
-                        // Kullanıcının daha fazla scroll yapılabildiğini görebilmesi için
-                        // ekstra boşluk eklenebilir
-                        Spacer(modifier = Modifier.height(60.dp))
-                    }
-                }
-            }
-        }
-    }
-
-    // İsim Düzenleme Dialog
-    if (showEditNameDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                if (!isUpdatingName) {
-                    showEditNameDialog = false
-                }
-            },
-            title = { Text(stringResource(id = R.string.edit_profile)) },
-            text = {
-                Column {
-                    OutlinedTextField(
-                        value = newUserName,
-                        onValueChange = { newUserName = it },
-                        label = { Text(stringResource(id = R.string.name)) },
-                        singleLine = true,
-                        enabled = !isUpdatingName,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    if (isUpdatingName) {
-                        LinearProgressIndicator(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 16.dp)
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        // Boş isim veya aynı isim kontrolü
-                        if (newUserName.isBlank()) {
-                            showToast(context, "İsim boş olamaz")
-                            return@Button
-                        }
-
-                        if (newUserName == userName) {
-                            showEditNameDialog = false
-                            return@Button
-                        }
-
-                        isUpdatingName = true
-
-                        // Firebase'de kullanıcı adını güncelle
-                        currentUser?.let { user ->
-                            val profileUpdates = UserProfileChangeRequest.Builder()
-                                .setDisplayName(newUserName)
-                                .build()
-
-                            user.updateProfile(profileUpdates)
-                                .addOnCompleteListener { task ->
-                                    if (task.isSuccessful) {
-                                        // İsim başarıyla güncellendi
-                                        userName = newUserName
-                                        showToast(context, "İsminiz başarıyla güncellendi")
-                                    } else {
-                                        // Hata durumu
-                                        showToast(context, "İsim güncellenirken bir hata oluştu: ${task.exception?.message}")
-                                        Log.e("SettingsScreen", "İsim güncelleme hatası", task.exception)
-                                    }
-                                    isUpdatingName = false
-                                    showEditNameDialog = false
-                                }
-                        } ?: run {
-                            // Kullanıcı oturum açmamışsa
-                            showToast(context, "Kullanıcı bilgilerine erişilemiyor")
-                            isUpdatingName = false
-                            showEditNameDialog = false
-                        }
-                    },
-                    enabled = !isUpdatingName && newUserName.isNotBlank()
-                ) {
-                    Text(stringResource(id = R.string.save))
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showEditNameDialog = false },
-                    enabled = !isUpdatingName
-                ) {
-                    Text(stringResource(id = R.string.cancel))
-                }
-            }
-        )
-    }
-
-    // Çıkış Dialog
-    if (showLogoutDialog) {
-        AlertDialog(
-            onDismissRequest = { showLogoutDialog = false },
-            title = { Text(stringResource(id = R.string.logout)) },
-            text = { Text(stringResource(id = R.string.logout_confirm)) },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        // Önce FirebaseAuth'tan çıkış yap
-                        AuthUtils.logout()
-                        // Dialog'u kapat
-                        showLogoutDialog = false
-                        // Ardından Login ekranına yönlendir
-                        onLogout()
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text(stringResource(R.string.yes_logout))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showLogoutDialog = false }) {
-                    Text(stringResource(id = R.string.cancel))
-                }
-            }
-        )
-    }
-}
-
-@Composable
-fun ProfileSection(
-    userName: String,
-    userEmail: String,
-    onEditProfile: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(4.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary,
-                            MaterialTheme.colorScheme.secondary
-                        )
-                    )
-                )
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Profil Fotoğrafı
-                Box(
+            item {
+                Row(
                     modifier = Modifier
-                        .size(100.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.2f))
-                        .border(
-                            width = 3.dp,
-                            color = MaterialTheme.colorScheme.surface,
-                            shape = CircleShape
-                        ),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = userName.firstOrNull()?.toString()?.uppercase() ?: "?",
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = MaterialTheme.colorScheme.surface,
-                        fontWeight = FontWeight.Bold
-                    )
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Deep)
+                    }
+                    Text("RemindUp Sweet Profile", fontWeight = FontWeight.ExtraBold, color = Deep)
+                    IconButton(onClick = onNavigateToPremium) {
+                        Icon(Icons.Filled.Star, contentDescription = null, tint = Orange)
+                    }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = userName,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.surface,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    text = userEmail,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
-                    onClick = onEditProfile,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.primary
-                    ),
-                    shape = RoundedCornerShape(12.dp)
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Profili Düzenle"
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.edit_profile))
+                    Box(
+                        modifier = Modifier
+                            .size(104.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFFD7C4)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(initials, color = Color.White, fontWeight = FontWeight.Black, fontSize = 30.sp)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(name, fontWeight = FontWeight.ExtraBold, fontSize = 30.sp, color = Deep)
+                    Text(email, color = Orange, fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            item {
+                Surface(
+                    color = Color(0xFFFFF5DF),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onNavigateToPremium
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(Color.White),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.Star, contentDescription = null, tint = Orange, modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(modifier = Modifier.size(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                if (isPremium) "Premium Member" else "Free Member",
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Deep
+                            )
+                            Text(
+                                if (isPremium) "Unlocking sweet possibilities" else "Upgrade to unlock sweet possibilities",
+                                color = Orange,
+                                fontSize = 12.sp
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(if (isPremium) Color(0xFF22C55E) else Color(0xFF9CA3AF))
+                        )
+                    }
+                }
+            }
+
+            item { Text("Account Settings", fontWeight = FontWeight.ExtraBold, color = Deep, fontSize = 20.sp) }
+
+            item {
+                SettingRow(
+                    icon = Icons.Filled.PersonOutline,
+                    title = "Personal Information",
+                    subtitle = "Update your bio and photo"
+                )
+            }
+            item {
+                SettingRow(
+                    icon = Icons.Filled.Notifications,
+                    title = "Notifications",
+                    subtitle = "Manage your sweet alerts"
+                )
+            }
+            item {
+                SettingRow(
+                    icon = Icons.Filled.Security,
+                    title = "Security",
+                    subtitle = "Password and privacy settings"
+                )
+            }
+            item {
+                SettingRow(
+                    icon = Icons.Filled.Palette,
+                    title = "Appearance",
+                    subtitle = "Theme and colors"
+                )
+            }
+
+            item {
+                Surface(
+                    color = Color(0xFFF8EDEE),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    TextButton(
+                        onClick = {
+                            AuthUtils.logout()
+                            onLogout()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp)
+                    ) {
+                        Text("Sign Out", color = Color(0xFFFF3B30), fontWeight = FontWeight.ExtraBold)
+                    }
                 }
             }
         }
@@ -556,56 +247,49 @@ fun ProfileSection(
 }
 
 @Composable
-fun SettingsSection(
+private fun SettingRow(
+    icon: ImageVector,
     title: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    trailingContent: @Composable () -> Unit = {},
-    onClick: () -> Unit = {}
+    subtitle: String
 ) {
-    Log.d("SettingsSection", "Rendering section: $title")
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable {
-                Log.d("SettingsSection", "Section clicked: $title")
-                onClick()
-            },
-        shape = RoundedCornerShape(16.dp)
+        color = Color(0xFFFAFAFA),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFFCECDD)),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = title,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
+                Icon(icon, contentDescription = null, tint = Orange, modifier = Modifier.size(18.dp))
+            }
+            Spacer(modifier = Modifier.size(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium
+                    color = Deep,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = subtitle,
+                    color = Color(0xFF8A90A8),
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-
-            trailingContent()
+            Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = Color(0xFFB7BDD2))
         }
     }
 }

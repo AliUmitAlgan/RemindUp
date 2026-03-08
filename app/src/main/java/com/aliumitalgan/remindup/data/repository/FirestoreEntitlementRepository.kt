@@ -8,8 +8,9 @@ import com.aliumitalgan.remindup.domain.repository.EntitlementRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class FirestoreEntitlementRepository(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
@@ -73,7 +74,7 @@ class FirestoreEntitlementRepository(
 
     override suspend fun getTodayAiUsage(): Int {
         val userId = auth.currentUser?.uid ?: return 0
-        val dailyId = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)
+        val dailyId = todayUsageId()
         val snapshot = firestore.collection("users")
             .document(userId)
             .collection("usage")
@@ -85,7 +86,7 @@ class FirestoreEntitlementRepository(
 
     override suspend fun incrementTodayAiUsage(): Boolean {
         val userId = auth.currentUser?.uid ?: return false
-        val dailyId = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)
+        val dailyId = todayUsageId()
         val usageRef = firestore.collection("users")
             .document(userId)
             .collection("usage")
@@ -104,5 +105,9 @@ class FirestoreEntitlementRepository(
         }.await()
 
         return true
+    }
+
+    private fun todayUsageId(): String {
+        return SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
     }
 }
