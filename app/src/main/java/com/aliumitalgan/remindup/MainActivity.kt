@@ -176,8 +176,7 @@ fun RemindUpApp() {
         Log.d(TAG, "Language changed in RemindUpApp: $currentLanguage")
     }
 
-    // Başlangıç ekranı olarak her zaman Login ekranını ayarla
-    val startDestination = Screen.Login.route
+    val startDestination = Screen.Splash.route
 
     AppNavigation(
         navController = navController,

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +47,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aliumitalgan.remindup.components.BottomNavigationBar
 import com.aliumitalgan.remindup.components.mainBottomNavItems
+import com.aliumitalgan.remindup.components.MoreActionsBottomSheet
+import com.aliumitalgan.remindup.components.SignOutConfirmationDialog
 import com.aliumitalgan.remindup.data.repository.FirestoreEntitlementRepository
 import com.aliumitalgan.remindup.domain.model.EntitlementStatus
 import com.aliumitalgan.remindup.domain.model.PlanType
@@ -64,7 +67,11 @@ fun SettingsScreenContent(
     onNavigateToGoals: () -> Unit = {},
     onNavigateToReminders: () -> Unit = {},
     onNavigateToProgress: () -> Unit = {},
-    onNavigateToPremium: () -> Unit = {}
+    onNavigateToPremium: () -> Unit = {},
+    onNavigateToSocial: () -> Unit = {},
+    onNavigateToPersonalInfo: () -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {},
+    onNavigateToSecurity: () -> Unit = {}
 ) {
     var currentRoute by remember { mutableStateOf("settings") }
     val navItems = mainBottomNavItems()
@@ -75,6 +82,8 @@ fun SettingsScreenContent(
     val initials = name.split(" ").mapNotNull { it.firstOrNull()?.uppercase() }.take(2).joinToString("").ifBlank { "SR" }
 
     var isPremium by remember { mutableStateOf(false) }
+    var showSignOutDialog by remember { mutableStateOf(false) }
+    var showMoreActions by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         runCatching {
             val entitlement = FirestoreEntitlementRepository().getEntitlement()
@@ -94,7 +103,8 @@ fun SettingsScreenContent(
                     when (route) {
                         "home" -> onNavigateToHome()
                         "goals" -> onNavigateToGoals()
-                        "progress" -> onNavigateToProgress()
+                        "social" -> onNavigateToSocial()
+                        "analytic" -> onNavigateToProgress()
                         "settings" -> Unit
                     }
                 },
@@ -121,8 +131,13 @@ fun SettingsScreenContent(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Deep)
                     }
                     Text("RemindUp Sweet Profile", fontWeight = FontWeight.ExtraBold, color = Deep)
-                    IconButton(onClick = onNavigateToPremium) {
-                        Icon(Icons.Filled.Star, contentDescription = null, tint = Orange)
+                    Row {
+                        IconButton(onClick = { showMoreActions = true }) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = null, tint = Deep)
+                        }
+                        IconButton(onClick = onNavigateToPremium) {
+                            Icon(Icons.Filled.Star, contentDescription = null, tint = Orange)
+                        }
                     }
                 }
             }
@@ -198,21 +213,24 @@ fun SettingsScreenContent(
                 SettingRow(
                     icon = Icons.Filled.PersonOutline,
                     title = "Personal Information",
-                    subtitle = "Update your bio and photo"
+                    subtitle = "Update your bio and photo",
+                    onClick = onNavigateToPersonalInfo
                 )
             }
             item {
                 SettingRow(
                     icon = Icons.Filled.Notifications,
                     title = "Notifications",
-                    subtitle = "Manage your sweet alerts"
+                    subtitle = "Manage your sweet alerts",
+                    onClick = onNavigateToNotifications
                 )
             }
             item {
                 SettingRow(
                     icon = Icons.Filled.Security,
                     title = "Security",
-                    subtitle = "Password and privacy settings"
+                    subtitle = "Password and privacy settings",
+                    onClick = onNavigateToSecurity
                 )
             }
             item {
@@ -230,10 +248,7 @@ fun SettingsScreenContent(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     TextButton(
-                        onClick = {
-                            AuthUtils.logout()
-                            onLogout()
-                        },
+                        onClick = { showSignOutDialog = true },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 6.dp)
@@ -244,18 +259,41 @@ fun SettingsScreenContent(
             }
         }
     }
+
+    if (showSignOutDialog) {
+        SignOutConfirmationDialog(
+            onDismiss = { showSignOutDialog = false },
+            onConfirmSignOut = {
+                AuthUtils.logout()
+                showSignOutDialog = false
+                onLogout()
+            }
+        )
+    }
+
+    if (showMoreActions) {
+        MoreActionsBottomSheet(
+            onDismiss = { showMoreActions = false },
+            onShareProfile = { showMoreActions = false },
+            onExportData = { showMoreActions = false },
+            onHelpCenter = { showMoreActions = false },
+            onReportProblem = { showMoreActions = false }
+        )
+    }
 }
 
 @Composable
 private fun SettingRow(
     icon: ImageVector,
     title: String,
-    subtitle: String
+    subtitle: String,
+    onClick: (() -> Unit)? = null
 ) {
     Surface(
         color = Color(0xFFFAFAFA),
         shape = RoundedCornerShape(16.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick ?: {}
     ) {
         Row(
             modifier = Modifier

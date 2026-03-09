@@ -63,12 +63,13 @@ fun ProgressScreenContent(
     onNavigateToHome: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onNavigateToGoals: () -> Unit = {},
-    onNavigateToReminders: () -> Unit = {}
+    onNavigateToReminders: () -> Unit = {},
+    onNavigateToSocial: () -> Unit = {}
 ) {
     var goals by remember { mutableStateOf<List<Goal>>(emptyList()) }
     var reminders by remember { mutableStateOf<List<Reminder>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    var currentRoute by remember { mutableStateOf("progress") }
+    var currentRoute by remember { mutableStateOf("analytic") }
     val navItems = mainBottomNavItems()
 
     LaunchedEffect(Unit) {
@@ -102,7 +103,8 @@ fun ProgressScreenContent(
                     when (route) {
                         "home" -> onNavigateToHome()
                         "goals" -> onNavigateToGoals()
-                        "progress" -> Unit
+                        "social" -> onNavigateToSocial()
+                        "analytic" -> Unit
                         "settings" -> onNavigateToSettings()
                     }
                 },

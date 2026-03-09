@@ -77,7 +77,7 @@ fun RemindersScreenContent(
         BottomNavItem(stringResource(R.string.home), Icons.Filled.Home, Icons.Outlined.Home, "home"),
         BottomNavItem(stringResource(R.string.goals), Icons.Filled.CheckCircle, Icons.Outlined.CheckCircle, "goals"),
         BottomNavItem(stringResource(R.string.reminders), Icons.Filled.Notifications, Icons.Outlined.Notifications, "reminders"),
-        BottomNavItem(stringResource(R.string.progress), Icons.Filled.ShowChart, Icons.Outlined.ShowChart, "progress"),
+        BottomNavItem(stringResource(R.string.progress), Icons.Filled.ShowChart, Icons.Outlined.ShowChart, "analytic"),
         BottomNavItem(stringResource(R.string.profile), Icons.Filled.Person, Icons.Outlined.Person, "profile")
     )
     var selectedNavItem by remember { mutableStateOf(bottomNavItems[2].route) }
@@ -293,7 +293,7 @@ fun RemindersScreenContent(
                         "home" -> onNavigateToHome()
                         "goals" -> onNavigateToGoals()
                         "reminders" -> {} // Zaten hatırlatıcı ekranındayız
-                        "progress" -> onNavigateToProgress()
+                        "analytic" -> onNavigateToProgress()
                         "profile" -> onNavigateToSettings()
                     }
                 }

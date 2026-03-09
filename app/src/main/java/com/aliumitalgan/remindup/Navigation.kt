@@ -2,43 +2,99 @@ package com.aliumitalgan.remindup
 
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.aliumitalgan.remindup.screens.ForgotPasswordScreen
 import com.aliumitalgan.remindup.screens.GoalsScreenContent
 import com.aliumitalgan.remindup.screens.HomeScreenContent
 import com.aliumitalgan.remindup.screens.LoginScreenContent
+import com.aliumitalgan.remindup.screens.OnboardingScreen
+import com.aliumitalgan.remindup.screens.PasswordResetConfirmationScreen
 import com.aliumitalgan.remindup.screens.ProgressScreenContent
 import com.aliumitalgan.remindup.screens.RegisterScreenContent
+import com.aliumitalgan.remindup.screens.EditCategoryScreen
+import com.aliumitalgan.remindup.screens.NotificationsScreen
+import com.aliumitalgan.remindup.screens.PersonalInformationScreen
+import com.aliumitalgan.remindup.screens.SecurityScreen
 import com.aliumitalgan.remindup.screens.SettingsScreenContent
+import com.aliumitalgan.remindup.screens.SocialScreen
+import com.aliumitalgan.remindup.screens.SplashScreen
+import com.aliumitalgan.remindup.screens.SweetTaskDetailScreen
 import com.aliumitalgan.remindup.ui.assistant.AiAssistantScreen
 import com.aliumitalgan.remindup.ui.premium.PremiumScreen
-import com.aliumitalgan.remindup.ui.reminders.RemindersScreen
+import com.aliumitalgan.remindup.utils.OnboardingPreferences
+import androidx.compose.ui.platform.LocalContext
 
 sealed class Screen(val route: String) {
+    object Splash : Screen("splash")
+    object Onboarding : Screen("onboarding")
     object Login : Screen("login")
     object Register : Screen("register")
+    object ForgotPassword : Screen("forgotPassword")
+    object PasswordResetConfirmation : Screen("passwordResetConfirmation")
     object Home : Screen("home")
     object Goals : Screen("goals")
-    object Progress : Screen("progress")
+    object Analytic : Screen("analytic")
+    object SweetTaskDetail : Screen("sweetTaskDetail/{goalId}") {
+        fun createRoute(goalId: String): String = "sweetTaskDetail/$goalId"
+    }
     object Reminders : Screen("reminders")
     object Settings : Screen("settings")
+    object Social : Screen("social")
     object Assistant : Screen("assistant")
     object Premium : Screen("premium")
+    object PersonalInfo : Screen("personalInfo")
+    object Notifications : Screen("notifications")
+    object Security : Screen("security")
+    object EditCategory : Screen("editCategory/{categoryId}") {
+        fun createRoute(categoryId: String): String = "editCategory/$categoryId"
+    }
+    object NewCategory : Screen("newCategory")
 }
 
 @Composable
 fun AppNavigation(
     navController: NavHostController = rememberNavController(),
-    startDestination: String = Screen.Login.route
+    startDestination: String = Screen.Splash.route
 ) {
+    val context = LocalContext.current
+
     NavHost(
         navController = navController,
         startDestination = startDestination
     ) {
+        composable(Screen.Splash.route) {
+            SplashScreen(
+                onNavigateToOnboarding = {
+                    navController.navigate(Screen.Onboarding.route) {
+                        popUpTo(Screen.Splash.route) { inclusive = true }
+                    }
+                },
+                onNavigateToLogin = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Splash.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Screen.Onboarding.route) {
+            OnboardingScreen(
+                onComplete = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Onboarding.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
         composable(Screen.Login.route) {
             LoginScreenContent(
                 onNavigateToRegister = { navController.navigate(Screen.Register.route) },
+                onNavigateToForgotPassword = { navController.navigate(Screen.ForgotPassword.route) },
                 onLoginSuccess = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
@@ -58,43 +114,96 @@ fun AppNavigation(
             )
         }
 
+        composable(Screen.ForgotPassword.route) {
+            ForgotPasswordScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onResetEmailSent = {
+                    navController.navigate(Screen.PasswordResetConfirmation.route) {
+                        popUpTo(Screen.ForgotPassword.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Screen.PasswordResetConfirmation.route) {
+            PasswordResetConfirmationScreen(
+                onBackToLogin = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.PasswordResetConfirmation.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
         composable(Screen.Home.route) {
             HomeScreenContent(
                 onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
                 onNavigateToReminders = { navController.navigate(Screen.Reminders.route) },
-                onNavigateToProgress = { navController.navigate(Screen.Progress.route) },
+                onNavigateToProgress = { navController.navigate(Screen.Analytic.route) },
                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
-                onNavigateToAssistant = { navController.navigate(Screen.Assistant.route) }
+                onNavigateToAssistant = { navController.navigate(Screen.Assistant.route) },
+                onNavigateToSocial = { navController.navigate(Screen.Social.route) }
             )
         }
 
         composable(Screen.Goals.route) {
             GoalsScreenContent(
-                onNavigateToProgress = { navController.navigate(Screen.Progress.route) },
+                onNavigateToProgress = { navController.navigate(Screen.Analytic.route) },
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToHome = { navController.navigate(Screen.Home.route) },
                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
-                onNavigateToReminders = { navController.navigate(Screen.Reminders.route) }
+                onNavigateToReminders = { navController.navigate(Screen.Reminders.route) },
+                onNavigateToSocial = { navController.navigate(Screen.Social.route) },
+                onNavigateToSweetTaskDetail = { goalId ->
+                    navController.navigate(Screen.SweetTaskDetail.createRoute(goalId))
+                }
             )
         }
 
-        composable(Screen.Progress.route) {
+        composable(Screen.Analytic.route) {
             ProgressScreenContent(
                 onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
                 onNavigateToHome = { navController.navigate(Screen.Home.route) },
                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
                 onNavigateToReminders = { navController.navigate(Screen.Reminders.route) },
+                onNavigateToSocial = { navController.navigate(Screen.Social.route) },
                 onNavigateBack = { navController.popBackStack() }
             )
         }
 
+        composable(
+            route = Screen.SweetTaskDetail.route,
+            arguments = listOf(navArgument("goalId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val goalId = backStackEntry.arguments?.getString("goalId").orEmpty()
+            SweetTaskDetailScreen(
+                goalId = goalId,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToHome = { navController.navigate(Screen.Home.route) },
+                onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
+                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
+                onNavigateToProgress = { navController.navigate(Screen.Analytic.route) },
+                onNavigateToSocial = { navController.navigate(Screen.Social.route) }
+            )
+        }
+
         composable(Screen.Reminders.route) {
-            RemindersScreen(
+            com.aliumitalgan.remindup.ui.reminders.RemindersScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToHome = { navController.navigate(Screen.Home.route) },
                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
                 onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
-                onNavigateToProgress = { navController.navigate(Screen.Progress.route) }
+                onNavigateToProgress = { navController.navigate(Screen.Analytic.route) }
+            )
+        }
+
+        composable(Screen.Social.route) {
+            SocialScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToHome = { navController.navigate(Screen.Home.route) },
+                onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
+                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
+                onNavigateToProgress = { navController.navigate(Screen.Analytic.route) }
             )
         }
 
@@ -109,8 +218,59 @@ fun AppNavigation(
                 onNavigateToHome = { navController.navigate(Screen.Home.route) },
                 onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
                 onNavigateToReminders = { navController.navigate(Screen.Reminders.route) },
-                onNavigateToProgress = { navController.navigate(Screen.Progress.route) },
-                onNavigateToPremium = { navController.navigate(Screen.Premium.route) }
+                onNavigateToProgress = { navController.navigate(Screen.Analytic.route) },
+                onNavigateToPremium = { navController.navigate(Screen.Premium.route) },
+                onNavigateToSocial = { navController.navigate(Screen.Social.route) },
+                onNavigateToPersonalInfo = { navController.navigate(Screen.PersonalInfo.route) },
+                onNavigateToNotifications = { navController.navigate(Screen.Notifications.route) },
+                onNavigateToSecurity = { navController.navigate(Screen.Security.route) }
+            )
+        }
+
+        composable(Screen.PersonalInfo.route) {
+            PersonalInformationScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onSave = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.Notifications.route) {
+            NotificationsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToHome = { navController.navigate(Screen.Home.route) },
+                onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
+                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
+                onNavigateToSocial = { navController.navigate(Screen.Social.route) }
+            )
+        }
+
+        composable(Screen.Security.route) {
+            SecurityScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onLogoutAll = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },
+                onNavigateToHome = { navController.navigate(Screen.Home.route) },
+                onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
+                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
+                onNavigateToSocial = { navController.navigate(Screen.Social.route) }
+            )
+        }
+
+        composable(
+            route = Screen.EditCategory.route,
+            arguments = listOf(navArgument("categoryId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val categoryId = backStackEntry.arguments?.getString("categoryId").orEmpty()
+            EditCategoryScreen(
+                categoryId = categoryId.ifEmpty { null },
+                onNavigateBack = { navController.popBackStack() },
+                onSave = { navController.popBackStack() },
+                onNavigateToHome = { navController.navigate(Screen.Home.route) },
+                onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
+                onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
             )
         }
 

@@ -30,7 +30,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,13 +45,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aliumitalgan.remindup.components.BottomNavigationBar
 import com.aliumitalgan.remindup.components.mainBottomNavItems
-import com.aliumitalgan.remindup.models.Goal
+import com.aliumitalgan.remindup.core.di.LocalAppContainer
+import com.aliumitalgan.remindup.core.di.RemindUpViewModelFactory
+import com.aliumitalgan.remindup.domain.model.Goal
 import com.aliumitalgan.remindup.models.Reminder
-import com.aliumitalgan.remindup.utils.ProgressUtils
-import com.aliumitalgan.remindup.utils.ReminderUtils
-import com.google.firebase.auth.FirebaseAuth
+import com.aliumitalgan.remindup.presentation.home.HomeViewModel
 
 private val SweetBackground = Color(0xFFF6F1EE)
 private val DailyGoalCard = Color(0xFFE8DDF1)
@@ -67,28 +68,21 @@ fun HomeScreenContent(
     onNavigateToReminders: () -> Unit,
     onNavigateToProgress: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToAssistant: () -> Unit = {}
+    onNavigateToAssistant: () -> Unit = {},
+    onNavigateToSocial: () -> Unit = {},
+    viewModel: HomeViewModel = viewModel(
+        factory = RemindUpViewModelFactory(LocalAppContainer.current)
+    )
 ) {
-    var goals by remember { mutableStateOf<List<Goal>>(emptyList()) }
-    var reminders by remember { mutableStateOf<List<Reminder>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
+    val uiState by viewModel.uiState.collectAsState()
+    val goals = uiState.goals.map { it.second }
+    val reminders = uiState.reminders.map { it.reminder }
+    val isLoading = uiState.isLoading
 
-    val user = FirebaseAuth.getInstance().currentUser
-    val userName = user?.displayName?.substringBefore(" ")?.ifBlank { null }
-        ?: user?.email?.substringBefore("@")
-        ?: "Maya"
+    val userName = uiState.userName
 
     val navItems = mainBottomNavItems()
     var currentRoute by remember { mutableStateOf("home") }
-
-    LaunchedEffect(Unit) {
-        isLoading = true
-        val goalsResult = ProgressUtils.getUserGoals()
-        val remindersResult = ReminderUtils.getUserReminders()
-        goals = goalsResult.getOrDefault(emptyList()).map { it.second }
-        reminders = remindersResult.getOrDefault(emptyList()).map { it.second }
-        isLoading = false
-    }
 
     val activeReminders = reminders.filter { it.isEnabled }
     val completedGoals = goals.count { it.progress >= 100 }
@@ -108,7 +102,8 @@ fun HomeScreenContent(
                     when (route) {
                         "home" -> Unit
                         "goals" -> onNavigateToGoals()
-                        "progress" -> onNavigateToProgress()
+                        "social" -> onNavigateToSocial()
+                        "analytic" -> onNavigateToProgress()
                         "settings" -> onNavigateToSettings()
                     }
                 },

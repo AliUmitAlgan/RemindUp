@@ -38,11 +38,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,14 +52,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.aliumitalgan.remindup.components.EmptyGoalsView
+import com.aliumitalgan.remindup.components.NoGoalsFoundView
 import com.aliumitalgan.remindup.components.BottomNavigationBar
 import com.aliumitalgan.remindup.components.mainBottomNavItems
-import com.aliumitalgan.remindup.models.Goal
-import com.aliumitalgan.remindup.utils.ProgressUtils
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
+import com.aliumitalgan.remindup.core.di.LocalAppContainer
+import com.aliumitalgan.remindup.core.di.RemindUpViewModelFactory
+import com.aliumitalgan.remindup.domain.model.Goal
+import com.aliumitalgan.remindup.presentation.goals.GoalsViewModel
 import java.util.Locale
 
 private val GoalsBackground = Color(0xFFF8F3EF)
@@ -75,30 +75,24 @@ fun GoalsScreenContent(
     onNavigateToHome: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onNavigateToReminders: () -> Unit = {},
-    onNavigateToProgress: () -> Unit = {}
+    onNavigateToProgress: () -> Unit = {},
+    onNavigateToSocial: () -> Unit = {},
+    onNavigateToSweetTaskDetail: (String) -> Unit = {},
+    viewModel: GoalsViewModel = viewModel(
+        factory = RemindUpViewModelFactory(LocalAppContainer.current)
+    )
 ) {
-    var goals by remember { mutableStateOf<List<Pair<String, Goal>>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var selectedFilter by remember { mutableStateOf("All Goals") }
+    val uiState by viewModel.uiState.collectAsState()
+    val goals = uiState.goals
+    val isLoading = uiState.isLoading
+    val selectedFilter = uiState.selectedFilter
     var showAddDialog by remember { mutableStateOf(false) }
     var titleInput by remember { mutableStateOf("") }
     var descInput by remember { mutableStateOf("") }
     var categoryInput by remember { mutableStateOf("Health") }
     var isSaving by remember { mutableStateOf(false) }
     var currentRoute by remember { mutableStateOf("goals") }
-    val coroutineScope = rememberCoroutineScope()
     val navItems = mainBottomNavItems()
-
-    suspend fun refreshGoals() {
-        isLoading = true
-        val result = ProgressUtils.getUserGoals()
-        goals = result.getOrDefault(emptyList())
-        isLoading = false
-    }
-
-    LaunchedEffect(Unit) {
-        refreshGoals()
-    }
 
     val filteredGoals = goals.filter { (_, goal) ->
         when (selectedFilter) {
@@ -120,7 +114,8 @@ fun GoalsScreenContent(
                     when (route) {
                         "home" -> onNavigateToHome()
                         "goals" -> Unit
-                        "progress" -> onNavigateToProgress()
+                        "social" -> onNavigateToSocial()
+                        "analytic" -> onNavigateToProgress()
                         "settings" -> onNavigateToSettings()
                     }
                 },
@@ -182,7 +177,7 @@ fun GoalsScreenContent(
                         listOf("All Goals", "Health", "Learning", "Work").forEach { filter ->
                             FilterChip(
                                 selected = selectedFilter == filter,
-                                onClick = { selectedFilter = filter },
+                                onClick = { viewModel.setFilter(filter) },
                                 label = { Text(filter, fontSize = 12.sp) },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = when (filter) {
@@ -198,31 +193,41 @@ fun GoalsScreenContent(
                     }
                 }
 
-                item {
-                    Text(
-                        text = "My Sweet Progress",
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 28.sp,
-                        color = Color(0xFF1A2140)
-                    )
-                    Text(
-                        text = "You have ${filteredGoals.size} active goals today!",
-                        color = Color(0xFF7D86A0),
-                        fontSize = 13.sp
-                    )
+                if (!goals.isEmpty()) {
+                    item {
+                        Text(
+                            text = "My Sweet Progress",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 28.sp,
+                            color = Color(0xFF1A2140)
+                        )
+                        Text(
+                            text = "You have ${filteredGoals.size} active goals today!",
+                            color = Color(0xFF7D86A0),
+                            fontSize = 13.sp
+                        )
+                    }
                 }
 
+                if (goals.isEmpty()) {
+                    item {
+                        EmptyGoalsView(onCreateGoal = { showAddDialog = true })
+                    }
+                } else if (filteredGoals.isEmpty()) {
+                    item {
+                        NoGoalsFoundView(onClearFilters = { viewModel.setFilter("All Goals") })
+                    }
+                } else {
                 items(filteredGoals) { (goalId, goal) ->
                     SweetGoalCard(
                         goal = goal,
+                        onClick = { onNavigateToSweetTaskDetail(goalId) },
                         onAddLog = {
                             val nextProgress = (goal.progress + 10).coerceAtMost(100)
-                            coroutineScope.launch {
-                                ProgressUtils.updateGoalProgress(goalId, nextProgress)
-                                refreshGoals()
-                            }
+                            viewModel.updateProgress(goalId, nextProgress)
                         }
                     )
+                }
                 }
 
                 item {
@@ -297,19 +302,21 @@ fun GoalsScreenContent(
                     enabled = !isSaving && titleInput.isNotBlank(),
                     onClick = {
                         isSaving = true
-                        coroutineScope.launch {
-                            addGoal(
-                                title = titleInput.trim(),
-                                description = descInput.trim(),
-                                categoryName = categoryInput.trim().ifBlank { "Health" }
-                            )
-                            titleInput = ""
-                            descInput = ""
-                            categoryInput = "Health"
-                            showAddDialog = false
-                            isSaving = false
-                            refreshGoals()
+                        val category = when (categoryInput.trim().lowercase(Locale.getDefault())) {
+                            "learning" -> 2
+                            "work" -> 3
+                            else -> 1
                         }
+                        viewModel.addGoal(
+                            title = titleInput.trim(),
+                            description = descInput.trim(),
+                            category = category
+                        )
+                        titleInput = ""
+                        descInput = ""
+                        categoryInput = "Health"
+                        showAddDialog = false
+                        isSaving = false
                     }
                 ) {
                     Text(if (isSaving) "Saving..." else "Save")
@@ -325,6 +332,7 @@ fun GoalsScreenContent(
 @Composable
 private fun SweetGoalCard(
     goal: Goal,
+    onClick: () -> Unit,
     onAddLog: () -> Unit
 ) {
     val accent = when (mapCategory(goal.category)) {
@@ -343,7 +351,8 @@ private fun SweetGoalCard(
     Surface(
         color = accent.copy(alpha = 0.18f),
         shape = RoundedCornerShape(16.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -415,30 +424,4 @@ private fun mapCategory(category: Int): String {
         3 -> "Work"
         else -> "Health"
     }
-}
-
-private suspend fun addGoal(
-    title: String,
-    description: String,
-    categoryName: String
-) {
-    val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
-    val category = when (categoryName.lowercase(Locale.getDefault())) {
-        "learning" -> 2
-        "work" -> 3
-        else -> 1
-    }
-
-    val goal = Goal(
-        title = title,
-        description = description,
-        progress = 0,
-        category = category,
-        userId = uid
-    )
-
-    FirebaseFirestore.getInstance()
-        .collection("goals")
-        .add(goal)
-        .await()
 }

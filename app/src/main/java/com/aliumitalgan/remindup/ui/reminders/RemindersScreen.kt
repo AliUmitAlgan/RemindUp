@@ -241,7 +241,7 @@ fun RemindersScreen(
                     when (route) {
                         "home" -> onNavigateToHome()
                         "goals" -> onNavigateToGoals()
-                        "progress" -> onNavigateToProgress()
+                        "analytic" -> onNavigateToProgress()
                         "settings" -> onNavigateToSettings()
                     }
                 },

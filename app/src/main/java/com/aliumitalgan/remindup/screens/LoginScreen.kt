@@ -56,6 +56,7 @@ import android.util.Log
 @Composable
 fun LoginScreenContent(
     onNavigateToRegister: () -> Unit,
+    onNavigateToForgotPassword: () -> Unit = {},
     onLoginSuccess: () -> Unit
 ) {
     val context = LocalContext.current
@@ -68,8 +69,6 @@ fun LoginScreenContent(
     var passwordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showError by remember { mutableStateOf(false) }
-    var showForgotPasswordDialog by remember { mutableStateOf(false) }
-    var forgotPasswordEmail by remember { mutableStateOf("") }
 
     // Focus requesters for input fields
     val emailFocusRequester = remember { FocusRequester() }
@@ -472,7 +471,7 @@ fun LoginScreenContent(
                             contentAlignment = Alignment.CenterEnd
                         ) {
                             TextButton(
-                                onClick = { showForgotPasswordDialog = true }
+                                onClick = { onNavigateToForgotPassword() }
                             ) {
                                 Text(
                                     text = stringResource(R.string.forgot_password),
@@ -697,77 +696,6 @@ fun LoginScreenContent(
                 }
             }
         }
-    }
-
-    // Forgot Password Dialog
-    if (showForgotPasswordDialog) {
-        AlertDialog(
-            onDismissRequest = { showForgotPasswordDialog = false },
-            title = {
-                Text(
-                    "Şifre Sıfırlama",
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Column {
-                    Text("Şifrenizi sıfırlamak için e-posta adresinizi girin.")
-                    Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedTextField(
-                        value = forgotPasswordEmail,
-                        onValueChange = { forgotPasswordEmail = it },
-                        label = { Text("E-posta") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Email,
-                            imeAction = ImeAction.Done
-                        ),
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.Email,
-                                contentDescription = "Email",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f),
-                            focusedLabelColor = MaterialTheme.colorScheme.primary
-                        )
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (forgotPasswordEmail.isNotEmpty() && forgotPasswordEmail.contains("@")) {
-                            // Firebase password reset logic
-                            Firebase.auth.sendPasswordResetEmail(forgotPasswordEmail)
-                                .addOnCompleteListener { task ->
-                                    if (task.isSuccessful) {
-                                        showToast(context, "Şifre sıfırlama bağlantısı e-postanıza gönderildi.")
-                                    } else {
-                                        showToast(context, "Şifre sıfırlama başarısız: ${task.exception?.message}")
-                                    }
-                                }
-                            showForgotPasswordDialog = false
-                        } else {
-                            showToast(context, "Lütfen geçerli bir e-posta adresi girin.")
-                        }
-                    },
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Gönder")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showForgotPasswordDialog = false }) {
-                    Text("İptal")
-                }
-            },
-            shape = RoundedCornerShape(24.dp)
-        )
     }
 }
 
