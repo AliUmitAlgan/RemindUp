@@ -31,9 +31,15 @@ class SecurityViewModel : ViewModel() {
         refreshSecurityPreferences()
     }
 
-    fun refreshSecurityPreferences() {
+    fun refreshSecurityPreferences(showLoading: Boolean = true) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            _uiState.update {
+                if (showLoading) {
+                    it.copy(isLoading = true, errorMessage = null)
+                } else {
+                    it.copy(errorMessage = null)
+                }
+            }
             UserPreferenceUtils.getSecurityPreferences()
                 .onSuccess { prefs ->
                     _uiState.update {
@@ -109,4 +115,3 @@ class SecurityViewModel : ViewModel() {
         _uiState.update { it.copy(errorMessage = null) }
     }
 }
-

@@ -42,6 +42,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -86,6 +87,7 @@ fun SecurityScreen(
     val activity = remember(context) { context.findFragmentActivity() }
     val biometricAuthManager = remember(context) { BiometricAuthManager(context) }
     val scope = rememberCoroutineScope()
+    val skipFirstResumeRefresh = remember { mutableStateOf(true) }
 
     fun refreshBiometricCapability() {
         val capability = biometricAuthManager.getCapability()
@@ -103,7 +105,11 @@ fun SecurityScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 refreshBiometricCapability()
-                viewModel.refreshSecurityPreferences()
+                if (skipFirstResumeRefresh.value) {
+                    skipFirstResumeRefresh.value = false
+                } else {
+                    viewModel.refreshSecurityPreferences(showLoading = false)
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

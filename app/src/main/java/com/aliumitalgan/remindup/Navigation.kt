@@ -3,7 +3,9 @@ package com.aliumitalgan.remindup
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -73,7 +75,9 @@ fun AppNavigation(
     modifier: Modifier = Modifier
 ) {
     NavHost(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .padding(top = 8.dp),
         navController = navController,
         startDestination = startDestination
     ) {

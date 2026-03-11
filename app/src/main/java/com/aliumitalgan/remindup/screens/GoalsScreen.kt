@@ -1,12 +1,10 @@
 package com.aliumitalgan.remindup.screens
-
-import android.app.DatePickerDialog
-import android.app.TimePickerDialog
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,12 +18,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
@@ -56,8 +56,10 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -67,7 +69,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -89,7 +90,7 @@ import com.aliumitalgan.remindup.ui.theme.appTextSecondary
 import com.aliumitalgan.remindup.ui.theme.themedColor
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.ZoneId
+import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -116,6 +117,27 @@ private val GoalsSearchField: Color
     get() = themedColor(Color(0xFFF3F4F6), Color(0xFF222C3B))
 private val GoalsIconButton: Color
     get() = themedColor(Color(0xFFF2F4F7), Color(0xFF232F40))
+private val GoalTimeInputFormatters = listOf(
+    DateTimeFormatter.ofPattern("HH:mm"),
+    DateTimeFormatter.ofPattern("hh:mm a")
+)
+private val GoalTimeOutputFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("hh:mm a")
+private val weekDayLabels = listOf("P", "S", "C", "P", "C", "C", "P")
+private val timeHourOptions = (1..12).toList()
+private val timeMinuteOptions = (0..59).toList()
+private val GoalsPopupPrimary: Color
+    get() = themedColor(Color(0xFFF68B5C), Color(0xFFFF9D6E))
+private val GoalsPopupOnPrimary: Color
+    get() = themedColor(Color.White, Color(0xFF2A1A12))
+private val GoalsPopupSecondarySurface: Color
+    get() = themedColor(Color(0xFFE8ECF4), Color(0xFF314158))
+private val GoalsPopupChipSurface: Color
+    get() = themedColor(Color(0xFFEFF2F7), Color(0xFF253143))
+private val GoalsPopupChipSelectedSurface: Color
+    get() = themedColor(Color(0xFFFFEEE5), Color(0xFF4A2B1D))
+private val GoalsPopupMutedText: Color
+    get() = themedColor(Color(0xFF64748B), Color(0xFFAEB6C5))
 
 private data class GoalFilterOption(
     val key: String,
@@ -123,6 +145,11 @@ private data class GoalFilterOption(
     val icon: ImageVector,
     val accent: Color
 )
+
+private enum class TimeSelectorTarget {
+    Hour,
+    Minute
+}
 
 private val goalFilterOptions = listOf(
     GoalFilterOption("All Goals", "All", Icons.Filled.AutoAwesome, Color(0xFF64748B)),
@@ -162,21 +189,28 @@ fun GoalsScreenContent(
     var isSearchVisible by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var pendingDeleteGoalId by remember { mutableStateOf<String?>(null) }
-    val context = LocalContext.current
+    var showDatePickerPopup by remember { mutableStateOf(false) }
+    var showTimePickerPopup by remember { mutableStateOf(false) }
     val dateLabelFormatter = remember { DateTimeFormatter.ofPattern("dd MMM yyyy") }
     val displayTimeFormatter = remember { DateTimeFormatter.ofPattern("hh:mm a") }
     val storageTimeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
 
     val navItems = mainBottomNavItems()
-    val filteredGoals = goals.filter { (_, goal) ->
-        selectedFilter == "All Goals" || mapCategory(goal.category) == selectedFilter
-    }
-    val visibleGoals = filteredGoals.filter { (_, goal) ->
-        val query = searchQuery.trim()
-        query.isBlank() ||
-            goal.title.contains(query, ignoreCase = true) ||
-            goal.description.contains(query, ignoreCase = true) ||
-            mapCategory(goal.category).contains(query, ignoreCase = true)
+    val visibleGoals by remember(goals, selectedFilter, searchQuery) {
+        derivedStateOf {
+            val query = searchQuery.trim()
+            goals.asSequence()
+                .filter { (_, goal) ->
+                    selectedFilter == "All Goals" || mapCategory(goal.category) == selectedFilter
+                }
+                .filter { (_, goal) ->
+                    query.isBlank() ||
+                        goal.title.contains(query, ignoreCase = true) ||
+                        goal.description.contains(query, ignoreCase = true) ||
+                        mapCategory(goal.category).contains(query, ignoreCase = true)
+                }
+                .toList()
+        }
     }
     val headerTitle = if (selectedFilter == "All Goals") "All Goals" else "$selectedFilter Goals"
     val addGoalLabel = if (selectedFilter == "All Goals") "Add New Goal" else "Add $selectedFilter Goal"
@@ -356,7 +390,11 @@ fun GoalsScreenContent(
                         )
                     }
                 } else {
-                    items(visibleGoals, key = { it.first }) { (goalId, goal) ->
+                    items(
+                        items = visibleGoals,
+                        key = { it.first },
+                        contentType = { "goal" }
+                    ) { (goalId, goal) ->
                         GoalOverviewCard(
                             goal = goal,
                             onClick = { onNavigateToSweetTaskDetail(goalId) },
@@ -425,37 +463,14 @@ fun GoalsScreenContent(
             isSaving = isSaving,
             onDismiss = {
                 showAddDialog = false
+                showDatePickerPopup = false
+                showTimePickerPopup = false
                 isSaving = false
             },
             onTitleChange = { titleInput = it },
             onCategorySelected = { categoryInput = it },
-            onDateClick = {
-                DatePickerDialog(
-                    context,
-                    { _, year, month, dayOfMonth ->
-                        selectedDate = LocalDate.of(year, month + 1, dayOfMonth)
-                    },
-                    selectedDate.year,
-                    selectedDate.monthValue - 1,
-                    selectedDate.dayOfMonth
-                ).apply {
-                    datePicker.minDate = LocalDate.now()
-                        .atStartOfDay(ZoneId.systemDefault())
-                        .toInstant()
-                        .toEpochMilli()
-                }.show()
-            },
-            onTimeClick = {
-                TimePickerDialog(
-                    context,
-                    { _, hourOfDay, minute ->
-                        selectedTime = LocalTime.of(hourOfDay, minute)
-                    },
-                    selectedTime.hour,
-                    selectedTime.minute,
-                    false
-                ).show()
-            },
+            onDateClick = { showDatePickerPopup = true },
+            onTimeClick = { showTimePickerPopup = true },
             onSmartReminderToggle = { smartRemindersEnabled = it },
             onCreateGoal = {
                 isSaving = true
@@ -479,8 +494,32 @@ fun GoalsScreenContent(
                 selectedDate = LocalDate.now()
                 selectedTime = LocalTime.of(8, 0)
                 smartRemindersEnabled = true
+                showDatePickerPopup = false
+                showTimePickerPopup = false
                 showAddDialog = false
                 isSaving = false
+            }
+        )
+    }
+
+    if (showDatePickerPopup) {
+        SweetDatePickerDialog(
+            initialDate = selectedDate,
+            onDismiss = { showDatePickerPopup = false },
+            onConfirm = { pickedDate ->
+                selectedDate = pickedDate
+                showDatePickerPopup = false
+            }
+        )
+    }
+
+    if (showTimePickerPopup) {
+        SweetTimePickerDialog(
+            initialTime = selectedTime,
+            onDismiss = { showTimePickerPopup = false },
+            onConfirm = { pickedTime ->
+                selectedTime = pickedTime
+                showTimePickerPopup = false
             }
         )
     }
@@ -528,7 +567,7 @@ private fun GoalFilterChip(
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(999.dp),
-        color = if (selected) AccentOrange else GoalsChipContainer,
+        color = if (selected) option.accent else GoalsChipContainer,
         modifier = Modifier.heightIn(min = 44.dp)
     ) {
         Row(
@@ -597,7 +636,11 @@ private fun GoalOverviewCard(
     onDeleteClick: () -> Unit
 ) {
     var isMenuExpanded by remember { mutableStateOf(false) }
-    val accent = when (mapCategory(goal.category)) {
+    val category = remember(goal.category) { mapCategory(goal.category) }
+    val subtitle = remember(category, goal.reminderTime) { subtitleFor(category, goal.reminderTime) }
+    val progressLabel = remember(category) { progressLabelFor(category) }
+    val progressValue = remember(category, goal.progress) { progressValueFor(category, goal.progress) }
+    val accent = when (category) {
         "Health" -> AccentOrange
         "Learning" -> AccentPurple
         "Work" -> AccentMint
@@ -605,7 +648,7 @@ private fun GoalOverviewCard(
         "Hobby" -> Color(0xFF3B82F6)
         else -> Color(0xFF9BA3B8)
     }
-    val icon = when (mapCategory(goal.category)) {
+    val icon = when (category) {
         "Health" -> Icons.Filled.LocalFlorist
         "Learning" -> Icons.Filled.School
         "Work" -> Icons.Filled.Work
@@ -618,7 +661,7 @@ private fun GoalOverviewCard(
         color = GoalsCardSurface,
         shape = RoundedCornerShape(24.dp),
         tonalElevation = 1.dp,
-        shadowElevation = 3.dp,
+        shadowElevation = 1.dp,
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick
     ) {
@@ -653,7 +696,7 @@ private fun GoalOverviewCard(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = subtitleFor(goal),
+                        text = subtitle,
                         color = appTextSecondary,
                         fontWeight = FontWeight.Medium,
                         fontSize = 14.sp,
@@ -699,14 +742,14 @@ private fun GoalOverviewCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = progressLabelFor(goal),
+                    text = progressLabel,
                     color = themedColor(Color(0xFF6B7280), Color(0xFFAEB6C5)),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
                 )
                 Text(
-                    text = progressValueFor(goal),
+                    text = progressValue,
                     color = themedColor(Color(0xFF64748B), Color(0xFFD5DCE7)),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
@@ -727,6 +770,483 @@ private fun GoalOverviewCard(
                         .background(accent)
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun SweetDatePickerDialog(
+    initialDate: LocalDate,
+    onDismiss: () -> Unit,
+    onConfirm: (LocalDate) -> Unit
+) {
+    val today = remember { LocalDate.now() }
+    var selectedDate by remember(initialDate, today) {
+        mutableStateOf(if (initialDate.isBefore(today)) today else initialDate)
+    }
+    var displayedMonth by remember(initialDate, today) {
+        mutableStateOf(YearMonth.from(if (initialDate.isBefore(today)) today else initialDate))
+    }
+    val monthCells = remember(displayedMonth) { buildMonthCells(displayedMonth) }
+    val monthLabelFormatter = remember {
+        DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())
+    }
+    val dialogContainer = themedColor(Color.White, Color(0xFF161D27))
+    val heading = themedColor(Color(0xFF2B3342), Color(0xFFE5E7EB))
+    val panelColor = themedColor(Color(0xFFF9FAFB), Color(0xFF222C3B))
+    val weekdayColor = themedColor(Color(0xFF64748B), Color(0xFF9AA6B2))
+    val closeBg = themedColor(Color(0xFFF3F4F6), Color(0xFF2A3548))
+    val closeTint = themedColor(Color(0xFFB9C0CA), Color(0xFF94A3B8))
+    val monthTitle = displayedMonth.atDay(1)
+        .format(monthLabelFormatter)
+        .replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
+        }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(34.dp),
+            color = dialogContainer,
+            shadowElevation = 14.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Select Date",
+                        color = heading,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 22.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(closeBg)
+                            .clickable(onClick = onDismiss),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "Close date picker",
+                            tint = closeTint,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                Surface(
+                    color = panelColor,
+                    shape = RoundedCornerShape(22.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            HeaderCircleButton(
+                                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Previous month",
+                                onClick = { displayedMonth = displayedMonth.minusMonths(1) }
+                            )
+                            Text(
+                                text = monthTitle,
+                                color = heading,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.weight(1f)
+                            )
+                            HeaderCircleButton(
+                                icon = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = "Next month",
+                                onClick = { displayedMonth = displayedMonth.plusMonths(1) }
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            weekDayLabels.forEach { label ->
+                                Box(
+                                    modifier = Modifier.weight(1f),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        color = weekdayColor,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            monthCells.chunked(7).forEach { week ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    week.forEach { day ->
+                                        DateCell(
+                                            date = day,
+                                            today = today,
+                                            selectedDate = selectedDate,
+                                            onSelect = { selectedDate = it },
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel", color = GoalsPopupMutedText)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            onConfirm(selectedDate)
+                        },
+                        shape = RoundedCornerShape(18.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = GoalsPopupPrimary)
+                    ) {
+                        Text("Done", color = GoalsPopupOnPrimary, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SweetTimePickerDialog(
+    initialTime: LocalTime,
+    onDismiss: () -> Unit,
+    onConfirm: (LocalTime) -> Unit
+) {
+    var selectedHour by remember(initialTime) { mutableStateOf(to12Hour(initialTime.hour)) }
+    var selectedMinute by remember(initialTime) { mutableStateOf(initialTime.minute) }
+    var isPm by remember(initialTime) { mutableStateOf(initialTime.hour >= 12) }
+    var activeSelector by remember { mutableStateOf(TimeSelectorTarget.Hour) }
+    val dialogContainer = themedColor(Color.White, Color(0xFF161D27))
+    val heading = themedColor(Color(0xFF2B3342), Color(0xFFE5E7EB))
+    val panelColor = themedColor(Color(0xFFF9FAFB), Color(0xFF222C3B))
+    val previewColor = themedColor(Color(0xFFF1F3F8), Color(0xFF263244))
+    val dividerColor = themedColor(Color(0xFF64748B), Color(0xFFAEB6C5))
+    val closeBg = themedColor(Color(0xFFF3F4F6), Color(0xFF2A3548))
+    val closeTint = themedColor(Color(0xFFB9C0CA), Color(0xFF94A3B8))
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(34.dp),
+            color = dialogContainer,
+            shadowElevation = 14.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Select Time",
+                        color = heading,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 22.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(closeBg)
+                            .clickable(onClick = onDismiss),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "Close time picker",
+                            tint = closeTint,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                Surface(
+                    color = panelColor,
+                    shape = RoundedCornerShape(22.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            TimeValueBox(
+                                value = selectedHour.formatTwoDigits(),
+                                modifier = Modifier.weight(1f),
+                                container = previewColor,
+                                selected = activeSelector == TimeSelectorTarget.Hour,
+                                onClick = { activeSelector = TimeSelectorTarget.Hour }
+                            )
+                            Text(
+                                text = ":",
+                                color = dividerColor,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 28.sp
+                            )
+                            TimeValueBox(
+                                value = selectedMinute.formatTwoDigits(),
+                                modifier = Modifier.weight(1f),
+                                container = previewColor,
+                                selected = activeSelector == TimeSelectorTarget.Minute,
+                                onClick = { activeSelector = TimeSelectorTarget.Minute }
+                            )
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = GoalsPopupSecondarySurface
+                            ) {
+                                Text(
+                                    text = if (isPm) "PM" else "AM",
+                                    color = appTextPrimary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                                )
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            TimeChoiceChip(
+                                label = "AM",
+                                selected = !isPm,
+                                onClick = { isPm = false },
+                                modifier = Modifier.weight(1f)
+                            )
+                            TimeChoiceChip(
+                                label = "PM",
+                                selected = isPm,
+                                onClick = { isPm = true },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        Text(
+                            text = if (activeSelector == TimeSelectorTarget.Hour) "Hour" else "Minute",
+                            color = heading,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val options = if (activeSelector == TimeSelectorTarget.Hour) {
+                                timeHourOptions
+                            } else {
+                                timeMinuteOptions
+                            }
+                            items(options, key = { it }) { value ->
+                                TimeChoiceChip(
+                                    label = value.formatTwoDigits(),
+                                    selected = if (activeSelector == TimeSelectorTarget.Hour) {
+                                        selectedHour == value
+                                    } else {
+                                        selectedMinute == value
+                                    },
+                                    onClick = {
+                                        if (activeSelector == TimeSelectorTarget.Hour) {
+                                            selectedHour = value
+                                        } else {
+                                            selectedMinute = value
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel", color = GoalsPopupMutedText)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            onConfirm(LocalTime.of(to24Hour(selectedHour, isPm), selectedMinute))
+                        },
+                        shape = RoundedCornerShape(18.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = GoalsPopupPrimary)
+                    ) {
+                        Text("Done", color = GoalsPopupOnPrimary, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DateCell(
+    date: LocalDate?,
+    today: LocalDate,
+    selectedDate: LocalDate,
+    onSelect: (LocalDate) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (date == null) {
+        Spacer(modifier = modifier.aspectRatio(1f))
+        return
+    }
+
+    val isSelected = date == selectedDate
+    val isToday = date == today
+    val isPast = date.isBefore(today)
+    val textColor = when {
+        isPast -> GoalsPopupMutedText.copy(alpha = 0.55f)
+        isSelected -> GoalsPopupOnPrimary
+        else -> appTextPrimary
+    }
+
+    Surface(
+        onClick = { if (!isPast) onSelect(date) },
+        enabled = !isPast,
+        shape = CircleShape,
+        color = when {
+            isSelected -> GoalsPopupPrimary
+            isToday -> GoalsPopupPrimary.copy(alpha = 0.14f)
+            else -> Color.Transparent
+        },
+        border = if (isToday && !isSelected) {
+            BorderStroke(1.dp, GoalsPopupPrimary.copy(alpha = 0.5f))
+        } else {
+            null
+        },
+        modifier = modifier.aspectRatio(1f)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = date.dayOfMonth.toString(),
+                color = textColor,
+                fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Medium,
+                fontSize = 14.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun TimeValueBox(
+    value: String,
+    container: Color,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        color = container,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(
+            1.dp,
+            if (selected) GoalsPopupPrimary else Color.Transparent
+        ),
+        modifier = modifier.height(52.dp)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = value,
+                color = if (selected) GoalsPopupPrimary else appTextPrimary,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 24.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun TimeChoiceChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = if (selected) GoalsPopupChipSelectedSurface else GoalsPopupChipSurface,
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (selected) GoalsPopupPrimary else Color.Transparent
+        ),
+        modifier = modifier
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = label,
+                color = if (selected) GoalsPopupPrimary else appTextSecondary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
@@ -1076,6 +1596,30 @@ private fun SoftSelectorField(
     }
 }
 
+private fun buildMonthCells(month: YearMonth): List<LocalDate?> {
+    val firstDayOfMonth = month.atDay(1)
+    val leadingEmptyCells = (firstDayOfMonth.dayOfWeek.value + 6) % 7
+    val daysInMonth = month.lengthOfMonth()
+    val totalCells = ((leadingEmptyCells + daysInMonth + 6) / 7) * 7
+
+    return List(totalCells) { index ->
+        val day = index - leadingEmptyCells + 1
+        if (day in 1..daysInMonth) month.atDay(day) else null
+    }
+}
+
+private fun to12Hour(hour24: Int): Int {
+    val normalized = hour24 % 12
+    return if (normalized == 0) 12 else normalized
+}
+
+private fun to24Hour(hour12: Int, isPm: Boolean): Int {
+    val normalized = hour12 % 12
+    return if (isPm) normalized + 12 else normalized
+}
+
+private fun Int.formatTwoDigits(): String = toString().padStart(2, '0')
+
 private fun defaultCategoryForFilter(selectedFilter: String, fallback: String): String {
     return when (selectedFilter) {
         "Health", "Learning", "Work", "Personal", "Hobby" -> selectedFilter
@@ -1083,8 +1627,8 @@ private fun defaultCategoryForFilter(selectedFilter: String, fallback: String): 
     }
 }
 
-private fun subtitleFor(goal: Goal): String {
-    val cadence = when (mapCategory(goal.category)) {
+private fun subtitleFor(category: String, reminderTime: String): String {
+    val cadence = when (category) {
         "Health" -> "Daily routine"
         "Learning" -> "Practice session"
         "Work" -> "Focus session"
@@ -1092,24 +1636,24 @@ private fun subtitleFor(goal: Goal): String {
         "Hobby" -> "Creative session"
         else -> "Daily goal"
     }
-    val time = formatGoalTime(goal.reminderTime)
+    val time = formatGoalTime(reminderTime)
     return if (time != null) "$cadence - $time" else cadence
 }
 
-private fun progressLabelFor(goal: Goal): String {
-    return when (mapCategory(goal.category)) {
+private fun progressLabelFor(category: String): String {
+    return when (category) {
         "Health", "Personal", "Hobby" -> "Weekly Progress"
         else -> "Daily Progress"
     }
 }
 
-private fun progressValueFor(goal: Goal): String {
-    val completed = ((goal.progress.coerceIn(0, 100) / 20f).roundToInt()).coerceIn(0, 5)
-    return when (mapCategory(goal.category)) {
+private fun progressValueFor(category: String, progress: Int): String {
+    val completed = ((progress.coerceIn(0, 100) / 20f).roundToInt()).coerceIn(0, 5)
+    return when (category) {
         "Health", "Personal", "Hobby" -> "$completed/5 days"
         "Learning" -> "$completed/5 sessions"
         "Work" -> "$completed/5 tasks"
-        else -> "${goal.progress}%"
+        else -> "$progress%"
     }
 }
 
@@ -1119,13 +1663,12 @@ private fun formatGoalTime(value: String): String? {
         return null
     }
 
-    val patterns = listOf("HH:mm", "hh:mm a")
-    for (pattern in patterns) {
+    for (formatter in GoalTimeInputFormatters) {
         val parsed = runCatching {
-            LocalTime.parse(raw, DateTimeFormatter.ofPattern(pattern))
+            LocalTime.parse(raw, formatter)
         }.getOrNull()
         if (parsed != null) {
-            return parsed.format(DateTimeFormatter.ofPattern("hh:mm a"))
+            return parsed.format(GoalTimeOutputFormatter)
         }
     }
     return null
