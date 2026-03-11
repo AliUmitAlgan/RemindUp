@@ -22,16 +22,32 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.ArrowBackIosNew
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Coffee
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.FormatQuote
+import androidx.compose.material.icons.filled.LocalDining
+import androidx.compose.material.icons.filled.LocalFlorist
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Nightlight
+import androidx.compose.material.icons.filled.Pets
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.SelfImprovement
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Spa
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Work
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -58,6 +74,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -71,6 +88,7 @@ import com.aliumitalgan.remindup.components.BottomNavigationBar
 import com.aliumitalgan.remindup.components.mainBottomNavItems
 import com.aliumitalgan.remindup.core.di.LocalAppContainer
 import com.aliumitalgan.remindup.core.di.RemindUpViewModelFactory
+import com.aliumitalgan.remindup.domain.model.Goal
 import com.aliumitalgan.remindup.presentation.goals.GoalsViewModel
 import com.aliumitalgan.remindup.ui.theme.appCardColor
 import com.aliumitalgan.remindup.ui.theme.appTextPrimary
@@ -119,6 +137,13 @@ fun SweetTaskDetailScreen(
     val context = LocalContext.current
     val goalEntry = uiState.goals.firstOrNull { it.first == goalId }
     val goalName = goalEntry?.second?.title?.ifBlank { "Goal" } ?: "Goal"
+    val categoriesById = remember(uiState.categories) { uiState.categories.associateBy { it.id } }
+    val headerCategoryIcon = remember(goalEntry?.second, categoriesById) {
+        resolveHeaderCategoryIcon(
+            goal = goalEntry?.second,
+            categoriesById = categoriesById
+        )
+    }
     val scope = rememberCoroutineScope()
 
     var tasks by remember { mutableStateOf<List<Pair<String, SubGoal>>>(emptyList()) }
@@ -199,12 +224,13 @@ fun SweetTaskDetailScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
-                contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 90.dp),
+                contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 90.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
                     HeaderRow(
                         title = goalName,
+                        actionIcon = headerCategoryIcon,
                         onBack = onNavigateBack
                     )
                 }
@@ -271,22 +297,29 @@ fun SweetTaskDetailScreen(
                         TaskItem(
                             task = task,
                             onToggle = {
+                                val nextValue = !task.completed
+                                val previous = tasks
+                                val updated = previous.map { entry ->
+                                    if (entry.first == taskId) {
+                                        entry.copy(second = entry.second.copy(completed = nextValue))
+                                    } else {
+                                        entry
+                                    }
+                                }
+                                tasks = updated
+                                syncGoalProgress(
+                                    goalId = goalId,
+                                    viewModel = viewModel,
+                                    subGoals = updated.map { it.second }
+                                )
                                 scope.launch {
-                                    val nextValue = !task.completed
                                     val result = SubGoalUtils.updateSubGoalStatus(taskId, nextValue)
-                                    if (result.isSuccess) {
-                                        val updated = tasks.map { entry ->
-                                            if (entry.first == taskId) {
-                                                entry.copy(second = entry.second.copy(completed = nextValue))
-                                            } else {
-                                                entry
-                                            }
-                                        }
-                                        tasks = updated
+                                    if (result.isFailure) {
+                                        tasks = previous
                                         syncGoalProgress(
                                             goalId = goalId,
                                             viewModel = viewModel,
-                                            subGoals = updated.map { it.second }
+                                            subGoals = previous.map { it.second }
                                         )
                                     }
                                 }
@@ -549,10 +582,13 @@ private fun QuickAddChip(
 @Composable
 private fun HeaderRow(
     title: String,
+    actionIcon: ImageVector,
     onBack: () -> Unit
 ) {
     Box(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 2.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -598,7 +634,7 @@ private fun HeaderRow(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Filled.SelfImprovement,
+                    imageVector = actionIcon,
                     contentDescription = null,
                     tint = PrimaryOrange,
                     modifier = Modifier.size(19.dp)
@@ -765,6 +801,50 @@ private fun TaskItem(
                 )
             }
         }
+    }
+}
+
+private fun resolveHeaderCategoryIcon(
+    goal: Goal?,
+    categoriesById: Map<String, com.aliumitalgan.remindup.domain.model.GoalCategory>
+): ImageVector {
+    if (goal == null) return Icons.Filled.SelfImprovement
+    val customCategory = goal.categoryId.takeIf { it.isNotBlank() }?.let(categoriesById::get)
+    if (customCategory != null) {
+        return categoryIconForKey(customCategory.iconKey)
+    }
+    return mapLegacyCategoryIcon(goal.category)
+}
+
+private fun categoryIconForKey(iconKey: String): ImageVector {
+    return when (iconKey) {
+        "spa" -> Icons.Filled.Spa
+        "fitness_center" -> Icons.Filled.FitnessCenter
+        "bookmark" -> Icons.Filled.Bookmark
+        "nightlight" -> Icons.Filled.Nightlight
+        "coffee" -> Icons.Filled.Coffee
+        "work" -> Icons.Filled.Work
+        "alarm" -> Icons.Filled.Alarm
+        "pets" -> Icons.Filled.Pets
+        "self_care" -> Icons.Filled.SelfImprovement
+        "local_dining" -> Icons.Filled.LocalDining
+        "directions_run" -> Icons.AutoMirrored.Filled.DirectionsRun
+        "school" -> Icons.Filled.School
+        "movie" -> Icons.Filled.Movie
+        "shopping_cart" -> Icons.Filled.ShoppingCart
+        "favorite" -> Icons.Filled.Favorite
+        else -> Icons.Filled.SelfImprovement
+    }
+}
+
+private fun mapLegacyCategoryIcon(category: Int): ImageVector {
+    return when (category) {
+        1 -> Icons.Filled.LocalFlorist
+        2 -> Icons.Filled.School
+        3 -> Icons.Filled.Work
+        4 -> Icons.Filled.Star
+        5 -> Icons.Filled.Favorite
+        else -> Icons.Filled.SelfImprovement
     }
 }
 

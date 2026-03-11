@@ -1,5 +1,6 @@
 package com.aliumitalgan.remindup.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,20 +40,20 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,30 +65,38 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aliumitalgan.remindup.components.BottomNavigationBar
 import com.aliumitalgan.remindup.components.mainBottomNavItems
+import com.aliumitalgan.remindup.core.di.LocalAppContainer
+import com.aliumitalgan.remindup.core.di.RemindUpViewModelFactory
 import com.aliumitalgan.remindup.domain.model.GoalCategory
+import com.aliumitalgan.remindup.presentation.category.EditCategoryViewModel
 import com.aliumitalgan.remindup.ui.theme.themedColor
-import com.aliumitalgan.remindup.utils.GoalCategoryUtils
-import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.math.roundToInt
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 private val LightBg: Color
-    get() = themedColor(Color(0xFFFDFBF9), Color(0xFF0F131A))
+    get() = themedColor(Color(0xFFF5F3F4), Color(0xFF0F131A))
 private val AccentOrange = Color(0xFFF26522)
 private val Deep: Color
-    get() = themedColor(Color(0xFF1A1A1A), Color(0xFFE5E7EB))
-private val LightOrange = Color(0xFFFFF3E8)
-private val LightMint = Color(0xFFE8F5E9)
-private val LightLavender = Color(0xFFF3E8FF)
-private val LightBlue = Color(0xFFE8F4FD)
-private val LightYellow = Color(0xFFFFF8E1)
+    get() = themedColor(Color(0xFF0F172A), Color(0xFFE5E7EB))
+private val EditCard: Color
+    get() = themedColor(Color.White, Color(0xFF171F2A))
+private val EditPreviewBorder: Color
+    get() = themedColor(Color(0xFFF4DFD3), Color(0xFF334158))
+private val EditHeaderBack: Color
+    get() = themedColor(Color(0xFFE9EEF6), Color(0xFF2A3548))
+private val LightOrange = Color(0xFFF6D7C3)
+private val LightMint = Color(0xFFC9E8DB)
+private val LightLavender = Color(0xFFD8D9EB)
+private val LightBlue = Color(0xFFDCE5ED)
+private val LightYellow = Color(0xFFECE4B4)
 
 private val themeColors = listOf(
-    AccentOrange to "Orange",
+    LightOrange to "Peach",
     LightMint to "Mint",
     LightLavender to "Lavender",
-    LightBlue to "Blue",
-    LightYellow to "Yellow"
+    LightBlue to "Soft Blue",
+    LightYellow to "Lemon"
 )
 
 private data class CategoryIconOption(
@@ -96,20 +105,20 @@ private data class CategoryIconOption(
 )
 
 private val categoryIcons = listOf(
-    CategoryIconOption("spa", Icons.Filled.Spa),
+    CategoryIconOption("self_care", Icons.Filled.SelfImprovement),
     CategoryIconOption("fitness_center", Icons.Filled.FitnessCenter),
     CategoryIconOption("bookmark", Icons.Filled.Bookmark),
     CategoryIconOption("nightlight", Icons.Filled.Nightlight),
     CategoryIconOption("coffee", Icons.Filled.Coffee),
     CategoryIconOption("work", Icons.Filled.Work),
-    CategoryIconOption("alarm", Icons.Filled.Alarm),
+    CategoryIconOption("shopping_cart", Icons.Filled.ShoppingCart),
     CategoryIconOption("pets", Icons.Filled.Pets),
-    CategoryIconOption("self_care", Icons.Filled.SelfImprovement),
+    CategoryIconOption("spa", Icons.Filled.Spa),
+    CategoryIconOption("alarm", Icons.Filled.Alarm),
     CategoryIconOption("local_dining", Icons.Filled.LocalDining),
     CategoryIconOption("directions_run", Icons.AutoMirrored.Filled.DirectionsRun),
     CategoryIconOption("school", Icons.Filled.School),
     CategoryIconOption("movie", Icons.Filled.Movie),
-    CategoryIconOption("shopping_cart", Icons.Filled.ShoppingCart),
     CategoryIconOption("favorite", Icons.Filled.Favorite)
 )
 
@@ -120,18 +129,21 @@ fun EditCategoryScreen(
     onSave: () -> Unit = {},
     onNavigateToHome: () -> Unit = {},
     onNavigateToGoals: () -> Unit = {},
-    onNavigateToSettings: () -> Unit = {}
+    onNavigateToSettings: () -> Unit = {},
+    viewModel: EditCategoryViewModel = viewModel(
+        factory = RemindUpViewModelFactory(LocalAppContainer.current)
+    )
 ) {
     val normalizedCategoryId = categoryId?.takeUnless { it.equals("new", ignoreCase = true) }
+    val viewState by viewModel.uiState.collectAsState()
     var categoryName by remember { mutableStateOf("") }
     var selectedColor by remember { mutableStateOf(LightOrange) }
     var selectedIconIndex by remember { mutableStateOf(0) }
     var smartRemindersEnabled by remember { mutableStateOf(true) }
     var showAllIcons by remember { mutableStateOf(false) }
-    var currentRoute by remember { mutableStateOf("categories") }
-    var isSaving by remember { mutableStateOf(false) }
-    var saveError by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
+    var currentRoute by remember { mutableStateOf("goals") }
+    val isSaving = viewState.isSaving
+    val saveError = viewState.error
     val navItems = mainBottomNavItems()
     val visibleIconOptions = if (showAllIcons) {
         categoryIcons.mapIndexed { index, icon -> index to icon }
@@ -140,17 +152,16 @@ fun EditCategoryScreen(
     }
 
     LaunchedEffect(normalizedCategoryId) {
-        if (normalizedCategoryId.isNullOrBlank()) return@LaunchedEffect
-        GoalCategoryUtils.getGoalCategoryById(normalizedCategoryId)
-            .onSuccess { category ->
-                if (category != null) {
-                    categoryName = category.name
-                    selectedColor = parseCategoryColor(category.colorHex)
-                    selectedIconIndex = categoryIcons.indexOfFirst { it.key == category.iconKey }
-                        .takeIf { it >= 0 } ?: 0
-                    smartRemindersEnabled = category.smartRemindersEnabled
-                }
-            }
+        viewModel.loadCategory(normalizedCategoryId)
+    }
+
+    LaunchedEffect(viewState.loadedCategory?.id) {
+        val category = viewState.loadedCategory ?: return@LaunchedEffect
+        categoryName = category.name
+        selectedColor = parseCategoryColor(category.colorHex)
+        selectedIconIndex = categoryIcons.indexOfFirst { it.key == category.iconKey }
+            .takeIf { it >= 0 } ?: 0
+        smartRemindersEnabled = category.smartRemindersEnabled
     }
 
     Scaffold(
@@ -177,17 +188,28 @@ fun EditCategoryScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = 24.dp)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
+                    .padding(top = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onNavigateBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Deep)
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(EditHeaderBack)
+                        .clickable(onClick = onNavigateBack),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = null,
+                        tint = themedColor(Color(0xFF64748B), Color(0xFFCBD5E1))
+                    )
                 }
                 Text(
                     text = if (normalizedCategoryId == null) "New Category" else "Edit Category",
@@ -200,36 +222,25 @@ fun EditCategoryScreen(
                     onClick = {
                         val trimmedName = categoryName.trim()
                         if (trimmedName.isBlank()) {
-                            saveError = "Category name is required."
+                            viewModel.clearError()
                             return@TextButton
                         }
-                        isSaving = true
-                        saveError = null
-                        scope.launch {
-                            val category = GoalCategory(
-                                id = normalizedCategoryId ?: UUID.randomUUID().toString(),
-                                name = trimmedName,
-                                colorHex = selectedColor.toHexRgb(),
-                                iconKey = categoryIcons.getOrNull(selectedIconIndex)?.key ?: "self_care",
-                                smartRemindersEnabled = smartRemindersEnabled,
-                                createdAt = System.currentTimeMillis()
-                            )
-                            GoalCategoryUtils.saveGoalCategory(category)
-                                .onSuccess {
-                                    isSaving = false
-                                    onSave()
-                                }
-                                .onFailure { error ->
-                                    isSaving = false
-                                    saveError = error.message ?: "Failed to save category."
-                                }
-                        }
+                        val category = GoalCategory(
+                            id = normalizedCategoryId ?: UUID.randomUUID().toString(),
+                            name = trimmedName,
+                            colorHex = selectedColor.toHexRgb(),
+                            iconKey = categoryIcons.getOrNull(selectedIconIndex)?.key ?: "self_care",
+                            smartRemindersEnabled = smartRemindersEnabled,
+                            createdAt = System.currentTimeMillis()
+                        )
+                        viewModel.saveCategory(category = category, onSaved = onSave)
                     }
                 ) {
                     Text(
                         text = if (isSaving) "Saving..." else "Save",
                         color = AccentOrange,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp
                     )
                 }
             }
@@ -247,94 +258,132 @@ fun EditCategoryScreen(
             Text(
                 "LIVE PREVIEW",
                 fontSize = 12.sp,
-                color = Color(0xFF9CA3AF),
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(top = 10.dp)
+                color = themedColor(Color(0xFF516A8B), Color(0xFFA7B4C7)),
+                letterSpacing = 3.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 22.dp)
             )
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
-                shape = RoundedCornerShape(16.dp),
-                color = LightOrange
+                    .padding(top = 12.dp),
+                shape = RoundedCornerShape(22.dp),
+                color = EditCard,
+                border = BorderStroke(1.dp, EditPreviewBorder),
+                shadowElevation = 6.dp
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(horizontal = 18.dp, vertical = 18.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(selectedColor.copy(alpha = 0.3f)),
+                            .size(76.dp)
+                            .clip(RoundedCornerShape(22.dp))
+                            .background(selectedColor),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             categoryIcons[selectedIconIndex].icon,
                             contentDescription = null,
                             tint = AccentOrange,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(34.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.size(12.dp))
+                    Spacer(modifier = Modifier.size(14.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = categoryName.ifBlank { "Category Name" },
+                            text = categoryName.ifBlank { "Daily Mindfulness" },
                             fontWeight = FontWeight.Bold,
                             color = Deep,
-                            fontSize = 16.sp
+                            fontSize = 18.sp
                         )
-                        Text("12 Reminders scheduled", fontSize = 12.sp, color = Color(0xFF6B7280))
+                        Text(
+                            "12 Reminders scheduled",
+                            fontSize = 15.sp,
+                            color = themedColor(Color(0xFF64748B), Color(0xFFAEB6C5))
+                        )
                     }
+                    Icon(
+                        imageVector = Icons.Filled.Spa,
+                        contentDescription = null,
+                        tint = themedColor(Color(0xFFD1D5DB), Color(0xFF6B7280)).copy(alpha = 0.55f),
+                        modifier = Modifier.size(58.dp)
+                    )
                 }
             }
 
             Text(
                 "Category Name",
                 fontSize = 14.sp,
-                color = Deep,
-                fontWeight = FontWeight.Medium,
+                color = themedColor(Color(0xFF243B53), Color(0xFFD5DCE7)),
+                fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(top = 24.dp)
             )
-            OutlinedTextField(
+            TextField(
                 value = categoryName,
                 onValueChange = { categoryName = it },
+                singleLine = true,
+                placeholder = {
+                    Text(
+                        text = "Daily Mindfulness",
+                        color = themedColor(Color(0xFF9CA3AF), Color(0xFF7C8EA3))
+                    )
+                },
+                shape = RoundedCornerShape(18.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = EditCard,
+                    unfocusedContainerColor = EditCard,
+                    disabledContainerColor = EditCard,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                    focusedTextColor = Deep,
+                    unfocusedTextColor = Deep,
+                    cursorColor = AccentOrange
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
-                shape = RoundedCornerShape(12.dp)
+                    .padding(top = 10.dp)
             )
 
             Text(
                 "Theme Color",
                 fontSize = 14.sp,
-                color = Deep,
-                fontWeight = FontWeight.Medium,
+                color = themedColor(Color(0xFF243B53), Color(0xFFD5DCE7)),
+                fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(top = 24.dp)
             )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(top = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 themeColors.forEach { (color, _) ->
+                    val isSelected = selectedColor == color
                     Box(
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(56.dp)
                             .clip(CircleShape)
                             .background(color)
-                            .then(
-                                if (selectedColor == color) Modifier.border(2.dp, AccentOrange, CircleShape)
-                                else Modifier
+                            .border(
+                                width = if (isSelected) 3.dp else 2.dp,
+                                color = if (isSelected) AccentOrange else themedColor(Color.White, Color(0xFF263244)),
+                                shape = CircleShape
                             )
                             .clickable { selectedColor = color },
                         contentAlignment = Alignment.Center
                     ) {
-                        if (selectedColor == color) {
-                            Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(20.dp), tint = AccentOrange)
+                        if (isSelected) {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(22.dp),
+                                tint = Color.White
+                            )
                         }
                     }
                 }
@@ -343,45 +392,44 @@ fun EditCategoryScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 24.dp),
+                    .padding(top = 26.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     "Select Icon",
                     fontSize = 14.sp,
-                    color = Deep,
-                    fontWeight = FontWeight.Medium
+                    color = themedColor(Color(0xFF243B53), Color(0xFFD5DCE7)),
+                    fontWeight = FontWeight.Bold
                 )
-                TextButton(onClick = { showAllIcons = !showAllIcons }) {
-                    Text(
-                        text = if (showAllIcons) "SHOW LESS" else "VIEW ALL",
-                        color = AccentOrange,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+                Text(
+                    text = if (showAllIcons) "SHOW LESS" else "VIEW ALL",
+                    color = AccentOrange,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    modifier = Modifier.clickable { showAllIcons = !showAllIcons }
+                )
             }
             LazyVerticalGrid(
                 columns = GridCells.Fixed(4),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (showAllIcons) 320.dp else 180.dp)
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .height(if (showAllIcons) 328.dp else 176.dp)
+                    .padding(top = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(visibleIconOptions) { (index, icon) ->
                     val isSelected = selectedIconIndex == index
                     Box(
                         modifier = Modifier
-                            .size(64.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (isSelected) LightOrange else Color(0xFFF5F5F5)
-                            )
-                            .then(
-                                if (isSelected) Modifier.border(2.dp, AccentOrange, RoundedCornerShape(12.dp))
-                                else Modifier
+                            .size(74.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(if (isSelected) EditCard else themedColor(Color(0xFFF3F4F6), Color(0xFF253143)))
+                            .border(
+                                width = if (isSelected) 2.dp else 0.dp,
+                                color = if (isSelected) Color(0xFFF1D3C4) else Color.Transparent,
+                                shape = RoundedCornerShape(20.dp)
                             )
                             .clickable { selectedIconIndex = index },
                         contentAlignment = Alignment.Center
@@ -389,8 +437,8 @@ fun EditCategoryScreen(
                         Icon(
                             icon.icon,
                             contentDescription = null,
-                            tint = if (isSelected) AccentOrange else Color(0xFF6B7280),
-                            modifier = Modifier.size(28.dp)
+                            tint = if (isSelected) AccentOrange else themedColor(Color(0xFF94A3B8), Color(0xFF94A3B8)),
+                            modifier = Modifier.size(32.dp)
                         )
                     }
                 }
@@ -399,42 +447,61 @@ fun EditCategoryScreen(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 24.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = Color(0xFFF5F5F5)
+                    .padding(top = 28.dp),
+                shape = RoundedCornerShape(24.dp),
+                color = themedColor(Color(0xFFFFF6F0), Color(0xFF1F2937)),
+                border = BorderStroke(1.dp, EditPreviewBorder)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(14.dp),
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(LightOrange),
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(themedColor(Color(0xFFF7DFCF), Color(0xFF2A3548))),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Filled.Alarm, contentDescription = null, tint = AccentOrange, modifier = Modifier.size(22.dp))
+                        Icon(
+                            Icons.Filled.Alarm,
+                            contentDescription = null,
+                            tint = AccentOrange,
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
                     Spacer(modifier = Modifier.size(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Smart Reminders", fontWeight = FontWeight.SemiBold, color = Deep, fontSize = 15.sp)
-                        Text("Optimized alerts for this category", fontSize = 12.sp, color = Color(0xFF6B7280))
+                        Text(
+                            "Smart Reminders",
+                            fontWeight = FontWeight.Bold,
+                            color = Deep,
+                            fontSize = 16.sp
+                        )
+                        Text(
+                            "Optimized alerts for this category",
+                            fontSize = 12.sp,
+                            color = themedColor(Color(0xFF64748B), Color(0xFFAEB6C5))
+                        )
                     }
                     Switch(
                         checked = smartRemindersEnabled,
                         onCheckedChange = { smartRemindersEnabled = it },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
-                            checkedTrackColor = AccentOrange
+                            checkedTrackColor = AccentOrange,
+                            uncheckedThumbColor = Color.White,
+                            uncheckedTrackColor = themedColor(Color(0xFFD7DEE7), Color(0xFF475569)),
+                            checkedBorderColor = Color.Transparent,
+                            uncheckedBorderColor = Color.Transparent
                         )
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(30.dp))
         }
     }
 }

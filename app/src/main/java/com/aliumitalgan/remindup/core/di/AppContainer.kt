@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.aliumitalgan.remindup.data.repository.BillingVerificationRepository
 import com.aliumitalgan.remindup.data.repository.FirebaseAuthRepository
+import com.aliumitalgan.remindup.data.repository.FirestoreGoalCategoryRepository
 import com.aliumitalgan.remindup.data.repository.FirestoreEntitlementRepository
 import com.aliumitalgan.remindup.data.repository.FirestoreGoalRepository
 import com.aliumitalgan.remindup.data.repository.FirestoreReminderRepository
@@ -13,6 +14,7 @@ import com.aliumitalgan.remindup.data.repository.FunctionAiAssistantRepository
 import com.aliumitalgan.remindup.data.repository.SocialRepository
 import com.aliumitalgan.remindup.data.scheduler.WorkManagerReminderScheduler
 import com.aliumitalgan.remindup.domain.repository.AuthRepository
+import com.aliumitalgan.remindup.domain.repository.GoalCategoryRepository
 import com.aliumitalgan.remindup.domain.repository.GoalRepository
 import com.aliumitalgan.remindup.domain.repository.ReminderRepository
 import com.aliumitalgan.remindup.domain.service.RuleBasedFallbackService
@@ -20,13 +22,19 @@ import com.aliumitalgan.remindup.domain.usecase.goal.AddGoalUseCase
 import com.aliumitalgan.remindup.domain.usecase.goal.DeleteGoalUseCase
 import com.aliumitalgan.remindup.domain.usecase.goal.GetUserGoalsUseCase
 import com.aliumitalgan.remindup.domain.usecase.goal.UpdateGoalProgressUseCase
+import com.aliumitalgan.remindup.domain.usecase.goalcategory.DeleteGoalCategoryUseCase
+import com.aliumitalgan.remindup.domain.usecase.goalcategory.GetGoalCategoriesUseCase
+import com.aliumitalgan.remindup.domain.usecase.goalcategory.GetGoalCategoryByIdUseCase
+import com.aliumitalgan.remindup.domain.usecase.goalcategory.SaveGoalCategoryUseCase
 import com.aliumitalgan.remindup.domain.usecase.reminder.AddReminderUseCase
 import com.aliumitalgan.remindup.domain.usecase.reminder.DeleteReminderUseCase
 import com.aliumitalgan.remindup.domain.usecase.reminder.GetRemindersUseCase
 import com.aliumitalgan.remindup.domain.usecase.reminder.UpdateReminderUseCase
 import com.aliumitalgan.remindup.presentation.auth.LoginViewModel
+import com.aliumitalgan.remindup.presentation.category.EditCategoryViewModel
 import com.aliumitalgan.remindup.presentation.goals.GoalsViewModel
 import com.aliumitalgan.remindup.presentation.home.HomeViewModel
+import com.aliumitalgan.remindup.presentation.settings.SettingsViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
@@ -41,6 +49,7 @@ class AppContainer(
     // Repositories
     val authRepository: AuthRepository by lazy { FirebaseAuthRepository(auth, firestore) }
     val goalRepository: GoalRepository by lazy { FirestoreGoalRepository(auth, firestore) }
+    val goalCategoryRepository: GoalCategoryRepository by lazy { FirestoreGoalCategoryRepository(auth, firestore) }
     val entitlementRepository by lazy {
         FirestoreEntitlementRepository(auth = auth, firestore = firestore)
     }
@@ -66,6 +75,10 @@ class AppContainer(
     val addGoalUseCase by lazy { AddGoalUseCase(goalRepository) }
     val updateGoalProgressUseCase by lazy { UpdateGoalProgressUseCase(goalRepository) }
     val deleteGoalUseCase by lazy { DeleteGoalUseCase(goalRepository) }
+    val getGoalCategoriesUseCase by lazy { GetGoalCategoriesUseCase(goalCategoryRepository) }
+    val getGoalCategoryByIdUseCase by lazy { GetGoalCategoryByIdUseCase(goalCategoryRepository) }
+    val saveGoalCategoryUseCase by lazy { SaveGoalCategoryUseCase(goalCategoryRepository) }
+    val deleteGoalCategoryUseCase by lazy { DeleteGoalCategoryUseCase(goalCategoryRepository) }
 
     // Reminder Use Cases
     val getRemindersUseCase by lazy { GetRemindersUseCase(reminderRepository) }
@@ -94,12 +107,23 @@ class RemindUpViewModelFactory(
                 container.getUserGoalsUseCase,
                 container.addGoalUseCase,
                 container.updateGoalProgressUseCase,
-                container.deleteGoalUseCase
+                container.deleteGoalUseCase,
+                container.getGoalCategoriesUseCase,
+                container.deleteGoalCategoryUseCase
+            ) as T
+            modelClass.isAssignableFrom(EditCategoryViewModel::class.java) -> EditCategoryViewModel(
+                container.getGoalCategoryByIdUseCase,
+                container.saveGoalCategoryUseCase
             ) as T
             modelClass.isAssignableFrom(HomeViewModel::class.java) -> HomeViewModel(
                 container.getUserGoalsUseCase,
                 container.reminderRepository,
                 container.authRepository
+            ) as T
+            modelClass.isAssignableFrom(SettingsViewModel::class.java) -> SettingsViewModel(
+                container.getUserGoalsUseCase,
+                container.authRepository,
+                container.entitlementRepository
             ) as T
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         }

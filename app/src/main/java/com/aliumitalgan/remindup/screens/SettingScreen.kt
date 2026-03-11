@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,7 +34,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,13 +52,12 @@ import com.aliumitalgan.remindup.components.BottomNavigationBar
 import com.aliumitalgan.remindup.components.MoreActionsBottomSheet
 import com.aliumitalgan.remindup.components.SignOutConfirmationDialog
 import com.aliumitalgan.remindup.components.mainBottomNavItems
-import com.aliumitalgan.remindup.data.repository.FirestoreEntitlementRepository
-import com.aliumitalgan.remindup.domain.model.EntitlementStatus
-import com.aliumitalgan.remindup.domain.model.PlanType
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.aliumitalgan.remindup.core.di.LocalAppContainer
+import com.aliumitalgan.remindup.core.di.RemindUpViewModelFactory
+import com.aliumitalgan.remindup.presentation.settings.SettingsViewModel
 import com.aliumitalgan.remindup.utils.AuthUtils
-import com.aliumitalgan.remindup.utils.ProgressUtils
 import com.aliumitalgan.remindup.ui.theme.themedColor
-import com.google.firebase.auth.FirebaseAuth
 
 private val ProfileBg: Color
     get() = themedColor(Color(0xFFF5F2F2), Color(0xFF0F131A))
@@ -78,47 +78,25 @@ fun SettingsScreenContent(
     onNavigateToPersonalInfo: () -> Unit = {},
     onNavigateToNotifications: () -> Unit = {},
     onNavigateToSecurity: () -> Unit = {},
-    onNavigateToAppearance: () -> Unit = {}
+    onNavigateToAppearance: () -> Unit = {},
+    viewModel: SettingsViewModel = viewModel(
+        factory = RemindUpViewModelFactory(LocalAppContainer.current)
+    )
 ) {
-    var currentRoute by remember { mutableStateOf("settings") }
+    val uiState by viewModel.uiState.collectAsState()
+    val listState = rememberLazyListState()
     val navItems = mainBottomNavItems()
 
-    val user = FirebaseAuth.getInstance().currentUser
-    val name = user?.displayName?.ifBlank { null } ?: "Sweet Reminder"
-    val email = user?.email ?: "remindup.user@sweet.com"
-
-    var tasksDone by remember { mutableStateOf(128) }
-    var streaks by remember { mutableStateOf(42) }
-    var awards by remember { mutableStateOf(12) }
-    var isPremium by remember { mutableStateOf(false) }
     var showSignOutDialog by remember { mutableStateOf(false) }
     var showMoreActions by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        runCatching {
-            val entitlement = FirestoreEntitlementRepository().getEntitlement()
-            isPremium = entitlement.planType == PlanType.PREMIUM &&
-                (entitlement.status == EntitlementStatus.ACTIVE || entitlement.status == EntitlementStatus.GRACE)
-        }
-
-        runCatching {
-            val goals = ProgressUtils.getUserGoals().getOrDefault(emptyList()).map { it.second }
-            if (goals.isNotEmpty()) {
-                tasksDone = (goals.sumOf { it.progress } / 3).coerceAtLeast(8)
-                streaks = goals.count { it.progress >= 60 }.coerceAtLeast(1) * 3
-                awards = goals.count { it.progress >= 100 }.coerceAtLeast(1) * 2
-            }
-        }
-    }
 
     Scaffold(
         containerColor = ProfileBg,
         bottomBar = {
             BottomNavigationBar(
                 items = navItems,
-                currentRoute = currentRoute,
+                currentRoute = "settings",
                 onItemSelected = { route ->
-                    currentRoute = route
                     when (route) {
                         "home" -> onNavigateToHome()
                         "goals" -> onNavigateToGoals()
@@ -131,6 +109,7 @@ fun SettingsScreenContent(
         }
     ) { innerPadding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
@@ -193,8 +172,8 @@ fun SettingsScreenContent(
                         }
                     }
                     Spacer(modifier = Modifier.height(6.dp))
-                    Text(name, fontWeight = FontWeight.ExtraBold, fontSize = 32.sp, color = Deep)
-                    Text(email, color = AccentOrange, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text(uiState.name, fontWeight = FontWeight.ExtraBold, fontSize = 32.sp, color = Deep)
+                    Text(uiState.email, color = AccentOrange, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                     Spacer(modifier = Modifier.height(6.dp))
                     Surface(
                         color = themedColor(Color(0xFFF1F2F5), Color(0xFF232D3A)),
@@ -214,19 +193,19 @@ fun SettingsScreenContent(
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     MetricCard(
-                        value = tasksDone.toString(),
+                        value = uiState.tasksDone.toString(),
                         label = "TASKS\nDONE",
                         valueColor = Color(0xFFEC5A9B),
                         modifier = Modifier.weight(1f)
                     )
                     MetricCard(
-                        value = streaks.toString(),
+                        value = uiState.streaks.toString(),
                         label = "STREAKS",
                         valueColor = Color(0xFF43A2FF),
                         modifier = Modifier.weight(1f)
                     )
                     MetricCard(
-                        value = awards.toString(),
+                        value = uiState.awards.toString(),
                         label = "AWARDS",
                         valueColor = Color(0xFF43D3B8),
                         modifier = Modifier.weight(1f)
@@ -259,7 +238,7 @@ fun SettingsScreenContent(
                         Spacer(modifier = Modifier.size(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (isPremium) "Premium Member" else "Free Member",
+                                text = if (uiState.isPremium) "Premium Member" else "Free Member",
                                 fontWeight = FontWeight.ExtraBold,
                                 color = Deep
                             )

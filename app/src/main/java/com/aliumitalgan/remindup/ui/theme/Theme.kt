@@ -3,7 +3,6 @@ package com.aliumitalgan.remindup.ui.theme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -13,7 +12,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aliumitalgan.remindup.utils.LocaleWrapper
-import com.aliumitalgan.remindup.utils.ThemeManager
 
 // Modern renk paleti
 private val LightColors = lightColorScheme(
@@ -204,13 +202,7 @@ fun RemindUpTheme(
     val context = LocalContext.current
     val useDarkTheme = when {
         forceDarkTheme != null -> forceDarkTheme
-        else -> {
-            val themeState by ThemeManager.isDarkTheme
-            LaunchedEffect(Unit) {
-                ThemeManager.loadDarkThemeState(context)
-            }
-            themeState
-        }
+        else -> darkTheme
     }
 
     // Dynamic color - Android 12+ cihazlarda sistem renklerini kullan

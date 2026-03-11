@@ -4,11 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aliumitalgan.remindup.domain.model.Goal
 import com.aliumitalgan.remindup.domain.model.GoalCategory
+import com.aliumitalgan.remindup.domain.usecase.goalcategory.GetGoalCategoriesUseCase
+import com.aliumitalgan.remindup.domain.usecase.goalcategory.DeleteGoalCategoryUseCase
 import com.aliumitalgan.remindup.domain.usecase.goal.AddGoalUseCase
 import com.aliumitalgan.remindup.domain.usecase.goal.DeleteGoalUseCase
 import com.aliumitalgan.remindup.domain.usecase.goal.GetUserGoalsUseCase
 import com.aliumitalgan.remindup.domain.usecase.goal.UpdateGoalProgressUseCase
-import com.aliumitalgan.remindup.utils.GoalCategoryUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,7 +42,9 @@ class GoalsViewModel(
     private val getUserGoalsUseCase: GetUserGoalsUseCase,
     private val addGoalUseCase: AddGoalUseCase,
     private val updateGoalProgressUseCase: UpdateGoalProgressUseCase,
-    private val deleteGoalUseCase: DeleteGoalUseCase
+    private val deleteGoalUseCase: DeleteGoalUseCase,
+    private val getGoalCategoriesUseCase: GetGoalCategoriesUseCase,
+    private val deleteGoalCategoryUseCase: DeleteGoalCategoryUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(GoalsUiState())
@@ -54,7 +57,7 @@ class GoalsViewModel(
 
     fun loadGoals() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update { it.copy(isLoading = false, error = null) }
             getUserGoalsUseCase()
                 .onSuccess { goals ->
                     _uiState.update { it.copy(goals = goals, isLoading = false) }
@@ -76,7 +79,8 @@ class GoalsViewModel(
         categoryId: String = "",
         dueDate: String = "",
         reminderTime: String = "",
-        smartReminderEnabled: Boolean = true
+        smartReminderEnabled: Boolean = true,
+        onGoalSaved: ((String, Goal) -> Unit)? = null
     ) {
         viewModelScope.launch {
             val goal = Goal(
@@ -101,6 +105,7 @@ class GoalsViewModel(
                             error = null
                         )
                     }
+                    onGoalSaved?.invoke(goalId, savedGoal)
                 }
                 .onFailure { e ->
                     _uiState.update { it.copy(error = e.message) }
@@ -110,7 +115,7 @@ class GoalsViewModel(
 
     fun loadCategories() {
         viewModelScope.launch {
-            GoalCategoryUtils.getGoalCategories()
+            getGoalCategoriesUseCase()
                 .onSuccess { categories ->
                     _uiState.update { state ->
                         val selected = if (
@@ -183,6 +188,30 @@ class GoalsViewModel(
                 }
                 .onFailure { e ->
                     _uiState.update { it.copy(error = e.message) }
+                }
+        }
+    }
+
+    fun deleteCategory(categoryId: String) {
+        viewModelScope.launch {
+            deleteGoalCategoryUseCase(categoryId)
+                .onSuccess {
+                    _uiState.update { state ->
+                        val remainingCategories = state.categories.filterNot { it.id == categoryId }
+                        val nextFilter = when {
+                            state.selectedFilterId == GOALS_FILTER_ALL -> GOALS_FILTER_ALL
+                            remainingCategories.any { it.id == state.selectedFilterId } -> state.selectedFilterId
+                            else -> GOALS_FILTER_ALL
+                        }
+                        state.copy(
+                            categories = remainingCategories,
+                            selectedFilterId = nextFilter,
+                            error = null
+                        )
+                    }
+                }
+                .onFailure { e ->
+                    _uiState.update { it.copy(error = e.message ?: "Failed to delete category") }
                 }
         }
     }

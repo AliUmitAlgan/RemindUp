@@ -21,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -75,14 +76,13 @@ fun AppearanceScreen(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val isDarkMode by ThemeManager.isDarkTheme
+    val isDarkMode = isSystemInDarkTheme()
     val persistedDynamicAccents by ThemeManager.dynamicAccentsEnabled
     val scope = rememberCoroutineScope()
     var selectedTheme by remember { mutableStateOf("Peach") }
     var cornerRoundness by remember { mutableFloatStateOf(12f) }
     var dynamicAccents by remember { mutableStateOf(persistedDynamicAccents) }
     var isLoadingPreferences by remember { mutableStateOf(true) }
-    var isSavingDarkMode by remember { mutableStateOf(false) }
     var isSavingDynamicAccents by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -91,9 +91,6 @@ fun AppearanceScreen(
 
         UserPreferenceUtils.getAppearancePreferences()
             .onSuccess { prefs ->
-                prefs.darkModeEnabled?.let { remoteDarkMode ->
-                    ThemeManager.saveDarkThemeState(context, remoteDarkMode)
-                }
                 prefs.dynamicAccentsEnabled?.let { remoteDynamicAccents ->
                     ThemeManager.saveDynamicAccentsState(context, remoteDynamicAccents)
                     dynamicAccents = remoteDynamicAccents
@@ -104,22 +101,6 @@ fun AppearanceScreen(
             }
 
         isLoadingPreferences = false
-    }
-
-    fun updateDarkMode(nextIsDark: Boolean) {
-        if (isSavingDarkMode || nextIsDark == isDarkMode) return
-
-        val previous = isDarkMode
-        ThemeManager.saveDarkThemeState(context, nextIsDark)
-        isSavingDarkMode = true
-
-        scope.launch {
-            UserPreferenceUtils.updateAppearancePreference("darkModeEnabled", nextIsDark)
-                .onFailure {
-                    ThemeManager.saveDarkThemeState(context, previous)
-                }
-            isSavingDarkMode = false
-        }
     }
 
     fun updateDynamicAccents(nextValue: Boolean) {
@@ -223,8 +204,8 @@ fun AppearanceScreen(
                         isDarkPreview = false,
                         iconTint = Primary,
                         modifier = Modifier.weight(1f),
-                        enabled = !isLoadingPreferences && !isSavingDarkMode,
-                        onClick = { updateDarkMode(false) }
+                        enabled = false,
+                        onClick = {}
                     )
                     DisplayModeCard(
                         title = "Dark Mode",
@@ -233,10 +214,17 @@ fun AppearanceScreen(
                         isDarkPreview = true,
                         iconTint = Color(0xFF94A3B8),
                         modifier = Modifier.weight(1f),
-                        enabled = !isLoadingPreferences && !isSavingDarkMode,
-                        onClick = { updateDarkMode(true) }
+                        enabled = false,
+                        onClick = {}
                     )
                 }
+
+                Text(
+                    text = "Theme follows your phone setting automatically.",
+                    color = themedColor(Color(0xFF64748B), Color(0xFFAEB6C5)),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
             }
 
             Surface(

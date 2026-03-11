@@ -73,6 +73,15 @@ fun AppNavigation(
     startDestination: String = Screen.Splash.route,
     modifier: Modifier = Modifier
 ) {
+    fun navigateToTopLevel(route: String) {
+        if (navController.currentDestination?.route == route) return
+        navController.navigate(route) {
+            popUpTo(Screen.Home.route) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
     NavHost(
         modifier = modifier
             .fillMaxSize()
@@ -151,23 +160,23 @@ fun AppNavigation(
 
         composable(Screen.Home.route) {
             HomeScreenContent(
-                onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
-                onNavigateToReminders = { navController.navigate(Screen.Reminders.route) },
-                onNavigateToProgress = { navController.navigate(Screen.Analytic.route) },
-                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
+                onNavigateToGoals = { navigateToTopLevel(Screen.Goals.route) },
+                onNavigateToReminders = { navigateToTopLevel(Screen.Reminders.route) },
+                onNavigateToProgress = { navigateToTopLevel(Screen.Analytic.route) },
+                onNavigateToSettings = { navigateToTopLevel(Screen.Settings.route) },
                 onNavigateToAssistant = { navController.navigate(Screen.Assistant.route) },
-                onNavigateToSocial = { navController.navigate(Screen.Social.route) }
+                onNavigateToSocial = { navigateToTopLevel(Screen.Social.route) }
             )
         }
 
         composable(Screen.Goals.route) {
             GoalsScreenContent(
-                onNavigateToProgress = { navController.navigate(Screen.Analytic.route) },
+                onNavigateToProgress = { navigateToTopLevel(Screen.Analytic.route) },
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToHome = { navController.navigate(Screen.Home.route) },
-                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
-                onNavigateToReminders = { navController.navigate(Screen.Reminders.route) },
-                onNavigateToSocial = { navController.navigate(Screen.Social.route) },
+                onNavigateToHome = { navigateToTopLevel(Screen.Home.route) },
+                onNavigateToSettings = { navigateToTopLevel(Screen.Settings.route) },
+                onNavigateToReminders = { navigateToTopLevel(Screen.Reminders.route) },
+                onNavigateToSocial = { navigateToTopLevel(Screen.Social.route) },
                 onNavigateToEditCategory = { categoryId ->
                     navController.navigate(Screen.EditCategory.createRoute(categoryId))
                 },
@@ -179,11 +188,11 @@ fun AppNavigation(
 
         composable(Screen.Analytic.route) {
             ProgressScreenContent(
-                onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
-                onNavigateToHome = { navController.navigate(Screen.Home.route) },
-                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
-                onNavigateToReminders = { navController.navigate(Screen.Reminders.route) },
-                onNavigateToSocial = { navController.navigate(Screen.Social.route) },
+                onNavigateToGoals = { navigateToTopLevel(Screen.Goals.route) },
+                onNavigateToHome = { navigateToTopLevel(Screen.Home.route) },
+                onNavigateToSettings = { navigateToTopLevel(Screen.Settings.route) },
+                onNavigateToReminders = { navigateToTopLevel(Screen.Reminders.route) },
+                onNavigateToSocial = { navigateToTopLevel(Screen.Social.route) },
                 onNavigateBack = { navController.popBackStack() }
             )
         }
@@ -196,31 +205,31 @@ fun AppNavigation(
             SweetTaskDetailScreen(
                 goalId = goalId,
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToHome = { navController.navigate(Screen.Home.route) },
-                onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
-                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
-                onNavigateToProgress = { navController.navigate(Screen.Analytic.route) },
-                onNavigateToSocial = { navController.navigate(Screen.Social.route) }
+                onNavigateToHome = { navigateToTopLevel(Screen.Home.route) },
+                onNavigateToGoals = { navigateToTopLevel(Screen.Goals.route) },
+                onNavigateToSettings = { navigateToTopLevel(Screen.Settings.route) },
+                onNavigateToProgress = { navigateToTopLevel(Screen.Analytic.route) },
+                onNavigateToSocial = { navigateToTopLevel(Screen.Social.route) }
             )
         }
 
         composable(Screen.Reminders.route) {
             com.aliumitalgan.remindup.ui.reminders.RemindersScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToHome = { navController.navigate(Screen.Home.route) },
-                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
-                onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
-                onNavigateToProgress = { navController.navigate(Screen.Analytic.route) }
+                onNavigateToHome = { navigateToTopLevel(Screen.Home.route) },
+                onNavigateToSettings = { navigateToTopLevel(Screen.Settings.route) },
+                onNavigateToGoals = { navigateToTopLevel(Screen.Goals.route) },
+                onNavigateToProgress = { navigateToTopLevel(Screen.Analytic.route) }
             )
         }
 
         composable(Screen.Social.route) {
             SocialScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToHome = { navController.navigate(Screen.Home.route) },
-                onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
-                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
-                onNavigateToProgress = { navController.navigate(Screen.Analytic.route) }
+                onNavigateToHome = { navigateToTopLevel(Screen.Home.route) },
+                onNavigateToGoals = { navigateToTopLevel(Screen.Goals.route) },
+                onNavigateToSettings = { navigateToTopLevel(Screen.Settings.route) },
+                onNavigateToProgress = { navigateToTopLevel(Screen.Analytic.route) }
             )
         }
 
@@ -232,12 +241,12 @@ fun AppNavigation(
                         popUpTo(0) { inclusive = true }
                     }
                 },
-                onNavigateToHome = { navController.navigate(Screen.Home.route) },
-                onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
-                onNavigateToReminders = { navController.navigate(Screen.Reminders.route) },
-                onNavigateToProgress = { navController.navigate(Screen.Analytic.route) },
+                onNavigateToHome = { navigateToTopLevel(Screen.Home.route) },
+                onNavigateToGoals = { navigateToTopLevel(Screen.Goals.route) },
+                onNavigateToReminders = { navigateToTopLevel(Screen.Reminders.route) },
+                onNavigateToProgress = { navigateToTopLevel(Screen.Analytic.route) },
                 onNavigateToPremium = { navController.navigate(Screen.Premium.route) },
-                onNavigateToSocial = { navController.navigate(Screen.Social.route) },
+                onNavigateToSocial = { navigateToTopLevel(Screen.Social.route) },
                 onNavigateToPersonalInfo = { navController.navigate(Screen.PersonalInfo.route) },
                 onNavigateToNotifications = { navController.navigate(Screen.Notifications.route) },
                 onNavigateToSecurity = { navController.navigate(Screen.Security.route) },
@@ -255,10 +264,10 @@ fun AppNavigation(
         composable(Screen.Notifications.route) {
             NotificationsScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToHome = { navController.navigate(Screen.Home.route) },
-                onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
-                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
-                onNavigateToSocial = { navController.navigate(Screen.Social.route) }
+                onNavigateToHome = { navigateToTopLevel(Screen.Home.route) },
+                onNavigateToGoals = { navigateToTopLevel(Screen.Goals.route) },
+                onNavigateToSettings = { navigateToTopLevel(Screen.Settings.route) },
+                onNavigateToSocial = { navigateToTopLevel(Screen.Social.route) }
             )
         }
 
@@ -270,10 +279,10 @@ fun AppNavigation(
                         popUpTo(0) { inclusive = true }
                     }
                 },
-                onNavigateToHome = { navController.navigate(Screen.Home.route) },
-                onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
-                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
-                onNavigateToSocial = { navController.navigate(Screen.Social.route) },
+                onNavigateToHome = { navigateToTopLevel(Screen.Home.route) },
+                onNavigateToGoals = { navigateToTopLevel(Screen.Goals.route) },
+                onNavigateToSettings = { navigateToTopLevel(Screen.Settings.route) },
+                onNavigateToSocial = { navigateToTopLevel(Screen.Social.route) },
                 onNavigateToChangePassword = { navController.navigate(Screen.ChangePassword.route) }
             )
         }
@@ -332,9 +341,9 @@ fun AppNavigation(
                 categoryId = categoryId.takeUnless { it.isBlank() || it.equals("new", ignoreCase = true) },
                 onNavigateBack = { navController.popBackStack() },
                 onSave = { navController.popBackStack() },
-                onNavigateToHome = { navController.navigate(Screen.Home.route) },
-                onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
-                onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
+                onNavigateToHome = { navigateToTopLevel(Screen.Home.route) },
+                onNavigateToGoals = { navigateToTopLevel(Screen.Goals.route) },
+                onNavigateToSettings = { navigateToTopLevel(Screen.Settings.route) }
             )
         }
 

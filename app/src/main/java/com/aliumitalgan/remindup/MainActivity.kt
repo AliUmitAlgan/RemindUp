@@ -12,6 +12,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -52,7 +53,8 @@ class MainActivity : ComponentActivity() {
         NotificationUtils.createNotificationChannels(this)
         NotificationUtils.loadNotificationState(this)
         NotificationUtils.resetAppLaunchState()
-        ThemeManager.loadThemeState(this)
+        ThemeManager.setDarkTheme(isSystemDarkMode(configuration = resources.configuration))
+        ThemeManager.loadDynamicAccentsState(this)
         LanguageManager.loadSavedLanguage(this)
         NotificationNavigationState.updateFromIntent(intent)
 
@@ -70,11 +72,15 @@ class MainActivity : ComponentActivity() {
             val currentLanguage by LanguageManager.currentLanguage
             val languageState = remember { mutableStateOf(currentLanguage) }
             val appContainer = remember { AppContainer(applicationContext) }
-            val isDarkTheme by ThemeManager.isDarkTheme
             val dynamicAccentsEnabled by ThemeManager.dynamicAccentsEnabled
+            val systemIsDarkTheme = isSystemInDarkTheme()
 
             LaunchedEffect(currentLanguage) {
                 languageState.value = currentLanguage
+            }
+
+            LaunchedEffect(systemIsDarkTheme) {
+                ThemeManager.setDarkTheme(systemIsDarkTheme)
             }
 
             CompositionLocalProvider(
@@ -83,7 +89,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 key(currentLanguage) {
                     RemindUpTheme(
-                        darkTheme = isDarkTheme,
+                        darkTheme = systemIsDarkTheme,
                         dynamicColor = dynamicAccentsEnabled
                     ) {
                         Surface(
@@ -134,6 +140,10 @@ class MainActivity : ComponentActivity() {
             hide(WindowInsetsCompat.Type.statusBars())
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
+    }
+
+    private fun isSystemDarkMode(configuration: Configuration): Boolean {
+        return (configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
     }
 }
 
