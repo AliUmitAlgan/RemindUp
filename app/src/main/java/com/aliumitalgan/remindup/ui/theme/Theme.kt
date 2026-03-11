@@ -68,12 +68,12 @@ private val DarkColors = darkColorScheme(
     errorContainer = Color(0xFF93000A),
     onErrorContainer = Color(0xFFFFDAD6),
 
-    background = Color(0xFF121826),
+    background = Color(0xFF0B0F14),
     onBackground = Color(0xFFE2E8F0),
 
-    surface = Color(0xFF1E293B),
+    surface = Color(0xFF131923),
     onSurface = Color(0xFFE2E8F0),
-    surfaceVariant = Color(0xFF334155),
+    surfaceVariant = Color(0xFF1F2937),
     onSurfaceVariant = Color(0xFFC5C6D0)
 )
 
@@ -198,7 +198,7 @@ object AppColors {
 fun RemindUpTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     forceDarkTheme: Boolean? = null,
-    dynamicColor: Boolean = true, // Dynamic color özelliği Android 12+ için
+    dynamicColor: Boolean = false, // Dynamic color özelliği Android 12+ için
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
@@ -234,3 +234,4 @@ fun RemindUpTheme(
         )
     }
 }
+

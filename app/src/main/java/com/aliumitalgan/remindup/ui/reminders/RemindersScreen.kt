@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,8 +23,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
@@ -94,144 +95,146 @@ fun RemindersScreen(
         viewModel.onEvent(RemindersUiEvent.ClearMessage)
     }
 
-    Scaffold(
-        topBar = {
-            Column {
-                TopAppBar(
-                    title = {
-                        if (state.isSearchActive) {
-                            OutlinedTextField(
-                                value = state.searchQuery,
-                                onValueChange = {
-                                    viewModel.onEvent(RemindersUiEvent.SearchQueryChanged(it))
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("Hatırlatıcı ara...") },
-                                singleLine = true,
-                                leadingIcon = {
-                                    Icon(Icons.Default.Search, contentDescription = null)
-                                },
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                                    cursorColor = MaterialTheme.colorScheme.primary
-                                ),
-                                shape = RoundedCornerShape(24.dp)
-                            )
-                        } else {
-                            Text(
-                                text = stringResource(R.string.reminders),
-                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-                            )
-                        }
+    val headerContent: @Composable () -> Unit = {
+        Column {
+            TopAppBar(
+                title = {
+                    if (state.isSearchActive) {
+                        OutlinedTextField(
+                            value = state.searchQuery,
+                            onValueChange = {
+                                viewModel.onEvent(RemindersUiEvent.SearchQueryChanged(it))
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text("Hatırlatıcı ara...") },
+                            singleLine = true,
+                            leadingIcon = {
+                                Icon(Icons.Default.Search, contentDescription = null)
+                            },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                cursorColor = MaterialTheme.colorScheme.primary
+                            ),
+                            shape = RoundedCornerShape(24.dp)
+                        )
+                    } else {
+                        Text(
+                            text = stringResource(R.string.reminders),
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = null
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { viewModel.onEvent(RemindersUiEvent.ToggleSearch) }) {
+                        Icon(
+                            imageVector = if (state.isSearchActive) Icons.Default.Close else Icons.Default.Search,
+                            contentDescription = null
+                        )
+                    }
+                    IconButton(onClick = { viewModel.onEvent(RemindersUiEvent.ShowAddDialog) }) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                ),
+                windowInsets = WindowInsets(0, 0, 0, 0)
+            )
+
+            AnimatedVisibility(
+                visible = !state.isSearchActive || state.searchQuery.isEmpty(),
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                FilterChips(
+                    selectedCategory = state.selectedCategory,
+                    selectedType = state.selectedType,
+                    onCategorySelected = {
+                        viewModel.onEvent(RemindersUiEvent.CategoryFilterChanged(it))
                     },
-                    navigationIcon = {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(
-                                imageVector = Icons.Default.ArrowBack,
-                                contentDescription = null
-                            )
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = { viewModel.onEvent(RemindersUiEvent.ToggleSearch) }) {
-                            Icon(
-                                imageVector = if (state.isSearchActive) Icons.Default.Close else Icons.Default.Search,
-                                contentDescription = null
-                            )
-                        }
-                        IconButton(onClick = { viewModel.onEvent(RemindersUiEvent.ShowAddDialog) }) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface
-                    )
+                    onTypeSelected = {
+                        viewModel.onEvent(RemindersUiEvent.TypeFilterChanged(it))
+                    }
                 )
+            }
 
-                AnimatedVisibility(
-                    visible = !state.isSearchActive || state.searchQuery.isEmpty(),
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
+            AnimatedVisibility(
+                visible = state.searchQuery.isNotEmpty() ||
+                    state.selectedCategory != null ||
+                    state.selectedType != null,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    FilterChips(
-                        selectedCategory = state.selectedCategory,
-                        selectedType = state.selectedType,
-                        onCategorySelected = {
-                            viewModel.onEvent(RemindersUiEvent.CategoryFilterChanged(it))
-                        },
-                        onTypeSelected = {
-                            viewModel.onEvent(RemindersUiEvent.TypeFilterChanged(it))
-                        }
-                    )
-                }
-
-                AnimatedVisibility(
-                    visible = state.searchQuery.isNotEmpty() ||
-                        state.selectedCategory != null ||
-                        state.selectedType != null,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                        modifier = Modifier.padding(end = 8.dp)
                     ) {
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                            modifier = Modifier.padding(end = 8.dp)
-                        ) {
-                            Text(
-                                text = "${state.visibleReminders.size} sonuç",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                            )
-                        }
+                        Text(
+                            text = "${state.visibleReminders.size} sonuç",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
 
-                        state.selectedCategory?.let { category ->
-                            FilterChip(
-                                selected = true,
-                                onClick = {
-                                    viewModel.onEvent(RemindersUiEvent.CategoryFilterChanged(null))
-                                },
-                                label = { Text(categoryLabel(category)) },
-                                trailingIcon = {
-                                    Icon(Icons.Default.Close, contentDescription = null, Modifier.size(16.dp))
-                                },
-                                modifier = Modifier.padding(end = 8.dp),
-                                colors = FilterChipDefaults.filterChipColors()
-                            )
-                        }
+                    state.selectedCategory?.let { category ->
+                        FilterChip(
+                            selected = true,
+                            onClick = {
+                                viewModel.onEvent(RemindersUiEvent.CategoryFilterChanged(null))
+                            },
+                            label = { Text(categoryLabel(category)) },
+                            trailingIcon = {
+                                Icon(Icons.Default.Close, contentDescription = null, Modifier.size(16.dp))
+                            },
+                            modifier = Modifier.padding(end = 8.dp),
+                            colors = FilterChipDefaults.filterChipColors()
+                        )
+                    }
 
-                        state.selectedType?.let { type ->
-                            FilterChip(
-                                selected = true,
-                                onClick = {
-                                    viewModel.onEvent(RemindersUiEvent.TypeFilterChanged(null))
-                                },
-                                label = { Text(typeLabel(type)) },
-                                trailingIcon = {
-                                    Icon(Icons.Default.Close, contentDescription = null, Modifier.size(16.dp))
-                                },
-                                modifier = Modifier.padding(end = 8.dp),
-                                colors = FilterChipDefaults.filterChipColors()
-                            )
-                        }
+                    state.selectedType?.let { type ->
+                        FilterChip(
+                            selected = true,
+                            onClick = {
+                                viewModel.onEvent(RemindersUiEvent.TypeFilterChanged(null))
+                            },
+                            label = { Text(typeLabel(type)) },
+                            trailingIcon = {
+                                Icon(Icons.Default.Close, contentDescription = null, Modifier.size(16.dp))
+                            },
+                            modifier = Modifier.padding(end = 8.dp),
+                            colors = FilterChipDefaults.filterChipColors()
+                        )
+                    }
 
-                        Spacer(modifier = Modifier.weight(1f))
+                    Spacer(modifier = Modifier.weight(1f))
 
-                        TextButton(onClick = { viewModel.onEvent(RemindersUiEvent.ClearFilters) }) {
-                            Text("Temizle")
-                        }
+                    TextButton(onClick = { viewModel.onEvent(RemindersUiEvent.ClearFilters) }) {
+                        Text("Temizle")
                     }
                 }
             }
-        },
+        }
+    }
+
+    Scaffold(
         bottomBar = {
             BottomNavigationBar(
                 items = bottomNavItems,
@@ -244,8 +247,7 @@ fun RemindersScreen(
                         "analytic" -> onNavigateToProgress()
                         "settings" -> onNavigateToSettings()
                     }
-                },
-                onCenterActionClick = { viewModel.onEvent(RemindersUiEvent.ShowAddDialog) }
+                }
             )
         }
     ) { innerPadding ->
@@ -257,28 +259,43 @@ fun RemindersScreen(
         ) {
             when {
                 state.isLoading -> {
-                    Box(
+                    Column(
                         modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+                        verticalArrangement = Arrangement.Top
                     ) {
-                        CircularProgressIndicator()
+                        headerContent()
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
                     }
                 }
                 state.visibleReminders.isEmpty() -> {
-                    EmptyRemindersView(
-                        onAddClick = { viewModel.onEvent(RemindersUiEvent.ShowAddDialog) },
-                        isFiltered = state.searchQuery.isNotEmpty() ||
-                            state.selectedCategory != null ||
-                            state.selectedType != null
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Top
+                    ) {
+                        headerContent()
+                        EmptyRemindersView(
+                            onAddClick = { viewModel.onEvent(RemindersUiEvent.ShowAddDialog) },
+                            isFiltered = state.searchQuery.isNotEmpty() ||
+                                state.selectedCategory != null ||
+                                state.selectedType != null
+                        )
+                    }
                 }
                 else -> {
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        item {
+                            headerContent()
+                        }
                         items(state.visibleReminders, key = { it.id }) { record ->
                             ReminderCard(
                                 reminder = record.reminder,
@@ -337,4 +354,5 @@ private fun typeLabel(type: ReminderType): String {
         ReminderType.MONTHLY -> "Aylık"
     }
 }
+
 

@@ -16,17 +16,26 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Coffee
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.LocalDining
+import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Nightlight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Pets
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.SelfImprovement
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.Icon
@@ -53,10 +62,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aliumitalgan.remindup.components.BottomNavigationBar
 import com.aliumitalgan.remindup.components.mainBottomNavItems
+import com.aliumitalgan.remindup.ui.theme.themedColor
 
-private val LightBg = Color(0xFFFDFBF9)
+private val LightBg: Color
+    get() = themedColor(Color(0xFFFDFBF9), Color(0xFF0F131A))
 private val AccentOrange = Color(0xFFF26522)
-private val Deep = Color(0xFF1A1A1A)
+private val Deep: Color
+    get() = themedColor(Color(0xFF1A1A1A), Color(0xFFE5E7EB))
 private val LightOrange = Color(0xFFFFF3E8)
 private val LightMint = Color(0xFFE8F5E9)
 private val LightLavender = Color(0xFFF3E8FF)
@@ -79,7 +91,14 @@ private val categoryIcons = listOf(
     Icons.Filled.Coffee,
     Icons.Filled.Work,
     Icons.Filled.Alarm,
-    Icons.Filled.Pets
+    Icons.Filled.Pets,
+    Icons.Filled.SelfImprovement,
+    Icons.Filled.LocalDining,
+    Icons.AutoMirrored.Filled.DirectionsRun,
+    Icons.Filled.School,
+    Icons.Filled.Movie,
+    Icons.Filled.ShoppingCart,
+    Icons.Filled.Favorite
 )
 
 @Composable
@@ -95,28 +114,17 @@ fun EditCategoryScreen(
     var selectedColor by remember { mutableStateOf(AccentOrange) }
     var selectedIconIndex by remember { mutableStateOf(0) }
     var smartRemindersEnabled by remember { mutableStateOf(true) }
+    var showAllIcons by remember { mutableStateOf(false) }
     var currentRoute by remember { mutableStateOf("categories") }
     val navItems = mainBottomNavItems()
+    val visibleIconOptions = if (showAllIcons) {
+        categoryIcons.mapIndexed { index, icon -> index to icon }
+    } else {
+        categoryIcons.take(8).mapIndexed { index, icon -> index to icon }
+    }
 
     Scaffold(
         containerColor = LightBg,
-        topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onNavigateBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Deep)
-                }
-                Text("Edit Category", fontWeight = FontWeight.Bold, color = Deep, fontSize = 18.sp)
-                TextButton(onClick = onSave) {
-                    Text("Save", color = AccentOrange, fontWeight = FontWeight.SemiBold)
-                }
-            }
-        },
         bottomBar = {
             BottomNavigationBar(
                 items = navItems,
@@ -130,8 +138,7 @@ fun EditCategoryScreen(
                         "analytic" -> { }
                         "settings" -> onNavigateToSettings()
                     }
-                },
-                onCenterActionClick = onNavigateToGoals
+                }
             )
         }
     ) { innerPadding ->
@@ -139,14 +146,31 @@ fun EditCategoryScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
         ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Deep)
+                }
+                Text("Edit Category", fontWeight = FontWeight.Bold, color = Deep, fontSize = 18.sp)
+                TextButton(onClick = onSave) {
+                    Text("Save", color = AccentOrange, fontWeight = FontWeight.SemiBold)
+                }
+            }
+
             Text(
                 "LIVE PREVIEW",
                 fontSize = 12.sp,
                 color = Color(0xFF9CA3AF),
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(top = 16.dp)
+                modifier = Modifier.padding(top = 10.dp)
             )
             Surface(
                 modifier = Modifier
@@ -245,21 +269,24 @@ fun EditCategoryScreen(
                     color = Deep,
                     fontWeight = FontWeight.Medium
                 )
-                TextButton(onClick = { }) {
-                    Text("VIEW ALL", color = AccentOrange, fontWeight = FontWeight.SemiBold)
+                TextButton(onClick = { showAllIcons = !showAllIcons }) {
+                    Text(
+                        text = if (showAllIcons) "SHOW LESS" else "VIEW ALL",
+                        color = AccentOrange,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
             LazyVerticalGrid(
                 columns = GridCells.Fixed(4),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp)
+                    .height(if (showAllIcons) 320.dp else 180.dp)
                     .padding(top = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(categoryIcons.indices.toList()) { index ->
-                    val icon = categoryIcons[index]
+                items(visibleIconOptions) { (index, icon) ->
                     val isSelected = selectedIconIndex == index
                     Box(
                         modifier = Modifier
@@ -327,3 +354,4 @@ fun EditCategoryScreen(
         }
     }
 }
+

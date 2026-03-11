@@ -28,6 +28,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.aliumitalgan.remindup.ui.theme.appCardColor
+import com.aliumitalgan.remindup.ui.theme.appTextPrimary
+import com.aliumitalgan.remindup.ui.theme.appTextSecondary
 
 private val WarningRed = Color(0xFFE53935)
 private val LightGray = Color(0xFFE8E8E8)
@@ -41,7 +44,7 @@ fun DeleteGoalDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(24.dp),
-            color = Color.White
+            color = appCardColor
         ) {
             Column(
                 modifier = Modifier
@@ -68,19 +71,19 @@ fun DeleteGoalDialog(
                     text = "Warning",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1A1A1A)
+                    color = appTextPrimary
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Are you sure you want to delete this goal?",
                     fontSize = 14.sp,
-                    color = Color(0xFF4A4A4A),
+                    color = appTextSecondary,
                     textAlign = TextAlign.Center
                 )
                 Text(
                     text = "This action cannot be undone.",
                     fontSize = 14.sp,
-                    color = Color(0xFF4A4A4A),
+                    color = appTextSecondary,
                     textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(24.dp))
@@ -91,8 +94,8 @@ fun DeleteGoalDialog(
                         .height(48.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = LightBlueGray,
-                        contentColor = Color(0xFF4A4A4A)
+                        containerColor = androidx.compose.ui.graphics.Color(0xFF2A3342),
+                        contentColor = appTextPrimary
                     )
                 ) {
                     Text("Keep Goal", fontWeight = FontWeight.SemiBold)

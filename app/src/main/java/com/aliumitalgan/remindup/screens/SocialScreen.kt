@@ -23,7 +23,6 @@ import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,10 +45,15 @@ import com.aliumitalgan.remindup.components.mainBottomNavItems
 import com.aliumitalgan.remindup.data.repository.FriendAchiever
 import com.aliumitalgan.remindup.data.repository.SocialData
 import com.aliumitalgan.remindup.data.repository.SocialRepository
+import com.aliumitalgan.remindup.ui.theme.appCardColor
+import com.aliumitalgan.remindup.ui.theme.appTextPrimary
+import com.aliumitalgan.remindup.ui.theme.appTextSecondary
+import com.aliumitalgan.remindup.ui.theme.themedColor
 import com.aliumitalgan.remindup.utils.ProgressUtils
 
 private val AccentOrange = Color(0xFFF26522)
-private val LightBg = Color(0xFFFBF8F4)
+private val LightBg: Color
+    get() = themedColor(Color(0xFFFBF8F4), Color(0xFF0F131A))
 
 @Composable
 fun SocialScreen(
@@ -61,8 +65,9 @@ fun SocialScreen(
     onAddFriend: () -> Unit = {}
 ) {
     val repository = remember { SocialRepository() }
-    val socialFlow = remember { repository.getSocialData() }
-    val result by socialFlow.collectAsState(initial = Result.failure(Exception("Loading...")))
+    var refreshKey by remember { mutableStateOf(0) }
+    val socialFlow = remember(refreshKey) { repository.getSocialData() }
+    val result by socialFlow.collectAsState(initial = null)
     var currentRoute by remember { mutableStateOf("social") }
     val navItems = mainBottomNavItems()
 
@@ -89,8 +94,7 @@ fun SocialScreen(
                         "analytic" -> onNavigateToProgress()
                         "settings" -> onNavigateToSettings()
                     }
-                },
-                onCenterActionClick = onNavigateToGoals
+                }
             )
         }
     ) { innerPadding ->
@@ -110,14 +114,14 @@ fun SocialScreen(
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = null,
-                        tint = Color(0xFF1A1A1A)
+                        tint = appTextPrimary
                     )
                 }
                 Text(
                     "Friends Activity",
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
-                    color = Color(0xFF1A1A1A)
+                    color = appTextPrimary
                 )
                 IconButton(onClick = onAddFriend) {
                     Icon(
@@ -129,8 +133,16 @@ fun SocialScreen(
             }
 
             when {
-                result.isSuccess -> {
-                    val data = result.getOrNull()
+                result == null -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = AccentOrange)
+                    }
+                }
+                result?.isSuccess == true -> {
+                    val data = result?.getOrNull()
                     if (data != null) {
                         LazyColumn(
                             modifier = Modifier
@@ -149,55 +161,98 @@ fun SocialScreen(
                                     "TOP ACHIEVERS",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp,
-                                    color = Color(0xFF6B7280)
+                                    color = appTextSecondary
                                 )
                             }
-                            items(data.achievers.ifEmpty {
-                                listOf(
-                                    FriendAchiever("1", "Ali Henderson", null, 92, "CRUSHING IT!", 1, false),
-                                    FriendAchiever("2", "Sarah Chen", null, 85, "Almost there", null, true),
-                                    FriendAchiever("3", "Michael Ross", null, 64, "Steady progress", null, false),
-                                    FriendAchiever("4", "Elena Gilbert", null, 32, "Starting the day", null, false)
-                                )
-                            }) { achiever ->
+                            items(data.achievers) { achiever ->
                                 AchieverCard(achiever = achiever)
+                            }
+                            if (data.achievers.isEmpty()) {
+                                item {
+                                    EmptySocialState()
+                                }
                             }
                         }
                     }
                 }
                 else -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        LazyColumn(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            item {
-                                DailyMomentumSection(avgProgress = 85, friendCount = 16)
-                            }
-                            item {
-                                Text(
-                                    "TOP ACHIEVERS",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    color = Color(0xFF6B7280)
-                                )
-                            }
-                            items(
-                                listOf(
-                                    FriendAchiever("1", "Ali Henderson", null, 92, "CRUSHING IT!", 1, false),
-                                    FriendAchiever("2", "Sarah Chen", null, 85, "Almost there", null, true),
-                                    FriendAchiever("3", "Michael Ross", null, 64, "Steady progress", null, false),
-                                    FriendAchiever("4", "Elena Gilbert", null, 32, "Starting the day", null, false)
-                                )
-                            ) { achiever ->
-                                AchieverCard(achiever = achiever)
-                            }
-                        }
-                    }
+                    ErrorSocialState(
+                        message = result?.exceptionOrNull()?.message ?: "Unable to load social data.",
+                        onRetry = { refreshKey += 1 }
+                    )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptySocialState() {
+    Surface(
+        color = appCardColor,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = "No friend activity yet",
+                fontWeight = FontWeight.Bold,
+                color = appTextPrimary,
+                fontSize = 16.sp
+            )
+            Text(
+                text = "When friends connect and update progress, you'll see them here.",
+                color = appTextSecondary,
+                fontSize = 13.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun ErrorSocialState(
+    message: String,
+    onRetry: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = appCardColor,
+            onClick = onRetry
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Social feed unavailable",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = appTextPrimary
+                )
+                Text(
+                    text = message,
+                    color = appTextSecondary,
+                    fontSize = 13.sp
+                )
+                Text(
+                    text = "Tap to retry",
+                    color = AccentOrange,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
+                )
             }
         }
     }
@@ -209,7 +264,7 @@ private fun DailyMomentumSection(
     friendCount: Int
 ) {
     Surface(
-        color = Color.White,
+        color = appCardColor,
         shape = RoundedCornerShape(20.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -240,7 +295,7 @@ private fun DailyMomentumSection(
                             text = "U${index + 1}",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1A1A1A)
+                            color = appTextPrimary
                         )
                     }
                 }
@@ -272,7 +327,7 @@ private fun DailyMomentumSection(
                 Text(
                     text = "AVG GROUP",
                     fontSize = 12.sp,
-                    color = Color(0xFF6B7280)
+                    color = appTextSecondary
                 )
             }
         }
@@ -282,7 +337,7 @@ private fun DailyMomentumSection(
 @Composable
 private fun AchieverCard(achiever: FriendAchiever) {
     Surface(
-        color = Color.White,
+        color = appCardColor,
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -303,7 +358,7 @@ private fun AchieverCard(achiever: FriendAchiever) {
                     text = achiever.displayName.firstOrNull()?.uppercase() ?: "U",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1A1A1A)
+                    color = appTextPrimary
                 )
             }
             Spacer(modifier = Modifier.size(12.dp))
@@ -313,7 +368,7 @@ private fun AchieverCard(achiever: FriendAchiever) {
                         text = achiever.displayName,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
-                        color = Color(0xFF1A1A1A)
+                        color = appTextPrimary
                     )
                     achiever.rank?.let { rank ->
                         Spacer(modifier = Modifier.size(8.dp))
@@ -334,7 +389,7 @@ private fun AchieverCard(achiever: FriendAchiever) {
                 Text(
                     text = achiever.status,
                     fontSize = 12.sp,
-                    color = if (achiever.status == "CRUSHING IT!") AccentOrange else Color(0xFF6B7280)
+                    color = if (achiever.status == "CRUSHING IT!") AccentOrange else appTextSecondary
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Box(
@@ -342,7 +397,7 @@ private fun AchieverCard(achiever: FriendAchiever) {
                         .fillMaxWidth()
                         .height(6.dp)
                         .clip(RoundedCornerShape(3.dp))
-                        .background(Color(0xFFE5E7EB))
+                        .background(themedColor(Color(0xFFE5E7EB), Color(0xFF334155)))
                 ) {
                     Box(
                         modifier = Modifier
@@ -367,8 +422,9 @@ private fun AchieverCard(achiever: FriendAchiever) {
                 text = "${achiever.progressPercent}%",
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp,
-                color = Color(0xFF1A1A1A)
+                color = appTextPrimary
             )
         }
     }
 }
+

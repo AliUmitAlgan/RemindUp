@@ -24,6 +24,7 @@ import com.aliumitalgan.remindup.domain.usecase.reminder.AddReminderUseCase
 import com.aliumitalgan.remindup.domain.usecase.reminder.DeleteReminderUseCase
 import com.aliumitalgan.remindup.domain.usecase.reminder.GetRemindersUseCase
 import com.aliumitalgan.remindup.domain.usecase.reminder.UpdateReminderUseCase
+import com.aliumitalgan.remindup.presentation.auth.LoginViewModel
 import com.aliumitalgan.remindup.presentation.goals.GoalsViewModel
 import com.aliumitalgan.remindup.presentation.home.HomeViewModel
 import com.google.firebase.auth.FirebaseAuth
@@ -86,6 +87,9 @@ class RemindUpViewModelFactory(
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return when {
+            modelClass.isAssignableFrom(LoginViewModel::class.java) -> LoginViewModel(
+                container.authRepository
+            ) as T
             modelClass.isAssignableFrom(GoalsViewModel::class.java) -> GoalsViewModel(
                 container.getUserGoalsUseCase,
                 container.addGoalUseCase,

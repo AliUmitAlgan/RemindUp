@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,16 +17,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,18 +48,22 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aliumitalgan.remindup.components.BottomNavigationBar
-import com.aliumitalgan.remindup.components.mainBottomNavItems
 import com.aliumitalgan.remindup.components.MoreActionsBottomSheet
 import com.aliumitalgan.remindup.components.SignOutConfirmationDialog
+import com.aliumitalgan.remindup.components.mainBottomNavItems
 import com.aliumitalgan.remindup.data.repository.FirestoreEntitlementRepository
 import com.aliumitalgan.remindup.domain.model.EntitlementStatus
 import com.aliumitalgan.remindup.domain.model.PlanType
 import com.aliumitalgan.remindup.utils.AuthUtils
+import com.aliumitalgan.remindup.utils.ProgressUtils
+import com.aliumitalgan.remindup.ui.theme.themedColor
 import com.google.firebase.auth.FirebaseAuth
 
-private val ProfileBg = Color(0xFFF5F2F2)
-private val Orange = Color(0xFFF26522)
-private val Deep = Color(0xFF161B38)
+private val ProfileBg: Color
+    get() = themedColor(Color(0xFFF5F2F2), Color(0xFF0F131A))
+private val AccentOrange = Color(0xFFF26522)
+private val Deep: Color
+    get() = themedColor(Color(0xFF161B38), Color(0xFFE5E7EB))
 
 @Composable
 fun SettingsScreenContent(
@@ -71,7 +77,8 @@ fun SettingsScreenContent(
     onNavigateToSocial: () -> Unit = {},
     onNavigateToPersonalInfo: () -> Unit = {},
     onNavigateToNotifications: () -> Unit = {},
-    onNavigateToSecurity: () -> Unit = {}
+    onNavigateToSecurity: () -> Unit = {},
+    onNavigateToAppearance: () -> Unit = {}
 ) {
     var currentRoute by remember { mutableStateOf("settings") }
     val navItems = mainBottomNavItems()
@@ -79,16 +86,28 @@ fun SettingsScreenContent(
     val user = FirebaseAuth.getInstance().currentUser
     val name = user?.displayName?.ifBlank { null } ?: "Sweet Reminder"
     val email = user?.email ?: "remindup.user@sweet.com"
-    val initials = name.split(" ").mapNotNull { it.firstOrNull()?.uppercase() }.take(2).joinToString("").ifBlank { "SR" }
 
+    var tasksDone by remember { mutableStateOf(128) }
+    var streaks by remember { mutableStateOf(42) }
+    var awards by remember { mutableStateOf(12) }
     var isPremium by remember { mutableStateOf(false) }
     var showSignOutDialog by remember { mutableStateOf(false) }
     var showMoreActions by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         runCatching {
             val entitlement = FirestoreEntitlementRepository().getEntitlement()
             isPremium = entitlement.planType == PlanType.PREMIUM &&
                 (entitlement.status == EntitlementStatus.ACTIVE || entitlement.status == EntitlementStatus.GRACE)
+        }
+
+        runCatching {
+            val goals = ProgressUtils.getUserGoals().getOrDefault(emptyList()).map { it.second }
+            if (goals.isNotEmpty()) {
+                tasksDone = (goals.sumOf { it.progress } / 3).coerceAtLeast(8)
+                streaks = goals.count { it.progress >= 60 }.coerceAtLeast(1) * 3
+                awards = goals.count { it.progress >= 100 }.coerceAtLeast(1) * 2
+            }
         }
     }
 
@@ -107,37 +126,33 @@ fun SettingsScreenContent(
                         "analytic" -> onNavigateToProgress()
                         "settings" -> Unit
                     }
-                },
-                onCenterActionClick = onNavigateToGoals
+                }
             )
         }
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(innerPadding),
+            contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 90.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Deep)
                     }
-                    Text("RemindUp Sweet Profile", fontWeight = FontWeight.ExtraBold, color = Deep)
-                    Row {
-                        IconButton(onClick = { showMoreActions = true }) {
-                            Icon(Icons.Filled.MoreVert, contentDescription = null, tint = Deep)
-                        }
-                        IconButton(onClick = onNavigateToPremium) {
-                            Icon(Icons.Filled.Star, contentDescription = null, tint = Orange)
-                        }
+                    Text(
+                        text = "Profile",
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Deep,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = { showMoreActions = true }) {
+                        Icon(Icons.Filled.MoreHoriz, contentDescription = null, tint = Deep)
                     }
                 }
             }
@@ -147,24 +162,81 @@ fun SettingsScreenContent(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(104.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFFFD7C4)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(initials, color = Color.White, fontWeight = FontWeight.Black, fontSize = 30.sp)
+                    Box(contentAlignment = Alignment.BottomEnd) {
+                        Box(
+                            modifier = Modifier
+                                .size(106.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFFFD7C4)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.PersonOutline,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(54.dp)
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(AccentOrange),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Edit,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(name, fontWeight = FontWeight.ExtraBold, fontSize = 30.sp, color = Deep)
-                    Text(email, color = Orange, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(name, fontWeight = FontWeight.ExtraBold, fontSize = 32.sp, color = Deep)
+                    Text(email, color = AccentOrange, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Surface(
+                        color = themedColor(Color(0xFFF1F2F5), Color(0xFF232D3A)),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text(
+                            text = "Joined May 2023",
+                            color = themedColor(Color(0xFF8B92A9), Color(0xFFAEB6C5)),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    MetricCard(
+                        value = tasksDone.toString(),
+                        label = "TASKS\nDONE",
+                        valueColor = Color(0xFFEC5A9B),
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricCard(
+                        value = streaks.toString(),
+                        label = "STREAKS",
+                        valueColor = Color(0xFF43A2FF),
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricCard(
+                        value = awards.toString(),
+                        label = "AWARDS",
+                        valueColor = Color(0xFF43D3B8),
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
 
             item {
                 Surface(
-                    color = Color(0xFFFFF5DF),
+                    color = themedColor(Color(0xFFFFF7E8), Color(0xFF202A37)),
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth(),
                     onClick = onNavigateToPremium
@@ -172,42 +244,44 @@ fun SettingsScreenContent(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(14.dp),
+                            .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
                                 .size(34.dp)
                                 .clip(CircleShape)
-                                .background(Color.White),
+                                .background(Color(0xFFFCCB43)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Filled.Star, contentDescription = null, tint = Orange, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Filled.Star, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                         }
                         Spacer(modifier = Modifier.size(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                if (isPremium) "Premium Member" else "Free Member",
+                                text = if (isPremium) "Premium Member" else "Free Member",
                                 fontWeight = FontWeight.ExtraBold,
                                 color = Deep
                             )
                             Text(
-                                if (isPremium) "Unlocking sweet possibilities" else "Upgrade to unlock sweet possibilities",
-                                color = Orange,
+                                text = "Unlocking sweet possibilities",
+                                color = AccentOrange,
                                 fontSize = 12.sp
                             )
                         }
                         Box(
                             modifier = Modifier
-                                .size(10.dp)
+                                .size(8.dp)
                                 .clip(CircleShape)
-                                .background(if (isPremium) Color(0xFF22C55E) else Color(0xFF9CA3AF))
+                                .background(Color(0xFF63CF88))
                         )
                     }
                 }
             }
 
-            item { Text("Account Settings", fontWeight = FontWeight.ExtraBold, color = Deep, fontSize = 20.sp) }
+            item {
+                Text("Account Settings", fontWeight = FontWeight.ExtraBold, color = Deep, fontSize = 21.sp)
+            }
 
             item {
                 SettingRow(
@@ -237,13 +311,14 @@ fun SettingsScreenContent(
                 SettingRow(
                     icon = Icons.Filled.Palette,
                     title = "Appearance",
-                    subtitle = "Theme and colors"
+                    subtitle = "Theme and colors",
+                    onClick = onNavigateToAppearance
                 )
             }
 
             item {
                 Surface(
-                    color = Color(0xFFF8EDEE),
+                    color = themedColor(Color(0xFFF8EDEE), Color(0xFF2A2023)),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -251,7 +326,7 @@ fun SettingsScreenContent(
                         onClick = { showSignOutDialog = true },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 6.dp)
+                            .padding(vertical = 4.dp)
                     ) {
                         Text("Sign Out", color = Color(0xFFFF3B30), fontWeight = FontWeight.ExtraBold)
                     }
@@ -283,17 +358,44 @@ fun SettingsScreenContent(
 }
 
 @Composable
+private fun MetricCard(
+    value: String,
+    label: String,
+    valueColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = themedColor(Color(0xFFF9FAFC), Color(0xFF1D2632)),
+        shape = RoundedCornerShape(16.dp),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(text = value, color = valueColor, fontWeight = FontWeight.ExtraBold, fontSize = 30.sp)
+            Text(
+                text = label,
+                color = themedColor(Color(0xFFABB2C5), Color(0xFFAEB6C5)),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
 private fun SettingRow(
     icon: ImageVector,
     title: String,
     subtitle: String,
-    onClick: (() -> Unit)? = null
+    onClick: () -> Unit
 ) {
     Surface(
-        color = Color(0xFFFAFAFA),
-        shape = RoundedCornerShape(16.dp),
+        color = themedColor(Color(0xFFFAFAFA), Color(0xFF171D26)),
+        shape = RoundedCornerShape(18.dp),
         modifier = Modifier.fillMaxWidth(),
-        onClick = onClick ?: {}
+        onClick = onClick
     ) {
         Row(
             modifier = Modifier
@@ -308,7 +410,7 @@ private fun SettingRow(
                     .background(Color(0xFFFCECDD)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, contentDescription = null, tint = Orange, modifier = Modifier.size(18.dp))
+                Icon(icon, contentDescription = null, tint = AccentOrange, modifier = Modifier.size(18.dp))
             }
             Spacer(modifier = Modifier.size(10.dp))
             Column(modifier = Modifier.weight(1f)) {

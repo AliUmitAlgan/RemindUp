@@ -28,10 +28,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aliumitalgan.remindup.ui.theme.themedColor
 import com.aliumitalgan.remindup.utils.OnboardingPreferences
 import kotlinx.coroutines.delay
 
-private val SplashBackground = Color(0xFFFBF8F4)
+private val SplashBackground: Color
+    get() = themedColor(Color(0xFFFBF8F4), Color(0xFF0F131A))
 private val AccentOrange = Color(0xFFF26522)
 private val GlowOrange = Color(0xFFFF7A29)
 
@@ -92,14 +94,14 @@ fun SplashScreen(
                 text = "RemindUp",
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF2D2D2D)
+                color = themedColor(Color(0xFF2D2D2D), Color(0xFFE5E7EB))
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "STAY ON TOP OF IT",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF7F7F90),
+                color = themedColor(Color(0xFF7F7F90), Color(0xFFAEB6C5)),
                 letterSpacing = 1.2.sp
             )
         }

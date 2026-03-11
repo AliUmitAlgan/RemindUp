@@ -52,13 +52,23 @@ class GoalsViewModel(
         }
     }
 
-    fun addGoal(title: String, description: String, category: Int) {
+    fun addGoal(
+        title: String,
+        description: String,
+        category: Int,
+        dueDate: String = "",
+        reminderTime: String = "",
+        smartReminderEnabled: Boolean = true
+    ) {
         viewModelScope.launch {
             val goal = Goal(
                 title = title,
                 description = description,
                 progress = 0,
-                category = category
+                category = category,
+                dueDate = dueDate,
+                reminderTime = reminderTime,
+                smartReminderEnabled = smartReminderEnabled
             )
             addGoalUseCase(goal)
                 .onSuccess { loadGoals() }

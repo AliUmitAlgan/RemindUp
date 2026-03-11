@@ -26,6 +26,9 @@ class FirestoreGoalRepository(
                 description = data["description"] as? String ?: "",
                 progress = (data["progress"] as? Number)?.toInt() ?: 0,
                 category = (data["category"] as? Number)?.toInt() ?: 0,
+                dueDate = data["dueDate"] as? String ?: "",
+                reminderTime = data["reminderTime"] as? String ?: "",
+                smartReminderEnabled = data["smartReminderEnabled"] as? Boolean ?: true,
                 isImportant = data["isImportant"] as? Boolean ?: false,
                 userId = data["userId"] as? String ?: "",
                 createdAt = (data["createdAt"] as? Number)?.toLong() ?: 0L
@@ -41,6 +44,9 @@ class FirestoreGoalRepository(
             "description" to goal.description,
             "progress" to goal.progress,
             "category" to goal.category,
+            "dueDate" to goal.dueDate,
+            "reminderTime" to goal.reminderTime,
+            "smartReminderEnabled" to goal.smartReminderEnabled,
             "isImportant" to goal.isImportant,
             "userId" to userId,
             "createdAt" to System.currentTimeMillis()

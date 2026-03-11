@@ -28,9 +28,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aliumitalgan.remindup.ui.theme.themedColor
 
 private val AccentOrange = Color(0xFFF26522)
-private val LightBg = Color(0xFFFBF8F4)
+private val LightBg: Color
+    get() = themedColor(Color(0xFFFBF8F4), Color(0xFF0F131A))
 
 @Composable
 fun PasswordResetConfirmationScreen(
@@ -67,13 +69,13 @@ fun PasswordResetConfirmationScreen(
                 text = "Check your inbox!",
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF1A1A1A)
+                color = themedColor(Color(0xFF1A1A1A), Color(0xFFE5E7EB))
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = "We just sent a magic link to your email. It might take a minute to arrive!",
                 fontSize = 16.sp,
-                color = Color(0xFF6B7280),
+                color = themedColor(Color(0xFF6B7280), Color(0xFF9CA3AF)),
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(32.dp))
@@ -84,8 +86,8 @@ fun PasswordResetConfirmationScreen(
                     .height(56.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFE5E7EB),
-                    contentColor = Color(0xFF1A1A1A)
+                    containerColor = themedColor(Color(0xFFE5E7EB), Color(0xFF1F2937)),
+                    contentColor = themedColor(Color(0xFF1A1A1A), Color(0xFFE5E7EB))
                 )
             ) {
                 Text("Back to Login", fontWeight = FontWeight.SemiBold)

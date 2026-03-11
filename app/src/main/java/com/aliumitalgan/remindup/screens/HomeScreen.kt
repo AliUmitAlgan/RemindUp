@@ -17,8 +17,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.SelfImprovement
@@ -53,8 +53,11 @@ import com.aliumitalgan.remindup.core.di.RemindUpViewModelFactory
 import com.aliumitalgan.remindup.domain.model.Goal
 import com.aliumitalgan.remindup.models.Reminder
 import com.aliumitalgan.remindup.presentation.home.HomeViewModel
+import com.aliumitalgan.remindup.ui.theme.appCardColor
+import com.aliumitalgan.remindup.ui.theme.themedColor
 
-private val SweetBackground = Color(0xFFF6F1EE)
+private val SweetBackground: Color
+    get() = themedColor(Color(0xFFF6F1EE), Color(0xFF0F131A))
 private val DailyGoalCard = Color(0xFFE8DDF1)
 private val MainTaskCard = Color(0xFFCBEEDD)
 private val LilacCard = Color(0xFFE8DDF9)
@@ -106,8 +109,7 @@ fun HomeScreenContent(
                         "analytic" -> onNavigateToProgress()
                         "settings" -> onNavigateToSettings()
                     }
-                },
-                onCenterActionClick = { onNavigateToGoals() }
+                }
             )
         }
     ) { innerPadding ->
@@ -159,7 +161,7 @@ fun HomeScreenContent(
                                 text = "Good Morning!",
                                 fontSize = 30.sp,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = Color(0xFF0A1C45),
+                                color = themedColor(Color(0xFF0A1C45), Color(0xFFE5E7EB)),
                                 lineHeight = 34.sp
                             )
                         }
@@ -209,7 +211,7 @@ fun HomeScreenContent(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(8.dp),
-                                color = Color.White.copy(alpha = 0.7f),
+                                color = themedColor(Color.White.copy(alpha = 0.7f), Color(0xFF2A3442)),
                                 shape = RoundedCornerShape(6.dp)
                             ) {
                                 Box(
@@ -290,7 +292,12 @@ fun HomeScreenContent(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Upcoming", fontWeight = FontWeight.ExtraBold, fontSize = 28.sp, color = Color(0xFF141A34))
+                        Text(
+                            "Upcoming",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 28.sp,
+                            color = themedColor(Color(0xFF141A34), Color(0xFFE5E7EB))
+                        )
                         Text(
                             text = "View all",
                             color = AccentOrange,
@@ -304,7 +311,7 @@ fun HomeScreenContent(
                     UpcomingTaskItem(
                         title = reminder.title.ifBlank { "Untitled Task" },
                         subtitle = reminder.description.ifBlank { "Every day at ${reminder.time}" },
-                        icon = if (reminder.title.contains("read", true)) Icons.Filled.MenuBook else Icons.Filled.Check
+                        icon = if (reminder.title.contains("read", true)) Icons.AutoMirrored.Filled.MenuBook else Icons.Filled.Check
                     )
                 }
 
@@ -348,7 +355,7 @@ private fun QuickTaskCard(
                 modifier = Modifier
                     .size(28.dp)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.9f)),
+                    .background(themedColor(Color.White.copy(alpha = 0.9f), Color(0xFF2A3442))),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(icon, contentDescription = null, tint = AccentOrange, modifier = Modifier.size(16.dp))
@@ -356,13 +363,13 @@ private fun QuickTaskCard(
             Text(
                 text = title,
                 fontWeight = FontWeight.ExtraBold,
-                color = Color(0xFF20233F),
+                color = themedColor(Color(0xFF20233F), Color(0xFFE5E7EB)),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = subtitle,
-                color = Color(0xFF6D7191),
+                color = themedColor(Color(0xFF6D7191), Color(0xFFAEB6C5)),
                 fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -378,7 +385,7 @@ private fun UpcomingTaskItem(
     icon: ImageVector
 ) {
     Surface(
-        color = Color.White.copy(alpha = 0.94f),
+        color = themedColor(Color.White.copy(alpha = 0.94f), appCardColor),
         shape = RoundedCornerShape(18.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -392,15 +399,15 @@ private fun UpcomingTaskItem(
                 modifier = Modifier
                     .size(34.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFF2F5FB)),
+                    .background(themedColor(Color(0xFFF2F5FB), Color(0xFF273244))),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(icon, contentDescription = null, tint = Color(0xFF5A7AAE), modifier = Modifier.size(18.dp))
             }
             Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, fontWeight = FontWeight.ExtraBold, color = Color(0xFF1D233F))
-                Text(subtitle, color = Color(0xFF7E869E), fontSize = 12.sp)
+                Text(title, fontWeight = FontWeight.ExtraBold, color = themedColor(Color(0xFF1D233F), Color(0xFFE5E7EB)))
+                Text(subtitle, color = themedColor(Color(0xFF7E869E), Color(0xFFAEB6C5)), fontSize = 12.sp)
             }
             Box(
                 modifier = Modifier
@@ -416,3 +423,4 @@ private fun UpcomingTaskItem(
         }
     }
 }
+

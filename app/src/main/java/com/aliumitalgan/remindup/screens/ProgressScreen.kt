@@ -17,13 +17,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Celebration
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.NightlightRound
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material.icons.filled.SelfImprovement
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -49,13 +47,17 @@ import com.aliumitalgan.remindup.components.BottomNavigationBar
 import com.aliumitalgan.remindup.components.mainBottomNavItems
 import com.aliumitalgan.remindup.models.Goal
 import com.aliumitalgan.remindup.models.Reminder
+import com.aliumitalgan.remindup.ui.theme.appCardColor
+import com.aliumitalgan.remindup.ui.theme.themedColor
 import com.aliumitalgan.remindup.utils.ProgressUtils
 import com.aliumitalgan.remindup.utils.ReminderUtils
 import com.google.firebase.auth.FirebaseAuth
 
-private val AnalyticsBg = Color(0xFFF6F2F1)
+private val AnalyticsBg: Color
+    get() = themedColor(Color(0xFFF6F2F1), Color(0xFF0F131A))
 private val Orange = Color(0xFFF26522)
-private val DeepText = Color(0xFF1A1E3F)
+private val DeepText: Color
+    get() = themedColor(Color(0xFF1A1E3F), Color(0xFFE5E7EB))
 
 @Composable
 fun ProgressScreenContent(
@@ -81,16 +83,10 @@ fun ProgressScreenContent(
 
     val userName = FirebaseAuth.getInstance().currentUser?.displayName?.substringBefore(" ") ?: "Alex"
     val totalGoals = goals.size
-    val avgProgress = if (goals.isEmpty()) 0 else goals.sumOf { it.progress } / goals.size
     val activePlans = reminders.count { it.isEnabled }
     val streakDays = goals.count { it.progress >= 50 } * 3
     val weeklyBars = buildWeeklyBars(goals)
-    val badges = listOf(
-        BadgeUi("Fast Finisher", Icons.Filled.Bolt, streakDays >= 7),
-        BadgeUi("Deep Work", Icons.Filled.WorkspacePremium, avgProgress >= 60),
-        BadgeUi("Self Care", Icons.Filled.FavoriteBorder, activePlans >= 3),
-        BadgeUi("???", Icons.Filled.Lock, false)
-    )
+    val topHabits = buildTopHabits(goals, reminders)
 
     Scaffold(
         containerColor = AnalyticsBg,
@@ -107,8 +103,7 @@ fun ProgressScreenContent(
                         "analytic" -> Unit
                         "settings" -> onNavigateToSettings()
                     }
-                },
-                onCenterActionClick = onNavigateToGoals
+                }
             )
         }
     ) { innerPadding ->
@@ -150,7 +145,7 @@ fun ProgressScreenContent(
                 item {
                     Surface(
                         shape = RoundedCornerShape(24.dp),
-                        color = Color.White,
+                        color = appCardColor,
                         tonalElevation = 1.dp
                     ) {
                         Column(
@@ -170,7 +165,11 @@ fun ProgressScreenContent(
                             }
                             Spacer(modifier = Modifier.height(8.dp))
                             Text("Great job, $userName!", fontWeight = FontWeight.ExtraBold, fontSize = 24.sp, color = DeepText)
-                            Text("You completed $totalGoals tasks this week", color = Color(0xFF757C95), fontSize = 12.sp)
+                            Text(
+                                "You completed $totalGoals tasks this week",
+                                color = themedColor(Color(0xFF757C95), Color(0xFFAEB6C5)),
+                                fontSize = 12.sp
+                            )
                         }
                     }
                 }
@@ -185,7 +184,7 @@ fun ProgressScreenContent(
 
                 item {
                     Surface(
-                        color = Color.White,
+                        color = appCardColor,
                         shape = RoundedCornerShape(20.dp)
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
@@ -221,21 +220,18 @@ fun ProgressScreenContent(
                 }
 
                 item {
-                    Text("Achievement Stickers", fontWeight = FontWeight.ExtraBold, color = DeepText, fontSize = 18.sp)
-                }
-
-                item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        badges.forEach { badge ->
-                            BadgeItem(
-                                badge = badge,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
+                        Text("Top Habits", fontWeight = FontWeight.ExtraBold, color = DeepText, fontSize = 18.sp)
+                        Text("View all", color = Orange, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
+                }
+
+                items(topHabits) { habit ->
+                    TopHabitCard(habit = habit)
                 }
 
                 item { Spacer(modifier = Modifier.height(4.dp)) }
@@ -253,56 +249,185 @@ private fun StatCard(
 ) {
     Surface(
         modifier = modifier,
-        color = Color.White,
+        color = appCardColor,
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, fontSize = 10.sp, color = Orange, fontWeight = FontWeight.Bold)
             Text(value, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = DeepText)
-            Text(subtitle, fontSize = 10.sp, color = Color(0xFF7B8098))
+            Text(subtitle, fontSize = 10.sp, color = themedColor(Color(0xFF7B8098), Color(0xFFAEB6C5)))
         }
     }
 }
 
-private data class BadgeUi(
+private data class HabitUi(
     val title: String,
+    val subtitle: String,
+    val progress: Int,
+    val streakDays: Int,
     val icon: ImageVector,
-    val unlocked: Boolean
+    val iconTint: Color,
+    val iconBg: Color,
+    val progressColor: Color
 )
 
 @Composable
-private fun BadgeItem(
-    badge: BadgeUi,
-    modifier: Modifier = Modifier
-) {
-    val bg = if (badge.unlocked) Color(0xFFEAF1FF) else Color(0xFFEDEFF4)
-    val tint = if (badge.unlocked) Orange else Color(0xFF9BA3B9)
+private fun TopHabitCard(habit: HabitUi) {
     Surface(
-        modifier = modifier,
-        color = bg,
-        shape = RoundedCornerShape(16.dp)
+        color = appCardColor,
+        shape = RoundedCornerShape(26.dp),
+        tonalElevation = 1.dp,
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(
-            modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Color.White),
+                    .size(86.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(habit.iconBg),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(badge.icon, contentDescription = null, tint = tint)
+                Icon(
+                    imageVector = habit.icon,
+                    contentDescription = null,
+                    tint = habit.iconTint,
+                    modifier = Modifier.size(36.dp)
+                )
             }
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = badge.title,
-                fontSize = 10.sp,
-                color = if (badge.unlocked) DeepText else Color(0xFF9BA3B9),
-                fontWeight = FontWeight.Bold
+
+            Spacer(modifier = Modifier.size(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = habit.title,
+                    color = DeepText,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 19.sp
+                )
+                Text(
+                    text = habit.subtitle,
+                    color = themedColor(Color(0xFF6F7B95), Color(0xFFAEB6C5)),
+                    fontSize = 14.sp
+                )
+            }
+
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "${habit.progress}%",
+                    color = habit.progressColor,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 20.sp
+                )
+                Text(
+                    text = "STREAK: ${habit.streakDays}D",
+                    color = themedColor(Color(0xFF92A0B8), Color(0xFF9FB0C7)),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp
+                )
+            }
+        }
+    }
+}
+
+private fun buildTopHabits(goals: List<Goal>, reminders: List<Reminder>): List<HabitUi> {
+    val colorSet = listOf(
+        Triple(Color(0xFF24A69A), Color(0xFFDDEDEB), Icons.Filled.WaterDrop),
+        Triple(Color(0xFFF07A22), Color(0xFFF5E8D3), Icons.Filled.SelfImprovement),
+        Triple(Color(0xFF4A83F6), Color(0xFFDDE6F7), Icons.Filled.NightlightRound)
+    )
+
+    val fromGoals = goals
+        .sortedByDescending { it.progress }
+        .take(3)
+        .mapIndexed { index, goal ->
+            val palette = colorSet[index % colorSet.size]
+            HabitUi(
+                title = goal.title.ifBlank { defaultHabitTitle(index) },
+                subtitle = goal.description.ifBlank { defaultHabitSubtitle(index) },
+                progress = goal.progress.coerceIn(0, 100),
+                streakDays = (goal.progress.coerceIn(0, 100) / 8).coerceAtLeast(1),
+                icon = palette.third,
+                iconTint = palette.first,
+                iconBg = palette.second,
+                progressColor = palette.first
             )
         }
+
+    if (fromGoals.size == 3) return fromGoals
+
+    val fromReminders = reminders
+        .filter { it.isEnabled }
+        .take(3)
+        .mapIndexed { index, reminder ->
+            val palette = colorSet[index % colorSet.size]
+            HabitUi(
+                title = reminder.title.ifBlank { defaultHabitTitle(index) },
+                subtitle = reminder.description.ifBlank { defaultHabitSubtitle(index) },
+                progress = listOf(100, 92, 78)[index % 3],
+                streakDays = listOf(12, 5, 3)[index % 3],
+                icon = palette.third,
+                iconTint = palette.first,
+                iconBg = palette.second,
+                progressColor = palette.first
+            )
+        }
+
+    val fallback = listOf(
+        HabitUi(
+            title = "Drink Water",
+            subtitle = "8 glasses daily",
+            progress = 100,
+            streakDays = 12,
+            icon = Icons.Filled.WaterDrop,
+            iconTint = Color(0xFF24A69A),
+            iconBg = Color(0xFFDDEDEB),
+            progressColor = Color(0xFF24A69A)
+        ),
+        HabitUi(
+            title = "Morning Meditation",
+            subtitle = "15 minutes daily",
+            progress = 92,
+            streakDays = 5,
+            icon = Icons.Filled.SelfImprovement,
+            iconTint = Color(0xFFF07A22),
+            iconBg = Color(0xFFF5E8D3),
+            progressColor = Color(0xFFF07A22)
+        ),
+        HabitUi(
+            title = "Sleep Early",
+            subtitle = "Before 11:00 PM",
+            progress = 78,
+            streakDays = 3,
+            icon = Icons.Filled.NightlightRound,
+            iconTint = Color(0xFF4A83F6),
+            iconBg = Color(0xFFDDE6F7),
+            progressColor = Color(0xFF4A83F6)
+        )
+    )
+
+    return (fromGoals + fromReminders + fallback)
+        .distinctBy { it.title }
+        .take(3)
+}
+
+private fun defaultHabitTitle(index: Int): String {
+    return when (index) {
+        0 -> "Drink Water"
+        1 -> "Morning Meditation"
+        else -> "Sleep Early"
+    }
+}
+
+private fun defaultHabitSubtitle(index: Int): String {
+    return when (index) {
+        0 -> "8 glasses daily"
+        1 -> "15 minutes daily"
+        else -> "Before 11:00 PM"
     }
 }
 
@@ -325,3 +450,4 @@ private fun dayLabel(index: Int): String {
         else -> "Sun"
     }
 }
+

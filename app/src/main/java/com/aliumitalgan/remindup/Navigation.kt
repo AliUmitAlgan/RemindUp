@@ -1,6 +1,8 @@
 package com.aliumitalgan.remindup
 
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -19,14 +21,13 @@ import com.aliumitalgan.remindup.screens.EditCategoryScreen
 import com.aliumitalgan.remindup.screens.NotificationsScreen
 import com.aliumitalgan.remindup.screens.PersonalInformationScreen
 import com.aliumitalgan.remindup.screens.SecurityScreen
+import com.aliumitalgan.remindup.screens.AppearanceScreen
 import com.aliumitalgan.remindup.screens.SettingsScreenContent
 import com.aliumitalgan.remindup.screens.SocialScreen
 import com.aliumitalgan.remindup.screens.SplashScreen
 import com.aliumitalgan.remindup.screens.SweetTaskDetailScreen
 import com.aliumitalgan.remindup.ui.assistant.AiAssistantScreen
 import com.aliumitalgan.remindup.ui.premium.PremiumScreen
-import com.aliumitalgan.remindup.utils.OnboardingPreferences
-import androidx.compose.ui.platform.LocalContext
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
@@ -49,6 +50,7 @@ sealed class Screen(val route: String) {
     object PersonalInfo : Screen("personalInfo")
     object Notifications : Screen("notifications")
     object Security : Screen("security")
+    object Appearance : Screen("appearance")
     object EditCategory : Screen("editCategory/{categoryId}") {
         fun createRoute(categoryId: String): String = "editCategory/$categoryId"
     }
@@ -58,11 +60,11 @@ sealed class Screen(val route: String) {
 @Composable
 fun AppNavigation(
     navController: NavHostController = rememberNavController(),
-    startDestination: String = Screen.Splash.route
+    startDestination: String = Screen.Splash.route,
+    modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-
     NavHost(
+        modifier = modifier.fillMaxSize(),
         navController = navController,
         startDestination = startDestination
     ) {
@@ -223,7 +225,8 @@ fun AppNavigation(
                 onNavigateToSocial = { navController.navigate(Screen.Social.route) },
                 onNavigateToPersonalInfo = { navController.navigate(Screen.PersonalInfo.route) },
                 onNavigateToNotifications = { navController.navigate(Screen.Notifications.route) },
-                onNavigateToSecurity = { navController.navigate(Screen.Security.route) }
+                onNavigateToSecurity = { navController.navigate(Screen.Security.route) },
+                onNavigateToAppearance = { navController.navigate(Screen.Appearance.route) }
             )
         }
 
@@ -256,6 +259,12 @@ fun AppNavigation(
                 onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
                 onNavigateToSocial = { navController.navigate(Screen.Social.route) }
+            )
+        }
+
+        composable(Screen.Appearance.route) {
+            AppearanceScreen(
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 

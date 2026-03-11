@@ -137,6 +137,7 @@ class MainActivity : ComponentActivity() {
         super.attachBaseContext(context)
         Log.d(TAG, "Super.attachBaseContext called with proper locale")
     }
+
 }
 
 @Composable
@@ -180,6 +181,7 @@ fun RemindUpApp() {
 
     AppNavigation(
         navController = navController,
-        startDestination = startDestination
+        startDestination = startDestination,
+        modifier = Modifier.fillMaxSize()
     )
 }

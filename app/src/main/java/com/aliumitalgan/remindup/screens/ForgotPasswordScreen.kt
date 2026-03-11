@@ -39,10 +39,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aliumitalgan.remindup.ui.theme.themedColor
 import com.google.firebase.auth.FirebaseAuth
 
 private val AccentOrange = Color(0xFFF26522)
-private val LightBg = Color(0xFFFBF8F4)
+private val LightBg: Color
+    get() = themedColor(Color(0xFFFBF8F4), Color(0xFF0F131A))
 
 @Composable
 fun ForgotPasswordScreen(
@@ -65,7 +67,7 @@ fun ForgotPasswordScreen(
             Icon(
                 Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Back",
-                tint = Color(0xFF1A1A1A)
+                tint = themedColor(Color(0xFF1A1A1A), Color(0xFFE5E7EB))
             )
         }
 
@@ -95,13 +97,13 @@ fun ForgotPasswordScreen(
                 text = "Forgot Password",
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF1A1A1A)
+                color = themedColor(Color(0xFF1A1A1A), Color(0xFFE5E7EB))
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "No worries! Enter your email and we'll send you a link to get back in.",
                 fontSize = 16.sp,
-                color = Color(0xFF6B7280),
+                color = themedColor(Color(0xFF6B7280), Color(0xFFAEB6C5)),
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
             Spacer(modifier = Modifier.height(32.dp))
@@ -116,8 +118,13 @@ fun ForgotPasswordScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = AccentOrange,
-                    unfocusedBorderColor = Color(0xFFE5E7EB),
-                    focusedLabelColor = AccentOrange
+                    unfocusedBorderColor = themedColor(Color(0xFFE5E7EB), Color(0xFF334155)),
+                    focusedLabelColor = AccentOrange,
+                    unfocusedLabelColor = themedColor(Color(0xFF6B7280), Color(0xFFAEB6C5)),
+                    focusedTextColor = themedColor(Color(0xFF1A1A1A), Color(0xFFE5E7EB)),
+                    unfocusedTextColor = themedColor(Color(0xFF1A1A1A), Color(0xFFE5E7EB)),
+                    focusedPlaceholderColor = themedColor(Color(0xFF9CA3AF), Color(0xFF94A3B8)),
+                    unfocusedPlaceholderColor = themedColor(Color(0xFF9CA3AF), Color(0xFF94A3B8))
                 )
             )
             Spacer(modifier = Modifier.height(24.dp))
@@ -157,10 +164,10 @@ fun ForgotPasswordScreen(
                     Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
-                    tint = Color(0xFF6B7280)
+                    tint = themedColor(Color(0xFF6B7280), Color(0xFFAEB6C5))
                 )
                 Spacer(modifier = Modifier.size(8.dp))
-                Text("Back to Login", color = Color(0xFF6B7280))
+                Text("Back to Login", color = themedColor(Color(0xFF6B7280), Color(0xFFAEB6C5)))
             }
         }
     }

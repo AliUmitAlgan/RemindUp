@@ -24,8 +24,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -109,101 +107,115 @@ fun PremiumScreen(
         onDispose { billingManager.disconnect() }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.premium_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
-            )
-        }
-    ) { innerPadding ->
-        Column(
+    Scaffold { innerPadding ->
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = stringResource(R.string.premium_subtitle),
-                style = MaterialTheme.typography.bodyLarge
-            )
-            Text(
-                text = stringResource(R.string.premium_current_plan, state.currentPlanLabel),
-                style = MaterialTheme.typography.labelLarge
-            )
-
-            state.infoMessage?.let {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Text(text = it, modifier = Modifier.padding(12.dp))
-                }
-            }
-            state.errorMessage?.let {
-                Card(modifier = Modifier.fillMaxWidth()) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                    }
                     Text(
-                        text = it,
-                        modifier = Modifier.padding(12.dp),
-                        color = MaterialTheme.colorScheme.error
+                        text = stringResource(R.string.premium_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(top = 10.dp)
                     )
                 }
             }
 
-            if (state.isLoading) {
-                CircularProgressIndicator()
+            item {
+                Text(
+                    text = stringResource(R.string.premium_subtitle),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+            item {
+                Text(
+                    text = stringResource(R.string.premium_current_plan, state.currentPlanLabel),
+                    style = MaterialTheme.typography.labelLarge
+                )
             }
 
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(state.offers) { offer ->
+            state.infoMessage?.let { message ->
+                item {
                     Card(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                        Text(text = message, modifier = Modifier.padding(12.dp))
+                    }
+                }
+            }
+            state.errorMessage?.let { message ->
+                item {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = message,
+                            modifier = Modifier.padding(12.dp),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+
+            if (state.isLoading) {
+                item {
+                    CircularProgressIndicator()
+                }
+            }
+
+            items(state.offers) { offer ->
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(text = offer.title, style = MaterialTheme.typography.titleMedium)
+                            Text(text = offer.price, style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Button(
+                            onClick = {
+                                val details = detailsByProductId[offer.productId] ?: return@Button
+                                val safeActivity = activity ?: return@Button
+                                billingManager.launchPurchase(safeActivity, details)
+                            }
                         ) {
-                            Column {
-                                Text(text = offer.title, style = MaterialTheme.typography.titleMedium)
-                                Text(text = offer.price, style = MaterialTheme.typography.bodyMedium)
-                            }
-                            Button(
-                                onClick = {
-                                    val details = detailsByProductId[offer.productId] ?: return@Button
-                                    val safeActivity = activity ?: return@Button
-                                    billingManager.launchPurchase(safeActivity, details)
-                                }
-                            ) {
-                                Text(stringResource(R.string.premium_subscribe))
-                            }
+                            Text(stringResource(R.string.premium_subscribe))
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-            TextButton(
-                onClick = {
-                    if (activity == null) return@TextButton
-                    viewModel.onEvent(PremiumUiEvent.RestorePurchases)
-                    coroutineScope.launch {
-                        val purchases = billingManager.restorePurchases()
-                        purchases.forEach { purchase ->
-                            val productId = purchase.products.firstOrNull() ?: return@forEach
-                            viewModel.onEvent(
-                                PremiumUiEvent.PurchaseVerified(
-                                    purchaseToken = purchase.purchaseToken,
-                                    productId = productId
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(
+                    onClick = {
+                        if (activity == null) return@TextButton
+                        viewModel.onEvent(PremiumUiEvent.RestorePurchases)
+                        coroutineScope.launch {
+                            val purchases = billingManager.restorePurchases()
+                            purchases.forEach { purchase ->
+                                val productId = purchase.products.firstOrNull() ?: return@forEach
+                                viewModel.onEvent(
+                                    PremiumUiEvent.PurchaseVerified(
+                                        purchaseToken = purchase.purchaseToken,
+                                        productId = productId
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
+                ) {
+                    Text(stringResource(R.string.premium_restore))
                 }
-            ) {
-                Text(stringResource(R.string.premium_restore))
             }
         }
     }
