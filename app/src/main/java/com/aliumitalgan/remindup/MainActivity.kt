@@ -3,7 +3,6 @@ package com.aliumitalgan.remindup
 import android.Manifest
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
@@ -27,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.navigation.compose.rememberNavController
@@ -57,16 +55,6 @@ class MainActivity : ComponentActivity() {
         ThemeManager.loadDynamicAccentsState(this)
         LanguageManager.loadSavedLanguage(this)
         NotificationNavigationState.updateFromIntent(intent)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val granted = ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-            if (!granted) {
-                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
-            }
-        }
 
         setContent {
             val currentLanguage by LanguageManager.currentLanguage
@@ -174,13 +162,14 @@ fun RemindUpApp() {
 
     LaunchedEffect(goalCelebrationPayload) {
         val payload = goalCelebrationPayload ?: return@LaunchedEffect
-        navController.navigate(
-            Screen.GoalCelebration.createRoute(
-                goalId = payload.goalId,
-                goalTitle = payload.goalTitle,
-                bonusXp = payload.bonusXp
-            )
+        val route = Screen.GoalCelebration.createRoute(
+            goalId = payload.goalId,
+            goalTitle = payload.goalTitle,
+            bonusXp = payload.bonusXp
         )
+        navController.navigate(route) {
+            launchSingleTop = true
+        }
         NotificationNavigationState.consumeGoalCelebrationPayload()
     }
 

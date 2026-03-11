@@ -4,9 +4,11 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.tasks.await
 
 data class FriendAchiever(
@@ -108,7 +110,7 @@ class SocialRepository(
         }
 
         awaitClose { }
-    }
+    }.flowOn(Dispatchers.IO)
 
     suspend fun syncCurrentUserStats(progressPercent: Int) {
         val user = auth.currentUser ?: return

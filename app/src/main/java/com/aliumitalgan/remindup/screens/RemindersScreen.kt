@@ -80,7 +80,6 @@ fun RemindersScreenContent(
         BottomNavItem(stringResource(R.string.progress), Icons.Filled.ShowChart, Icons.Outlined.ShowChart, "analytic"),
         BottomNavItem(stringResource(R.string.profile), Icons.Filled.Person, Icons.Outlined.Person, "profile")
     )
-    var selectedNavItem by remember { mutableStateOf(bottomNavItems[2].route) }
 
     // Verileri yükle
     LaunchedEffect(Unit, selectedCategory, selectedType, searchQuery) {
@@ -286,9 +285,8 @@ fun RemindersScreenContent(
         bottomBar = {
             BottomNavigationBar(
                 items = bottomNavItems,
-                currentRoute = selectedNavItem,
+                currentRoute = "reminders",
                 onItemSelected = { route ->
-                    selectedNavItem = route
                     when (route) {
                         "home" -> onNavigateToHome()
                         "goals" -> onNavigateToGoals()

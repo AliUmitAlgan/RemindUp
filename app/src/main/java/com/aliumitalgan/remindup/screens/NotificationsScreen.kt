@@ -136,7 +136,7 @@ fun NotificationsScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 2.dp, vertical = 16.dp)
+                            .padding(start = 2.dp, end = 2.dp, top = 8.dp, bottom = 16.dp)
                     ) {
                         IconButton(
                             onClick = onNavigateBack,

@@ -7,6 +7,7 @@ import com.aliumitalgan.remindup.domain.model.ReminderRecord
 import com.aliumitalgan.remindup.domain.repository.AuthRepository
 import com.aliumitalgan.remindup.domain.repository.ReminderRepository
 import com.aliumitalgan.remindup.domain.usecase.goal.GetUserGoalsUseCase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,7 +36,7 @@ class HomeViewModel(
     }
 
     fun loadData() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isLoading = true, error = null) }
             val user = authRepository.getCurrentUser()
             val userName = user?.name?.substringBefore(" ")?.ifBlank { null }

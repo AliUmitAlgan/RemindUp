@@ -195,27 +195,10 @@ fun OnboardingScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            repeat(3) { index ->
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 4.dp)
-                        .size(
-                            width = if (index == pagerState.currentPage) 24.dp else 6.dp,
-                            height = 6.dp
-                        )
-                        .clip(RoundedCornerShape(100))
-                        .background(
-                            if (index == pagerState.currentPage) AccentOrange
-                            else NeutralIndicator
-                        )
-                )
-            }
-        }
+        PageIndicator(
+            currentPage = pagerState.currentPage,
+            modifier = Modifier.fillMaxWidth()
+        )
 
         Spacer(modifier = Modifier.height(18.dp))
 
@@ -269,58 +252,74 @@ private fun TopHeader(
     onBack: () -> Unit,
     onSkip: () -> Unit
 ) {
-    Box(modifier = Modifier.fillMaxWidth()) {
-        if (page > 0) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .background(TopBackBg)
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = TopBackTint
-                )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .size(width = 72.dp, height = 48.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            if (page > 0) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(TopBackBg)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = TopBackTint
+                    )
+                }
             }
         }
 
-        when (page) {
-            0 -> {
-                Text(
-                    text = "RemindUp",
-                    modifier = Modifier.align(Alignment.Center),
-                    color = TitleText,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-                TextButton(
-                    onClick = onSkip,
-                    modifier = Modifier.align(Alignment.CenterEnd)
-                ) {
-                    Text("Skip", color = SoftMutedText, fontSize = 12.sp)
-                }
+        Text(
+            text = "RemindUp",
+            modifier = Modifier.align(Alignment.Center),
+            color = TitleText,
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp
+        )
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .size(width = 72.dp, height = 48.dp),
+            contentAlignment = Alignment.CenterEnd
+        ) {
+            TextButton(onClick = onSkip) {
+                Text("Skip", color = SoftMutedText, fontSize = 12.sp)
             }
-            1 -> {
-                Text(
-                    text = "RemindUp",
-                    modifier = Modifier.align(Alignment.Center),
-                    color = AccentOrange,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
-            }
-            else -> {
-                Text(
-                    text = "3 / 3",
-                    modifier = Modifier.align(Alignment.Center),
-                    color = SoftMutedText,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp
-                )
-            }
+        }
+    }
+}
+
+@Composable
+private fun PageIndicator(
+    currentPage: Int,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(3) { index ->
+            val isSelected = index == currentPage
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .size(width = 18.dp, height = 6.dp)
+                    .clip(RoundedCornerShape(100))
+                    .background(if (isSelected) AccentOrange else NeutralIndicator)
+            )
         }
     }
 }

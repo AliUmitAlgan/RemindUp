@@ -52,6 +52,8 @@ import com.aliumitalgan.remindup.ui.theme.themedColor
 import com.aliumitalgan.remindup.utils.ProgressUtils
 import com.aliumitalgan.remindup.utils.ReminderUtils
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private val AnalyticsBg: Color
     get() = themedColor(Color(0xFFF6F2F1), Color(0xFF0F131A))
@@ -71,13 +73,17 @@ fun ProgressScreenContent(
     var goals by remember { mutableStateOf<List<Goal>>(emptyList()) }
     var reminders by remember { mutableStateOf<List<Reminder>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    var currentRoute by remember { mutableStateOf("analytic") }
     val navItems = mainBottomNavItems()
 
     LaunchedEffect(Unit) {
         isLoading = true
-        goals = ProgressUtils.getUserGoals().getOrDefault(emptyList()).map { it.second }
-        reminders = ReminderUtils.getUserReminders().getOrDefault(emptyList()).map { it.second }
+        val loaded = withContext(Dispatchers.IO) {
+            val loadedGoals = ProgressUtils.getUserGoals().getOrDefault(emptyList()).map { it.second }
+            val loadedReminders = ReminderUtils.getUserReminders().getOrDefault(emptyList()).map { it.second }
+            loadedGoals to loadedReminders
+        }
+        goals = loaded.first
+        reminders = loaded.second
         isLoading = false
     }
 
@@ -93,9 +99,8 @@ fun ProgressScreenContent(
         bottomBar = {
             BottomNavigationBar(
                 items = navItems,
-                currentRoute = currentRoute,
+                currentRoute = "analytic",
                 onItemSelected = { route ->
-                    currentRoute = route
                     when (route) {
                         "home" -> onNavigateToHome()
                         "goals" -> onNavigateToGoals()
@@ -128,7 +133,7 @@ fun ProgressScreenContent(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 4.dp),
+                            .padding(top = 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {

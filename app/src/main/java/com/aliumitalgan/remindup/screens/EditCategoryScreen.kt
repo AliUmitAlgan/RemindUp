@@ -141,7 +141,6 @@ fun EditCategoryScreen(
     var selectedIconIndex by remember { mutableStateOf(0) }
     var smartRemindersEnabled by remember { mutableStateOf(true) }
     var showAllIcons by remember { mutableStateOf(false) }
-    var currentRoute by remember { mutableStateOf("goals") }
     val isSaving = viewState.isSaving
     val saveError = viewState.error
     val navItems = mainBottomNavItems()
@@ -169,9 +168,8 @@ fun EditCategoryScreen(
         bottomBar = {
             BottomNavigationBar(
                 items = navItems,
-                currentRoute = currentRoute,
+                currentRoute = "goals",
                 onItemSelected = { route ->
-                    currentRoute = route
                     when (route) {
                         "home" -> onNavigateToHome()
                         "goals" -> onNavigateToGoals()
@@ -193,7 +191,7 @@ fun EditCategoryScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 12.dp),
+                    .padding(top = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {

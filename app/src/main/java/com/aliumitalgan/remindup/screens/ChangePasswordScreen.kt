@@ -79,14 +79,14 @@ fun ChangePasswordScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 20.dp, vertical = 10.dp),
+                .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 10.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 4.dp)
+                        .padding(top = 0.dp)
                 ) {
                     IconButton(
                         onClick = onNavigateBack,

@@ -227,9 +227,9 @@
     <!-- Premium -->
     <string name="settings_premium">Premium</string>
     <string name="premium_title">RemindUp Premium</string>
-    <string name="premium_subtitle">Konum + Wi-Fi tetikleyicileri ve akıllı öneriler</string>
+    <string name="premium_subtitle">Ak&#305;ll&#305; &#246;neriler ve geli&#351;mi&#351; planlama ara&#231;lar&#305;</string>
     <string name="premium_monthly">Aylık Premium</string>
-    <string name="premium_yearly">Yıllık Premium (%30 avantaj)</string>
+    <string name="premium_yearly">Y&#305;ll&#305;k Premium (%%30 avantaj)</string>
     <string name="premium_current_plan">Mevcut plan: %1$s</string>
     <string name="premium_plan_free">Free</string>
     <string name="premium_plan_premium">Premium</string>

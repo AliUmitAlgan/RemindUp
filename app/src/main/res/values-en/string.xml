@@ -225,9 +225,9 @@
     <!-- Premium -->
     <string name="settings_premium">Premium</string>
     <string name="premium_title">RemindUp Premium</string>
-    <string name="premium_subtitle">Location + Wi-Fi triggers and smarter suggestions</string>
+    <string name="premium_subtitle">Smarter suggestions and advanced planning tools</string>
     <string name="premium_monthly">Monthly Premium</string>
-    <string name="premium_yearly">Yearly Premium (30% off)</string>
+    <string name="premium_yearly">Yearly Premium (30%% off)</string>
     <string name="premium_current_plan">Current plan: %1$s</string>
     <string name="premium_plan_free">Free</string>
     <string name="premium_plan_premium">Premium</string>

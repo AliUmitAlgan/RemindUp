@@ -180,7 +180,7 @@ fun SecurityScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 10.dp, bottom = 2.dp)
+                            .padding(top = 8.dp, bottom = 2.dp)
                     ) {
                         IconButton(
                             onClick = onNavigateBack,

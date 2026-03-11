@@ -148,7 +148,6 @@ fun SweetTaskDetailScreen(
 
     var tasks by remember { mutableStateOf<List<Pair<String, SubGoal>>>(emptyList()) }
     var isTasksLoading by remember { mutableStateOf(true) }
-    var currentRoute by remember { mutableStateOf("goals") }
     var showAddTaskDialog by remember { mutableStateOf(false) }
     var newTaskTitle by remember { mutableStateOf("") }
 
@@ -192,9 +191,8 @@ fun SweetTaskDetailScreen(
         bottomBar = {
             BottomNavigationBar(
                 items = navItems,
-                currentRoute = currentRoute,
+                currentRoute = "goals",
                 onItemSelected = { route ->
-                    currentRoute = route
                     when (route) {
                         "home" -> onNavigateToHome()
                         "goals" -> onNavigateToGoals()
@@ -224,7 +222,7 @@ fun SweetTaskDetailScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
-                contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 90.dp),
+                contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 90.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {

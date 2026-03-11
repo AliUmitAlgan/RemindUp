@@ -32,9 +32,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -86,7 +83,6 @@ fun HomeScreenContent(
     val userName = uiState.userName
 
     val navItems = mainBottomNavItems()
-    var currentRoute by remember { mutableStateOf("home") }
 
     val activeReminders = reminders.filter { it.isEnabled }
     val completedGoals = goals.count { it.progress >= 100 }
@@ -100,9 +96,8 @@ fun HomeScreenContent(
         bottomBar = {
             BottomNavigationBar(
                 items = navItems,
-                currentRoute = currentRoute,
+                currentRoute = "home",
                 onItemSelected = { route ->
-                    currentRoute = route
                     when (route) {
                         "home" -> Unit
                         "goals" -> onNavigateToGoals()

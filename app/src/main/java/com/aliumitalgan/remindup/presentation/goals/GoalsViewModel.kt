@@ -10,6 +10,7 @@ import com.aliumitalgan.remindup.domain.usecase.goal.AddGoalUseCase
 import com.aliumitalgan.remindup.domain.usecase.goal.DeleteGoalUseCase
 import com.aliumitalgan.remindup.domain.usecase.goal.GetUserGoalsUseCase
 import com.aliumitalgan.remindup.domain.usecase.goal.UpdateGoalProgressUseCase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -56,8 +57,8 @@ class GoalsViewModel(
     }
 
     fun loadGoals() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = false, error = null) }
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update { it.copy(isLoading = true, error = null) }
             getUserGoalsUseCase()
                 .onSuccess { goals ->
                     _uiState.update { it.copy(goals = goals, isLoading = false) }
@@ -114,7 +115,7 @@ class GoalsViewModel(
     }
 
     fun loadCategories() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             getGoalCategoriesUseCase()
                 .onSuccess { categories ->
                     _uiState.update { state ->

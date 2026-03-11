@@ -142,7 +142,7 @@ fun AppearanceScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 16.dp)
+                        .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 16.dp)
                 ) {
                     IconButton(
                         onClick = onNavigateBack,

@@ -91,7 +91,7 @@ fun PersonalInformationScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 10.dp)
+                        .padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 10.dp)
                 ) {
                     IconButton(
                         onClick = onNavigateBack,

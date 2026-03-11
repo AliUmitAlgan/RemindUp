@@ -70,15 +70,18 @@ sealed class Screen(val route: String) {
 @Composable
 fun AppNavigation(
     navController: NavHostController = rememberNavController(),
-    startDestination: String = Screen.Splash.route,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    startDestination: String = Screen.Splash.route
 ) {
     fun navigateToTopLevel(route: String) {
-        if (navController.currentDestination?.route == route) return
-        navController.navigate(route) {
-            popUpTo(Screen.Home.route) { saveState = true }
-            launchSingleTop = true
-            restoreState = true
+        val currentRoute = navController.currentBackStackEntry?.destination?.route
+        if (currentRoute == route) return
+
+        val restored = navController.popBackStack(route, inclusive = false)
+        if (!restored) {
+            navController.navigate(route) {
+                launchSingleTop = true
+            }
         }
     }
 
@@ -98,6 +101,11 @@ fun AppNavigation(
                 },
                 onNavigateToLogin = {
                     navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Splash.route) { inclusive = true }
+                    }
+                },
+                onNavigateToHome = {
+                    navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Splash.route) { inclusive = true }
                     }
                 }

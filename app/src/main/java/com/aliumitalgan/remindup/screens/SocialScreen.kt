@@ -50,6 +50,8 @@ import com.aliumitalgan.remindup.ui.theme.appTextPrimary
 import com.aliumitalgan.remindup.ui.theme.appTextSecondary
 import com.aliumitalgan.remindup.ui.theme.themedColor
 import com.aliumitalgan.remindup.utils.ProgressUtils
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private val AccentOrange = Color(0xFFF26522)
 private val LightBg: Color
@@ -68,11 +70,12 @@ fun SocialScreen(
     var refreshKey by remember { mutableStateOf(0) }
     val socialFlow = remember(refreshKey) { repository.getSocialData() }
     val result by socialFlow.collectAsState(initial = null)
-    var currentRoute by remember { mutableStateOf("social") }
     val navItems = mainBottomNavItems()
 
     LaunchedEffect(Unit) {
-        val goals = ProgressUtils.getUserGoals().getOrDefault(emptyList())
+        val goals = withContext(Dispatchers.IO) {
+            ProgressUtils.getUserGoals().getOrDefault(emptyList())
+        }
         val completed = goals.count { it.second.progress >= 100 }
         val total = goals.size
         val progress = if (total > 0) (completed * 100) / total else 0
@@ -84,9 +87,8 @@ fun SocialScreen(
         bottomBar = {
             BottomNavigationBar(
                 items = navItems,
-                currentRoute = currentRoute,
+                currentRoute = "social",
                 onItemSelected = { route ->
-                    currentRoute = route
                     when (route) {
                         "home" -> onNavigateToHome()
                         "goals" -> onNavigateToGoals()
@@ -106,7 +108,7 @@ fun SocialScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {

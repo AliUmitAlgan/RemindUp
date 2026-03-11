@@ -8,16 +8,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import com.aliumitalgan.remindup.LocalLanguage
 import com.aliumitalgan.remindup.utils.LanguageManager
 import com.aliumitalgan.remindup.R
 
@@ -30,20 +29,17 @@ fun LanguageSelectionDialog(
     onDismiss: () -> Unit,
     onLanguageSelected: (String) -> Unit
 ) {
-    val TAG = "LanguageSelectionDialog"
-    Log.d(TAG, "Dialog composable started")
-
-    // Context'i al
-    val context = LocalContext.current
+    val tag = "LanguageSelectionDialog"
+    Log.d(tag, "Dialog composable started")
 
     // Mevcut dili takip et
     val currentLanguage by LanguageManager.currentLanguage
-    Log.d(TAG, "Current language: $currentLanguage")
+    Log.d(tag, "Current language: $currentLanguage")
 
     // Dialog içeriği
     Dialog(
         onDismissRequest = {
-            Log.d(TAG, "Dialog dismissed via outside click")
+            Log.d(tag, "Dialog dismissed via outside click")
             onDismiss()
         }
     ) {
@@ -82,7 +78,11 @@ fun LanguageSelectionDialog(
                     )
                 }
 
-                Divider(modifier = Modifier.padding(bottom = 16.dp))
+                HorizontalDivider(
+                    modifier = Modifier.padding(bottom = 16.dp),
+                    thickness = DividerDefaults.Thickness,
+                    color = DividerDefaults.color
+                )
 
                 // Türkçe Seçeneği
                 LanguageOption(
@@ -90,7 +90,7 @@ fun LanguageSelectionDialog(
                     languageCode = LanguageManager.LANGUAGE_TURKISH,
                     isSelected = currentLanguage == LanguageManager.LANGUAGE_TURKISH,
                     onClick = {
-                        Log.d(TAG, "Turkish language selected")
+                        Log.d(tag, "Turkish language selected")
                         onLanguageSelected(LanguageManager.LANGUAGE_TURKISH)
                     }
                 )
@@ -103,7 +103,7 @@ fun LanguageSelectionDialog(
                     languageCode = LanguageManager.LANGUAGE_ENGLISH,
                     isSelected = currentLanguage == LanguageManager.LANGUAGE_ENGLISH,
                     onClick = {
-                        Log.d(TAG, "English language selected")
+                        Log.d(tag, "English language selected")
                         onLanguageSelected(LanguageManager.LANGUAGE_ENGLISH)
                     }
                 )
@@ -113,7 +113,7 @@ fun LanguageSelectionDialog(
                 // İptal butonu
                 Button(
                     onClick = {
-                        Log.d(TAG, "Cancel button clicked")
+                        Log.d(tag, "Cancel button clicked")
                         onDismiss()
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -138,7 +138,7 @@ private fun LanguageOption(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val TAG = "LanguageOption"
+    val tag = "LanguageOption"
 
     // Dil seçeneğinin renklerini belirle
     val backgroundColor = if (isSelected) {
@@ -158,7 +158,7 @@ private fun LanguageOption(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .clickable {
-                Log.d(TAG, "Option clicked: $languageName")
+                Log.d(tag, "Option clicked: $languageName")
                 onClick()
             },
         color = backgroundColor,

@@ -25,8 +25,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.ShowChart
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -46,9 +56,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -60,10 +67,10 @@ import com.aliumitalgan.remindup.R
 import com.aliumitalgan.remindup.components.BottomNavigationBar
 import com.aliumitalgan.remindup.components.EmptyRemindersView
 import com.aliumitalgan.remindup.components.ReminderCard
-import com.aliumitalgan.remindup.components.mainBottomNavItems
 import com.aliumitalgan.remindup.core.di.LocalAppContainer
 import com.aliumitalgan.remindup.models.ReminderCategory
 import com.aliumitalgan.remindup.models.ReminderType
+import com.aliumitalgan.remindup.screens.BottomNavItem
 import com.aliumitalgan.remindup.screens.FilterChips
 import com.aliumitalgan.remindup.screens.ModernReminderDialog
 
@@ -81,9 +88,24 @@ fun RemindersScreen(
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsState()
-    var selectedNavItem by remember { mutableStateOf("goals") }
 
-    val bottomNavItems = mainBottomNavItems()
+    val bottomNavItems = listOf(
+        BottomNavItem(stringResource(R.string.home), Icons.Filled.Home, Icons.Outlined.Home, "home"),
+        BottomNavItem(stringResource(R.string.goals), Icons.Filled.CheckCircle, Icons.Outlined.CheckCircle, "goals"),
+        BottomNavItem(
+            stringResource(R.string.reminders),
+            Icons.Filled.Notifications,
+            Icons.Outlined.Notifications,
+            "reminders"
+        ),
+        BottomNavItem(
+            stringResource(R.string.progress),
+            Icons.Filled.ShowChart,
+            Icons.Outlined.ShowChart,
+            "analytic"
+        ),
+        BottomNavItem(stringResource(R.string.profile), Icons.Filled.Person, Icons.Outlined.Person, "settings")
+    )
 
     val editingReminder = state.editingReminderId?.let { id ->
         state.allReminders.firstOrNull { it.id == id }?.reminder
@@ -238,12 +260,12 @@ fun RemindersScreen(
         bottomBar = {
             BottomNavigationBar(
                 items = bottomNavItems,
-                currentRoute = selectedNavItem,
+                currentRoute = "reminders",
                 onItemSelected = { route ->
-                    selectedNavItem = route
                     when (route) {
                         "home" -> onNavigateToHome()
                         "goals" -> onNavigateToGoals()
+                        "reminders" -> Unit
                         "analytic" -> onNavigateToProgress()
                         "settings" -> onNavigateToSettings()
                     }

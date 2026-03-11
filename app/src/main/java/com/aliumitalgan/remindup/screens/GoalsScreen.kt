@@ -255,7 +255,6 @@ fun GoalsScreenContent(
     var selectedTime by remember { mutableStateOf(LocalTime.of(8, 0)) }
     var smartRemindersEnabled by remember { mutableStateOf(true) }
     var isSaving by remember { mutableStateOf(false) }
-    var currentRoute by remember { mutableStateOf("goals") }
     var isSearchVisible by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var pendingDeleteGoalId by remember { mutableStateOf<String?>(null) }
@@ -372,9 +371,8 @@ fun GoalsScreenContent(
         bottomBar = {
             BottomNavigationBar(
                 items = navItems,
-                currentRoute = currentRoute,
+                currentRoute = "goals",
                 onItemSelected = { route ->
-                    currentRoute = route
                     when (route) {
                         "home" -> onNavigateToHome()
                         "goals" -> Unit

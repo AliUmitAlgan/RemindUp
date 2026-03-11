@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
 import com.aliumitalgan.remindup.ui.theme.themedColor
 import com.aliumitalgan.remindup.utils.OnboardingPreferences
 import kotlinx.coroutines.delay
@@ -40,7 +41,8 @@ private val GlowOrange = Color(0xFFFF7A29)
 @Composable
 fun SplashScreen(
     onNavigateToOnboarding: () -> Unit,
-    onNavigateToLogin: () -> Unit
+    onNavigateToLogin: () -> Unit,
+    onNavigateToHome: () -> Unit
 ) {
     val context = LocalContext.current
     val scale = remember { Animatable(0.8f) }
@@ -110,10 +112,14 @@ fun SplashScreen(
     LaunchedEffect(Unit) {
         delay(2500)
         val completed = OnboardingPreferences.isOnboardingCompleted(context)
-        if (completed) {
-            onNavigateToLogin()
-        } else {
+        val hasActiveSession = FirebaseAuth.getInstance().currentUser != null
+
+        if (!completed) {
             onNavigateToOnboarding()
+        } else if (hasActiveSession) {
+            onNavigateToHome()
+        } else {
+            onNavigateToLogin()
         }
     }
 }

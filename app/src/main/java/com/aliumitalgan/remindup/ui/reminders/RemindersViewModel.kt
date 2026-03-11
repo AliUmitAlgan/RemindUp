@@ -8,6 +8,7 @@ import com.aliumitalgan.remindup.domain.usecase.reminder.AddReminderUseCase
 import com.aliumitalgan.remindup.domain.usecase.reminder.DeleteReminderUseCase
 import com.aliumitalgan.remindup.domain.usecase.reminder.GetRemindersUseCase
 import com.aliumitalgan.remindup.domain.usecase.reminder.UpdateReminderUseCase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -84,7 +85,7 @@ class RemindersViewModel(
     }
 
     private fun saveReminder(event: RemindersUiEvent.SaveReminder) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isLoading = true, message = null) }
             val editingId = _uiState.value.editingReminderId
             val result = if (editingId != null) {
@@ -118,7 +119,7 @@ class RemindersViewModel(
     }
 
     private fun deleteReminder(reminderId: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isLoading = true, message = null) }
             deleteReminderUseCase(reminderId)
                 .onSuccess {
@@ -137,7 +138,7 @@ class RemindersViewModel(
     }
 
     private fun toggleEnabled(reminderId: String, enabled: Boolean) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val target = _uiState.value.allReminders.firstOrNull { it.id == reminderId } ?: return@launch
             val updated = target.reminder.copy(isEnabled = enabled)
             updateReminderUseCase(reminderId, updated)
@@ -153,7 +154,7 @@ class RemindersViewModel(
     }
 
     private fun refreshReminders() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isLoading = true) }
             getRemindersUseCase()
                 .onSuccess { reminders ->

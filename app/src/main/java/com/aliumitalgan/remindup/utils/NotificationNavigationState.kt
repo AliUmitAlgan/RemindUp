@@ -3,6 +3,7 @@ package com.aliumitalgan.remindup.utils
 import android.content.Intent
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
+import android.os.SystemClock
 
 data class GoalCelebrationNavigationPayload(
     val goalId: String,
@@ -23,11 +24,10 @@ object NotificationNavigationState {
         val goalId = intent.getStringExtra(NotificationUtils.EXTRA_GOAL_ID).orEmpty()
         val goalTitle = intent.getStringExtra(NotificationUtils.EXTRA_GOAL_TITLE).orEmpty()
         val bonusXp = intent.getIntExtra(NotificationUtils.EXTRA_BONUS_XP, 25)
-
-        if (goalId.isBlank()) return
+        val safeGoalId = goalId.ifBlank { "goal_celebration_${SystemClock.elapsedRealtime()}" }
 
         _goalCelebrationPayload.value = GoalCelebrationNavigationPayload(
-            goalId = goalId,
+            goalId = safeGoalId,
             goalTitle = goalTitle.ifBlank { "Goal" },
             bonusXp = bonusXp
         )
