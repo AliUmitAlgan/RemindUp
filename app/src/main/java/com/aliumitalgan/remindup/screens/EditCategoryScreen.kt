@@ -48,9 +48,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,7 +64,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aliumitalgan.remindup.components.BottomNavigationBar
 import com.aliumitalgan.remindup.components.mainBottomNavItems
+import com.aliumitalgan.remindup.domain.model.GoalCategory
 import com.aliumitalgan.remindup.ui.theme.themedColor
+import com.aliumitalgan.remindup.utils.GoalCategoryUtils
+import kotlinx.coroutines.launch
+import java.util.UUID
+import kotlin.math.roundToInt
 
 private val LightBg: Color
     get() = themedColor(Color(0xFFFDFBF9), Color(0xFF0F131A))
@@ -83,22 +90,27 @@ private val themeColors = listOf(
     LightYellow to "Yellow"
 )
 
+private data class CategoryIconOption(
+    val key: String,
+    val icon: ImageVector
+)
+
 private val categoryIcons = listOf(
-    Icons.Filled.Spa,
-    Icons.Filled.FitnessCenter,
-    Icons.Filled.Bookmark,
-    Icons.Filled.Nightlight,
-    Icons.Filled.Coffee,
-    Icons.Filled.Work,
-    Icons.Filled.Alarm,
-    Icons.Filled.Pets,
-    Icons.Filled.SelfImprovement,
-    Icons.Filled.LocalDining,
-    Icons.AutoMirrored.Filled.DirectionsRun,
-    Icons.Filled.School,
-    Icons.Filled.Movie,
-    Icons.Filled.ShoppingCart,
-    Icons.Filled.Favorite
+    CategoryIconOption("spa", Icons.Filled.Spa),
+    CategoryIconOption("fitness_center", Icons.Filled.FitnessCenter),
+    CategoryIconOption("bookmark", Icons.Filled.Bookmark),
+    CategoryIconOption("nightlight", Icons.Filled.Nightlight),
+    CategoryIconOption("coffee", Icons.Filled.Coffee),
+    CategoryIconOption("work", Icons.Filled.Work),
+    CategoryIconOption("alarm", Icons.Filled.Alarm),
+    CategoryIconOption("pets", Icons.Filled.Pets),
+    CategoryIconOption("self_care", Icons.Filled.SelfImprovement),
+    CategoryIconOption("local_dining", Icons.Filled.LocalDining),
+    CategoryIconOption("directions_run", Icons.AutoMirrored.Filled.DirectionsRun),
+    CategoryIconOption("school", Icons.Filled.School),
+    CategoryIconOption("movie", Icons.Filled.Movie),
+    CategoryIconOption("shopping_cart", Icons.Filled.ShoppingCart),
+    CategoryIconOption("favorite", Icons.Filled.Favorite)
 )
 
 @Composable
@@ -110,17 +122,35 @@ fun EditCategoryScreen(
     onNavigateToGoals: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {}
 ) {
-    var categoryName by remember { mutableStateOf("Daily Mindfulness") }
-    var selectedColor by remember { mutableStateOf(AccentOrange) }
+    val normalizedCategoryId = categoryId?.takeUnless { it.equals("new", ignoreCase = true) }
+    var categoryName by remember { mutableStateOf("") }
+    var selectedColor by remember { mutableStateOf(LightOrange) }
     var selectedIconIndex by remember { mutableStateOf(0) }
     var smartRemindersEnabled by remember { mutableStateOf(true) }
     var showAllIcons by remember { mutableStateOf(false) }
     var currentRoute by remember { mutableStateOf("categories") }
+    var isSaving by remember { mutableStateOf(false) }
+    var saveError by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
     val navItems = mainBottomNavItems()
     val visibleIconOptions = if (showAllIcons) {
         categoryIcons.mapIndexed { index, icon -> index to icon }
     } else {
         categoryIcons.take(8).mapIndexed { index, icon -> index to icon }
+    }
+
+    LaunchedEffect(normalizedCategoryId) {
+        if (normalizedCategoryId.isNullOrBlank()) return@LaunchedEffect
+        GoalCategoryUtils.getGoalCategoryById(normalizedCategoryId)
+            .onSuccess { category ->
+                if (category != null) {
+                    categoryName = category.name
+                    selectedColor = parseCategoryColor(category.colorHex)
+                    selectedIconIndex = categoryIcons.indexOfFirst { it.key == category.iconKey }
+                        .takeIf { it >= 0 } ?: 0
+                    smartRemindersEnabled = category.smartRemindersEnabled
+                }
+            }
     }
 
     Scaffold(
@@ -159,10 +189,59 @@ fun EditCategoryScreen(
                 IconButton(onClick = onNavigateBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Deep)
                 }
-                Text("Edit Category", fontWeight = FontWeight.Bold, color = Deep, fontSize = 18.sp)
-                TextButton(onClick = onSave) {
-                    Text("Save", color = AccentOrange, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = if (normalizedCategoryId == null) "New Category" else "Edit Category",
+                    fontWeight = FontWeight.Bold,
+                    color = Deep,
+                    fontSize = 18.sp
+                )
+                TextButton(
+                    enabled = !isSaving && categoryName.isNotBlank(),
+                    onClick = {
+                        val trimmedName = categoryName.trim()
+                        if (trimmedName.isBlank()) {
+                            saveError = "Category name is required."
+                            return@TextButton
+                        }
+                        isSaving = true
+                        saveError = null
+                        scope.launch {
+                            val category = GoalCategory(
+                                id = normalizedCategoryId ?: UUID.randomUUID().toString(),
+                                name = trimmedName,
+                                colorHex = selectedColor.toHexRgb(),
+                                iconKey = categoryIcons.getOrNull(selectedIconIndex)?.key ?: "self_care",
+                                smartRemindersEnabled = smartRemindersEnabled,
+                                createdAt = System.currentTimeMillis()
+                            )
+                            GoalCategoryUtils.saveGoalCategory(category)
+                                .onSuccess {
+                                    isSaving = false
+                                    onSave()
+                                }
+                                .onFailure { error ->
+                                    isSaving = false
+                                    saveError = error.message ?: "Failed to save category."
+                                }
+                        }
+                    }
+                ) {
+                    Text(
+                        text = if (isSaving) "Saving..." else "Save",
+                        color = AccentOrange,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
+            }
+
+            saveError?.let { error ->
+                Text(
+                    text = error,
+                    color = Color(0xFFB3261E),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
             }
 
             Text(
@@ -193,7 +272,7 @@ fun EditCategoryScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            categoryIcons[selectedIconIndex],
+                            categoryIcons[selectedIconIndex].icon,
                             contentDescription = null,
                             tint = AccentOrange,
                             modifier = Modifier.size(24.dp)
@@ -201,7 +280,12 @@ fun EditCategoryScreen(
                     }
                     Spacer(modifier = Modifier.size(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(categoryName, fontWeight = FontWeight.Bold, color = Deep, fontSize = 16.sp)
+                        Text(
+                            text = categoryName.ifBlank { "Category Name" },
+                            fontWeight = FontWeight.Bold,
+                            color = Deep,
+                            fontSize = 16.sp
+                        )
                         Text("12 Reminders scheduled", fontSize = 12.sp, color = Color(0xFF6B7280))
                     }
                 }
@@ -303,7 +387,7 @@ fun EditCategoryScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            icon,
+                            icon.icon,
                             contentDescription = null,
                             tint = if (isSelected) AccentOrange else Color(0xFF6B7280),
                             modifier = Modifier.size(28.dp)
@@ -353,5 +437,22 @@ fun EditCategoryScreen(
             Spacer(modifier = Modifier.height(32.dp))
         }
     }
+}
+
+private fun parseCategoryColor(hex: String): Color {
+    val cleaned = hex.trim().removePrefix("#")
+    val colorLong = when (cleaned.length) {
+        6 -> ("FF$cleaned").toLongOrNull(16)
+        8 -> cleaned.toLongOrNull(16)
+        else -> null
+    } ?: return LightOrange
+    return Color(colorLong)
+}
+
+private fun Color.toHexRgb(): String {
+    val r = (red * 255).roundToInt().coerceIn(0, 255)
+    val g = (green * 255).roundToInt().coerceIn(0, 255)
+    val b = (blue * 255).roundToInt().coerceIn(0, 255)
+    return "#%02X%02X%02X".format(r, g, b)
 }
 

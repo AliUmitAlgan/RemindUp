@@ -3,10 +3,12 @@ package com.aliumitalgan.remindup.presentation.goals
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aliumitalgan.remindup.domain.model.Goal
+import com.aliumitalgan.remindup.domain.model.GoalCategory
 import com.aliumitalgan.remindup.domain.usecase.goal.AddGoalUseCase
 import com.aliumitalgan.remindup.domain.usecase.goal.DeleteGoalUseCase
 import com.aliumitalgan.remindup.domain.usecase.goal.GetUserGoalsUseCase
 import com.aliumitalgan.remindup.domain.usecase.goal.UpdateGoalProgressUseCase
+import com.aliumitalgan.remindup.utils.GoalCategoryUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,6 +20,8 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+const val GOALS_FILTER_ALL = "all"
+
 data class GoalCelebrationEvent(
     val goalId: String,
     val goalTitle: String,
@@ -26,9 +30,10 @@ data class GoalCelebrationEvent(
 
 data class GoalsUiState(
     val goals: List<Pair<String, Goal>> = emptyList(),
+    val categories: List<GoalCategory> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
-    val selectedFilter: String = "All Goals",
+    val selectedFilterId: String = GOALS_FILTER_ALL,
     val celebrationEvent: GoalCelebrationEvent? = null
 )
 
@@ -44,6 +49,7 @@ class GoalsViewModel(
 
     init {
         loadGoals()
+        loadCategories()
     }
 
     fun loadGoals() {
@@ -67,7 +73,7 @@ class GoalsViewModel(
     fun addGoal(
         title: String,
         description: String,
-        category: Int,
+        categoryId: String = "",
         dueDate: String = "",
         reminderTime: String = "",
         smartReminderEnabled: Boolean = true
@@ -77,7 +83,8 @@ class GoalsViewModel(
                 title = title,
                 description = description,
                 progress = 0,
-                category = category,
+                categoryId = categoryId,
+                category = 0,
                 dueDate = dueDate,
                 reminderTime = reminderTime,
                 smartReminderEnabled = smartReminderEnabled
@@ -97,6 +104,28 @@ class GoalsViewModel(
                 }
                 .onFailure { e ->
                     _uiState.update { it.copy(error = e.message) }
+                }
+        }
+    }
+
+    fun loadCategories() {
+        viewModelScope.launch {
+            GoalCategoryUtils.getGoalCategories()
+                .onSuccess { categories ->
+                    _uiState.update { state ->
+                        val selected = if (
+                            state.selectedFilterId == GOALS_FILTER_ALL ||
+                            categories.any { it.id == state.selectedFilterId }
+                        ) {
+                            state.selectedFilterId
+                        } else {
+                            GOALS_FILTER_ALL
+                        }
+                        state.copy(categories = categories, selectedFilterId = selected)
+                    }
+                }
+                .onFailure { e ->
+                    _uiState.update { it.copy(error = e.message ?: "Failed to load categories") }
                 }
         }
     }
@@ -158,8 +187,8 @@ class GoalsViewModel(
         }
     }
 
-    fun setFilter(filter: String) {
-        _uiState.update { it.copy(selectedFilter = filter) }
+    fun setFilter(filterId: String) {
+        _uiState.update { it.copy(selectedFilterId = filterId) }
     }
 
     fun clearError() {

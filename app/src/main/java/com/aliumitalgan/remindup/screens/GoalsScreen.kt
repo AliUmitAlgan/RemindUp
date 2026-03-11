@@ -27,27 +27,38 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Coffee
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.LocalDining
 import androidx.compose.material.icons.filled.LocalFlorist
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Nightlight
 import androidx.compose.material.icons.filled.NotificationsNone
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.SelfImprovement
+import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Spa
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -59,6 +70,8 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -70,12 +83,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aliumitalgan.remindup.components.BottomNavigationBar
 import com.aliumitalgan.remindup.components.DeleteGoalDialog
@@ -85,6 +102,8 @@ import com.aliumitalgan.remindup.components.mainBottomNavItems
 import com.aliumitalgan.remindup.core.di.LocalAppContainer
 import com.aliumitalgan.remindup.core.di.RemindUpViewModelFactory
 import com.aliumitalgan.remindup.domain.model.Goal
+import com.aliumitalgan.remindup.domain.model.GoalCategory
+import com.aliumitalgan.remindup.presentation.goals.GOALS_FILTER_ALL
 import com.aliumitalgan.remindup.presentation.goals.GoalsViewModel
 import com.aliumitalgan.remindup.ui.theme.appTextPrimary
 import com.aliumitalgan.remindup.ui.theme.appTextSecondary
@@ -144,7 +163,14 @@ private data class GoalFilterOption(
     val key: String,
     val label: String,
     val icon: ImageVector,
-    val accent: Color
+    val accent: Color,
+    val isAddAction: Boolean = false
+)
+
+private data class GoalCategoryPresentation(
+    val name: String,
+    val accent: Color,
+    val icon: ImageVector
 )
 
 private enum class TimeSelectorTarget {
@@ -152,13 +178,24 @@ private enum class TimeSelectorTarget {
     Minute
 }
 
-private val goalFilterOptions = listOf(
-    GoalFilterOption("All Goals", "All", Icons.Filled.AutoAwesome, Color(0xFF64748B)),
-    GoalFilterOption("Health", "Health", Icons.Filled.LocalFlorist, AccentOrange),
-    GoalFilterOption("Learning", "Learning", Icons.Filled.School, AccentPurple),
-    GoalFilterOption("Work", "Work", Icons.Filled.Work, AccentMint),
-    GoalFilterOption("Personal", "Personal", Icons.Filled.Star, AccentGreen),
-    GoalFilterOption("Hobby", "Hobby", Icons.Filled.Brush, Color(0xFF3B82F6))
+private const val GOALS_FILTER_NEW_CATEGORY = "new_category"
+
+private val categoryIconOptions = listOf(
+    "spa" to Icons.Filled.Spa,
+    "fitness_center" to Icons.Filled.FitnessCenter,
+    "bookmark" to Icons.Filled.Bookmark,
+    "nightlight" to Icons.Filled.Nightlight,
+    "coffee" to Icons.Filled.Coffee,
+    "work" to Icons.Filled.Work,
+    "alarm" to Icons.Filled.Alarm,
+    "pets" to Icons.Filled.Pets,
+    "self_care" to Icons.Filled.SelfImprovement,
+    "local_dining" to Icons.Filled.LocalDining,
+    "directions_run" to Icons.AutoMirrored.Filled.DirectionsRun,
+    "school" to Icons.Filled.School,
+    "movie" to Icons.Filled.Movie,
+    "shopping_cart" to Icons.Filled.ShoppingCart,
+    "favorite" to Icons.Filled.Favorite
 )
 
 @Composable
@@ -169,6 +206,7 @@ fun GoalsScreenContent(
     onNavigateToReminders: () -> Unit = {},
     onNavigateToProgress: () -> Unit = {},
     onNavigateToSocial: () -> Unit = {},
+    onNavigateToEditCategory: (String?) -> Unit = {},
     onNavigateToSweetTaskDetail: (String) -> Unit = {},
     viewModel: GoalsViewModel = viewModel(
         factory = RemindUpViewModelFactory(LocalAppContainer.current)
@@ -176,12 +214,14 @@ fun GoalsScreenContent(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val goals = uiState.goals
+    val categories = uiState.categories
     val isLoading = uiState.isLoading
-    val selectedFilter = uiState.selectedFilter
+    val selectedFilterId = uiState.selectedFilterId
+    val categoriesById = remember(categories) { categories.associateBy { it.id } }
 
     var showAddDialog by remember { mutableStateOf(false) }
     var titleInput by remember { mutableStateOf("") }
-    var categoryInput by remember { mutableStateOf("Health") }
+    var selectedCategoryIdInput by remember { mutableStateOf("") }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var selectedTime by remember { mutableStateOf(LocalTime.of(8, 0)) }
     var smartRemindersEnabled by remember { mutableStateOf(true) }
@@ -197,26 +237,78 @@ fun GoalsScreenContent(
     val storageTimeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
     val listState = rememberLazyListState()
     val filterScrollState = rememberScrollState()
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     val navItems = mainBottomNavItems()
-    val visibleGoals by remember(goals, selectedFilter, searchQuery) {
+    val filterOptions = remember(categories) {
+        buildList {
+            add(
+                GoalFilterOption(
+                    key = GOALS_FILTER_ALL,
+                    label = "All",
+                    icon = Icons.Filled.AutoAwesome,
+                    accent = Color(0xFF718096)
+                )
+            )
+            add(
+                GoalFilterOption(
+                    key = GOALS_FILTER_NEW_CATEGORY,
+                    label = "+ New Category",
+                    icon = Icons.Filled.Add,
+                    accent = AccentOrange,
+                    isAddAction = true
+                )
+            )
+            categories.forEach { category ->
+                add(
+                    GoalFilterOption(
+                        key = category.id,
+                        label = category.name.ifBlank { "Category" },
+                        icon = iconForCategoryKey(category.iconKey),
+                        accent = parseCategoryAccent(category.colorHex)
+                    )
+                )
+            }
+        }
+    }
+    val visibleGoals by remember(goals, selectedFilterId, searchQuery, categoriesById) {
         derivedStateOf {
             val query = searchQuery.trim()
             goals.asSequence()
                 .filter { (_, goal) ->
-                    selectedFilter == "All Goals" || mapCategory(goal.category) == selectedFilter
+                    selectedFilterId == GOALS_FILTER_ALL || goal.categoryId == selectedFilterId
                 }
                 .filter { (_, goal) ->
+                    val categoryLabel = resolveCategoryPresentation(goal, categoriesById).name
                     query.isBlank() ||
                         goal.title.contains(query, ignoreCase = true) ||
                         goal.description.contains(query, ignoreCase = true) ||
-                        mapCategory(goal.category).contains(query, ignoreCase = true)
+                        categoryLabel.contains(query, ignoreCase = true)
                 }
                 .toList()
         }
     }
-    val headerTitle = if (selectedFilter == "All Goals") "All Goals" else "$selectedFilter Goals"
-    val addGoalLabel = if (selectedFilter == "All Goals") "Add New Goal" else "Add $selectedFilter Goal"
+    val selectedFilterName = categoriesById[selectedFilterId]?.name?.ifBlank { "Category" } ?: "All"
+    val headerTitle = if (selectedFilterId == GOALS_FILTER_ALL) "All Goals" else "$selectedFilterName Goals"
+    val addGoalLabel = if (selectedFilterId == GOALS_FILTER_ALL) "Add New Goal" else "Add $selectedFilterName Goal"
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.loadCategories()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    LaunchedEffect(categories) {
+        if (selectedCategoryIdInput.isNotBlank() && categories.none { it.id == selectedCategoryIdInput }) {
+            selectedCategoryIdInput = categories.firstOrNull()?.id.orEmpty()
+        }
+    }
 
     Scaffold(
         containerColor = GoalsBackground,
@@ -362,11 +454,17 @@ fun GoalsScreenContent(
                                     .horizontalScroll(filterScrollState),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                goalFilterOptions.forEach { filter ->
+                                filterOptions.forEach { filter ->
                                     GoalFilterChip(
                                         option = filter,
-                                        selected = selectedFilter == filter.key,
-                                        onClick = { viewModel.setFilter(filter.key) }
+                                        selected = !filter.isAddAction && selectedFilterId == filter.key,
+                                        onClick = {
+                                            if (filter.isAddAction) {
+                                                onNavigateToEditCategory(null)
+                                            } else {
+                                                viewModel.setFilter(filter.key)
+                                            }
+                                        }
                                     )
                                 }
                             }
@@ -378,7 +476,11 @@ fun GoalsScreenContent(
                     item {
                         EmptyGoalsView(
                             onCreateGoal = {
-                                categoryInput = defaultCategoryForFilter(selectedFilter, categoryInput)
+                                selectedCategoryIdInput = defaultCategoryForFilter(
+                                    selectedFilterId = selectedFilterId,
+                                    categories = categories,
+                                    fallback = selectedCategoryIdInput
+                                )
                                 showAddDialog = true
                             }
                         )
@@ -387,7 +489,7 @@ fun GoalsScreenContent(
                     item {
                         NoGoalsFoundView(
                             onClearFilters = {
-                                viewModel.setFilter("All Goals")
+                                viewModel.setFilter(GOALS_FILTER_ALL)
                                 searchQuery = ""
                                 isSearchVisible = false
                             }
@@ -401,6 +503,7 @@ fun GoalsScreenContent(
                     ) { (goalId, goal) ->
                         GoalOverviewCard(
                             goal = goal,
+                            categoriesById = categoriesById,
                             onClick = { onNavigateToSweetTaskDetail(goalId) },
                             onDeleteClick = { pendingDeleteGoalId = goalId }
                         )
@@ -411,7 +514,11 @@ fun GoalsScreenContent(
                     AddGoalInlineButton(
                         label = addGoalLabel,
                         onClick = {
-                            categoryInput = defaultCategoryForFilter(selectedFilter, categoryInput)
+                            selectedCategoryIdInput = defaultCategoryForFilter(
+                                selectedFilterId = selectedFilterId,
+                                categories = categories,
+                                fallback = selectedCategoryIdInput
+                            )
                             showAddDialog = true
                         }
                     )
@@ -460,7 +567,8 @@ fun GoalsScreenContent(
     if (showAddDialog) {
         CreateGoalDialog(
             title = titleInput,
-            selectedCategory = categoryInput,
+            categories = categories,
+            selectedCategoryId = selectedCategoryIdInput,
             dateLabel = selectedDate.format(dateLabelFormatter),
             timeLabel = selectedTime.format(displayTimeFormatter),
             smartRemindersEnabled = smartRemindersEnabled,
@@ -472,29 +580,32 @@ fun GoalsScreenContent(
                 isSaving = false
             },
             onTitleChange = { titleInput = it },
-            onCategorySelected = { categoryInput = it },
+            onCategorySelected = { selectedCategoryIdInput = it },
+            onCreateCategoryClick = {
+                showAddDialog = false
+                showDatePickerPopup = false
+                showTimePickerPopup = false
+                onNavigateToEditCategory(null)
+            },
             onDateClick = { showDatePickerPopup = true },
             onTimeClick = { showTimePickerPopup = true },
             onSmartReminderToggle = { smartRemindersEnabled = it },
             onCreateGoal = {
                 isSaving = true
-                val category = when (categoryInput.trim().lowercase(Locale.getDefault())) {
-                    "learning" -> 2
-                    "work" -> 3
-                    "personal" -> 4
-                    "hobby" -> 5
-                    else -> 1
-                }
                 viewModel.addGoal(
                     title = titleInput.trim(),
                     description = "",
-                    category = category,
+                    categoryId = selectedCategoryIdInput,
                     dueDate = selectedDate.format(DateTimeFormatter.ISO_LOCAL_DATE),
                     reminderTime = selectedTime.format(storageTimeFormatter),
                     smartReminderEnabled = smartRemindersEnabled
                 )
                 titleInput = ""
-                categoryInput = defaultCategoryForFilter(selectedFilter, "Health")
+                selectedCategoryIdInput = defaultCategoryForFilter(
+                    selectedFilterId = selectedFilterId,
+                    categories = categories,
+                    fallback = selectedCategoryIdInput
+                )
                 selectedDate = LocalDate.now()
                 selectedTime = LocalTime.of(8, 0)
                 smartRemindersEnabled = true
@@ -568,10 +679,31 @@ private fun GoalFilterChip(
     selected: Boolean,
     onClick: () -> Unit
 ) {
+    val isActionChip = option.isAddAction
+    val selectedContentColor = if (option.accent.luminance() > 0.6f) {
+        themedColor(Color(0xFF1F2937), Color(0xFF111827))
+    } else {
+        Color.White
+    }
+    val defaultContentColor = if (isActionChip) {
+        AccentOrange
+    } else if (option.accent.luminance() > 0.6f) {
+        themedColor(Color(0xFF374151), Color(0xFFD1D5DB))
+    } else {
+        option.accent
+    }
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(999.dp),
-        color = if (selected) option.accent else GoalsChipContainer,
+        color = when {
+            selected -> option.accent
+            isActionChip -> themedColor(Color(0xFFFFF1EA), Color(0xFF2A3548))
+            else -> GoalsChipContainer
+        },
+        border = when {
+            selected || !isActionChip -> null
+            else -> BorderStroke(1.dp, themedColor(Color(0xFFFFD9C8), Color(0xFF3B495F)))
+        },
         modifier = Modifier.heightIn(min = 44.dp)
     ) {
         Row(
@@ -582,14 +714,16 @@ private fun GoalFilterChip(
             Icon(
                 imageVector = option.icon,
                 contentDescription = null,
-                tint = if (selected) Color.White else option.accent,
+                tint = if (selected) selectedContentColor else defaultContentColor,
                 modifier = Modifier.size(16.dp)
             )
             Text(
                 text = option.label,
-                color = if (selected) Color.White else themedColor(Color(0xFF334155), Color(0xFFD5DCE7)),
+                color = if (selected) selectedContentColor else defaultContentColor,
                 fontWeight = FontWeight.Bold,
-                fontSize = 13.sp
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -636,31 +770,21 @@ private fun AddGoalInlineButton(
 @Composable
 private fun GoalOverviewCard(
     goal: Goal,
+    categoriesById: Map<String, GoalCategory>,
     onClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
     var isMenuExpanded by remember { mutableStateOf(false) }
-    val category = remember(goal.category) { mapCategory(goal.category) }
+    val categoryPresentation = remember(goal.categoryId, goal.category, categoriesById) {
+        resolveCategoryPresentation(goal, categoriesById)
+    }
+    val category = categoryPresentation.name
+    val accent = categoryPresentation.accent
+    val icon = categoryPresentation.icon
     val subtitle = remember(category, goal.reminderTime) { subtitleFor(category, goal.reminderTime) }
     val progressLabel = remember(category) { progressLabelFor(category) }
     val progressValue = remember(category, goal.progress) { progressValueFor(category, goal.progress) }
     val borderColor = themedColor(Color(0xFFE6EAF0), Color(0xFF253143))
-    val accent = when (category) {
-        "Health" -> AccentOrange
-        "Learning" -> AccentPurple
-        "Work" -> AccentMint
-        "Personal" -> AccentGreen
-        "Hobby" -> Color(0xFF3B82F6)
-        else -> Color(0xFF9BA3B8)
-    }
-    val icon = when (category) {
-        "Health" -> Icons.Filled.LocalFlorist
-        "Learning" -> Icons.Filled.School
-        "Work" -> Icons.Filled.Work
-        "Personal" -> Icons.Filled.Star
-        "Hobby" -> Icons.Filled.Brush
-        else -> Icons.Filled.Language
-    }
 
     Surface(
         color = GoalsCardSurface,
@@ -712,7 +836,7 @@ private fun GoalOverviewCard(
                 }
                 Box {
                     IconButton(
-                        onClick = { isMenuExpanded = true },
+                        onClick = { isMenuExpanded = !isMenuExpanded },
                         modifier = Modifier.size(28.dp)
                     ) {
                         Icon(
@@ -722,24 +846,41 @@ private fun GoalOverviewCard(
                         )
                     }
                     if (isMenuExpanded) {
-                        DropdownMenu(
-                            expanded = true,
-                            onDismissRequest = { isMenuExpanded = false }
+                        Surface(
+                            onClick = {
+                                isMenuExpanded = false
+                                onDeleteClick()
+                            },
+                            shape = RoundedCornerShape(14.dp),
+                            color = themedColor(Color(0xFFFFF1EA), Color(0xFF2A3548)),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = themedColor(Color(0xFFFFD9C8), Color(0xFF334158))
+                            ),
+                            tonalElevation = 0.dp,
+                            shadowElevation = 0.dp,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(top = 30.dp)
                         ) {
-                            DropdownMenuItem(
-                                text = { Text("Delete Goal") },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Filled.Delete,
-                                        contentDescription = null,
-                                        tint = AccentOrange
-                                    )
-                                },
-                                onClick = {
-                                    isMenuExpanded = false
-                                    onDeleteClick()
-                                }
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Delete,
+                                    contentDescription = null,
+                                    tint = AccentOrange,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "Delete Goal",
+                                    color = themedColor(Color(0xFF1F2937), Color(0xFFE5E7EB)),
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp
+                                )
+                            }
                         }
                     }
                 }
@@ -1262,7 +1403,8 @@ private fun TimeChoiceChip(
 @Composable
 private fun CreateGoalDialog(
     title: String,
-    selectedCategory: String,
+    categories: List<GoalCategory>,
+    selectedCategoryId: String,
     dateLabel: String,
     timeLabel: String,
     smartRemindersEnabled: Boolean,
@@ -1270,6 +1412,7 @@ private fun CreateGoalDialog(
     onDismiss: () -> Unit,
     onTitleChange: (String) -> Unit,
     onCategorySelected: (String) -> Unit,
+    onCreateCategoryClick: () -> Unit,
     onDateClick: () -> Unit,
     onTimeClick: () -> Unit,
     onSmartReminderToggle: (Boolean) -> Unit,
@@ -1374,57 +1517,58 @@ private fun CreateGoalDialog(
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 13.sp
                     )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        GoalCategoryChip(
-                            icon = Icons.Filled.LocalFlorist,
-                            label = "Health",
-                            selected = selectedCategory == "Health",
-                            selectedColor = Color(0xFFD1FAE5),
-                            textColor = Color(0xFF047857),
-                            borderColor = Color(0xFFA7F3D0),
-                            onClick = { onCategorySelected("Health") }
-                        )
-                        GoalCategoryChip(
-                            icon = Icons.Filled.School,
-                            label = "Learning",
-                            selected = selectedCategory == "Learning",
-                            selectedColor = Color(0xFFEDE9FE),
-                            textColor = Color(0xFF7C3AED),
-                            borderColor = Color(0xFFDDD6FE),
-                            onClick = { onCategorySelected("Learning") }
-                        )
-                        GoalCategoryChip(
-                            icon = Icons.Filled.Work,
-                            label = "Work",
-                            selected = selectedCategory == "Work",
-                            selectedColor = Color(0xFFDFF7EE),
-                            textColor = Color(0xFF0F9D73),
-                            borderColor = Color(0xFFB9ECD7),
-                            onClick = { onCategorySelected("Work") }
-                        )
-                        GoalCategoryChip(
-                            icon = Icons.Filled.Star,
-                            label = "Personal",
-                            selected = selectedCategory == "Personal",
-                            selectedColor = Color(0xFFDCFCE7),
-                            textColor = Color(0xFF15803D),
-                            borderColor = Color(0xFFBBF7D0),
-                            onClick = { onCategorySelected("Personal") }
-                        )
-                        GoalCategoryChip(
-                            icon = Icons.Filled.Brush,
-                            label = "Hobby",
-                            selected = selectedCategory == "Hobby",
-                            selectedColor = Color(0xFFEFF6FF),
-                            textColor = Color(0xFF2563EB),
-                            borderColor = Color(0xFFBFDBFE),
-                            onClick = { onCategorySelected("Hobby") }
-                        )
+                    if (categories.isEmpty()) {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = themedColor(Color(0xFFFFF7F2), Color(0xFF243041)),
+                            border = BorderStroke(1.dp, themedColor(Color(0xFFFFE0D0), Color(0xFF334158)))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "No category yet",
+                                    color = heading,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 13.sp,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                TextButton(onClick = onCreateCategoryClick) {
+                                    Text(
+                                        text = "New Category",
+                                        color = AccentOrange,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            categories.forEach { category ->
+                                GoalCategoryChip(
+                                    icon = iconForCategoryKey(category.iconKey),
+                                    label = category.name.ifBlank { "Category" },
+                                    selected = selectedCategoryId == category.id,
+                                    accent = parseCategoryAccent(category.colorHex),
+                                    onClick = { onCategorySelected(category.id) }
+                                )
+                            }
+                            GoalCategoryChip(
+                                icon = Icons.Filled.Add,
+                                label = "New",
+                                selected = false,
+                                accent = AccentOrange,
+                                onClick = onCreateCategoryClick
+                            )
+                        }
                     }
                 }
 
@@ -1511,7 +1655,7 @@ private fun CreateGoalDialog(
 
                 Button(
                     onClick = onCreateGoal,
-                    enabled = title.isNotBlank() && !isSaving,
+                    enabled = title.isNotBlank() && !isSaving && (categories.isEmpty() || selectedCategoryId.isNotBlank()),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(64.dp),
@@ -1535,16 +1679,28 @@ private fun GoalCategoryChip(
     icon: ImageVector,
     label: String,
     selected: Boolean,
-    selectedColor: Color,
-    textColor: Color,
-    borderColor: Color,
+    accent: Color,
     onClick: () -> Unit,
 ) {
+    val selectedContentColor = if (accent.luminance() > 0.6f) {
+        themedColor(Color(0xFF1F2937), Color(0xFF111827))
+    } else {
+        Color.White
+    }
+    val selectedBackground = if (accent.luminance() > 0.7f) {
+        accent.copy(alpha = 0.95f)
+    } else {
+        accent
+    }
+    val unselectedText = themedColor(Color(0xFF475569), Color(0xFFCBD5E1))
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(100),
-        color = if (selected) selectedColor else themedColor(Color(0xFFEFF2F7), Color(0xFF253143)),
-        border = BorderStroke(2.dp, if (selected) borderColor else Color.Transparent)
+        color = if (selected) selectedBackground else themedColor(Color(0xFFEFF2F7), Color(0xFF253143)),
+        border = BorderStroke(
+            2.dp,
+            if (selected) accent.copy(alpha = 0.8f) else Color.Transparent
+        )
     ) {
         Row(
             modifier = Modifier
@@ -1555,12 +1711,12 @@ private fun GoalCategoryChip(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = textColor,
+                tint = if (selected) selectedContentColor else unselectedText,
                 modifier = Modifier.size(16.dp)
             )
             Text(
                 text = label,
-                color = textColor,
+                color = if (selected) selectedContentColor else unselectedText,
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp
             )
@@ -1628,11 +1784,18 @@ private fun to24Hour(hour12: Int, isPm: Boolean): Int {
 
 private fun Int.formatTwoDigits(): String = toString().padStart(2, '0')
 
-private fun defaultCategoryForFilter(selectedFilter: String, fallback: String): String {
-    return when (selectedFilter) {
-        "Health", "Learning", "Work", "Personal", "Hobby" -> selectedFilter
-        else -> fallback
+private fun defaultCategoryForFilter(
+    selectedFilterId: String,
+    categories: List<GoalCategory>,
+    fallback: String
+): String {
+    if (selectedFilterId != GOALS_FILTER_ALL && categories.any { it.id == selectedFilterId }) {
+        return selectedFilterId
     }
+    if (fallback.isNotBlank() && categories.any { it.id == fallback }) {
+        return fallback
+    }
+    return categories.firstOrNull()?.id.orEmpty()
 }
 
 private fun subtitleFor(category: String, reminderTime: String): String {
@@ -1682,6 +1845,58 @@ private fun formatGoalTime(value: String): String? {
     return null
 }
 
+private fun parseCategoryAccent(hex: String): Color {
+    val cleaned = hex.trim().removePrefix("#")
+    val colorLong = when (cleaned.length) {
+        6 -> ("FF$cleaned").toLongOrNull(16)
+        8 -> cleaned.toLongOrNull(16)
+        else -> null
+    } ?: return themedColor(Color(0xFF9BA3B8), Color(0xFFAEB6C5))
+    return Color(colorLong)
+}
+
+private fun iconForCategoryKey(iconKey: String): ImageVector {
+    return categoryIconOptions.firstOrNull { it.first == iconKey }?.second
+        ?: Icons.Filled.SelfImprovement
+}
+
+private fun resolveCategoryPresentation(
+    goal: Goal,
+    categoriesById: Map<String, GoalCategory>
+): GoalCategoryPresentation {
+    val customCategory = goal.categoryId.takeIf { it.isNotBlank() }?.let(categoriesById::get)
+    if (customCategory != null) {
+        return GoalCategoryPresentation(
+            name = customCategory.name.ifBlank { "Category" },
+            accent = parseCategoryAccent(customCategory.colorHex),
+            icon = iconForCategoryKey(customCategory.iconKey)
+        )
+    }
+
+    val legacyName = mapCategory(goal.category)
+    val legacyAccent = when (legacyName) {
+        "Health" -> AccentOrange
+        "Learning" -> AccentPurple
+        "Work" -> AccentMint
+        "Personal" -> AccentGreen
+        "Hobby" -> Color(0xFF3B82F6)
+        else -> Color(0xFF9BA3B8)
+    }
+    val legacyIcon = when (legacyName) {
+        "Health" -> Icons.Filled.LocalFlorist
+        "Learning" -> Icons.Filled.School
+        "Work" -> Icons.Filled.Work
+        "Personal" -> Icons.Filled.Star
+        "Hobby" -> Icons.Filled.Brush
+        else -> Icons.Filled.Language
+    }
+    return GoalCategoryPresentation(
+        name = legacyName,
+        accent = legacyAccent,
+        icon = legacyIcon
+    )
+}
+
 private fun mapCategory(category: Int): String {
     return when (category) {
         1 -> "Health"
@@ -1689,6 +1904,6 @@ private fun mapCategory(category: Int): String {
         3 -> "Work"
         4 -> "Personal"
         5 -> "Hobby"
-        else -> "Health"
+        else -> "General"
     }
 }

@@ -5,6 +5,7 @@ data class Goal(
     val title: String = "",
     val description: String = "",
     val progress: Int = 0,
+    val categoryId: String = "",
     val category: Int = 0,
     val dueDate: String = "",
     val reminderTime: String = "",

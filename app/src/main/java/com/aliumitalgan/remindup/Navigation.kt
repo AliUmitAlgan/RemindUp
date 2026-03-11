@@ -63,9 +63,8 @@ sealed class Screen(val route: String) {
         }
     }
     object EditCategory : Screen("editCategory/{categoryId}") {
-        fun createRoute(categoryId: String): String = "editCategory/$categoryId"
+        fun createRoute(categoryId: String? = null): String = "editCategory/${categoryId ?: "new"}"
     }
-    object NewCategory : Screen("newCategory")
 }
 
 @Composable
@@ -169,6 +168,9 @@ fun AppNavigation(
                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
                 onNavigateToReminders = { navController.navigate(Screen.Reminders.route) },
                 onNavigateToSocial = { navController.navigate(Screen.Social.route) },
+                onNavigateToEditCategory = { categoryId ->
+                    navController.navigate(Screen.EditCategory.createRoute(categoryId))
+                },
                 onNavigateToSweetTaskDetail = { goalId ->
                     navController.navigate(Screen.SweetTaskDetail.createRoute(goalId))
                 }
@@ -327,7 +329,7 @@ fun AppNavigation(
         ) { backStackEntry ->
             val categoryId = backStackEntry.arguments?.getString("categoryId").orEmpty()
             EditCategoryScreen(
-                categoryId = categoryId.ifEmpty { null },
+                categoryId = categoryId.takeUnless { it.isBlank() || it.equals("new", ignoreCase = true) },
                 onNavigateBack = { navController.popBackStack() },
                 onSave = { navController.popBackStack() },
                 onNavigateToHome = { navController.navigate(Screen.Home.route) },
