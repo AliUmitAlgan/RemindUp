@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.RoundedCorner
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -41,10 +42,12 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,6 +61,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aliumitalgan.remindup.ui.theme.themedColor
 import com.aliumitalgan.remindup.utils.ThemeManager
+import com.aliumitalgan.remindup.utils.UserPreferenceUtils
+import kotlinx.coroutines.launch
 
 private val ScreenBg: Color
     get() = themedColor(Color(0xFFF8F6F6), Color(0xFF0D1117))
@@ -71,9 +76,69 @@ fun AppearanceScreen(
 ) {
     val context = LocalContext.current
     val isDarkMode by ThemeManager.isDarkTheme
+    val persistedDynamicAccents by ThemeManager.dynamicAccentsEnabled
+    val scope = rememberCoroutineScope()
     var selectedTheme by remember { mutableStateOf("Peach") }
     var cornerRoundness by remember { mutableFloatStateOf(12f) }
-    var dynamicAccents by remember { mutableStateOf(false) }
+    var dynamicAccents by remember { mutableStateOf(persistedDynamicAccents) }
+    var isLoadingPreferences by remember { mutableStateOf(true) }
+    var isSavingDarkMode by remember { mutableStateOf(false) }
+    var isSavingDynamicAccents by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        ThemeManager.loadDynamicAccentsState(context)
+        dynamicAccents = ThemeManager.dynamicAccentsEnabled.value
+
+        UserPreferenceUtils.getAppearancePreferences()
+            .onSuccess { prefs ->
+                prefs.darkModeEnabled?.let { remoteDarkMode ->
+                    ThemeManager.saveDarkThemeState(context, remoteDarkMode)
+                }
+                prefs.dynamicAccentsEnabled?.let { remoteDynamicAccents ->
+                    ThemeManager.saveDynamicAccentsState(context, remoteDynamicAccents)
+                    dynamicAccents = remoteDynamicAccents
+                }
+            }
+            .onFailure {
+                // Local fallback is already loaded above.
+            }
+
+        isLoadingPreferences = false
+    }
+
+    fun updateDarkMode(nextIsDark: Boolean) {
+        if (isSavingDarkMode || nextIsDark == isDarkMode) return
+
+        val previous = isDarkMode
+        ThemeManager.saveDarkThemeState(context, nextIsDark)
+        isSavingDarkMode = true
+
+        scope.launch {
+            UserPreferenceUtils.updateAppearancePreference("darkModeEnabled", nextIsDark)
+                .onFailure {
+                    ThemeManager.saveDarkThemeState(context, previous)
+                }
+            isSavingDarkMode = false
+        }
+    }
+
+    fun updateDynamicAccents(nextValue: Boolean) {
+        if (isSavingDynamicAccents || nextValue == dynamicAccents) return
+
+        val previous = dynamicAccents
+        dynamicAccents = nextValue
+        ThemeManager.saveDynamicAccentsState(context, nextValue)
+        isSavingDynamicAccents = true
+
+        scope.launch {
+            UserPreferenceUtils.updateAppearancePreference("dynamicAccentsEnabled", nextValue)
+                .onFailure {
+                    dynamicAccents = previous
+                    ThemeManager.saveDynamicAccentsState(context, previous)
+                }
+            isSavingDynamicAccents = false
+        }
+    }
 
     Scaffold(
         containerColor = ScreenBg
@@ -132,6 +197,21 @@ fun AppearanceScreen(
                     title = "Display Mode"
                 )
 
+                if (isLoadingPreferences) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = Primary,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -143,7 +223,8 @@ fun AppearanceScreen(
                         isDarkPreview = false,
                         iconTint = Primary,
                         modifier = Modifier.weight(1f),
-                        onClick = { ThemeManager.saveDarkThemeState(context, false) }
+                        enabled = !isLoadingPreferences && !isSavingDarkMode,
+                        onClick = { updateDarkMode(false) }
                     )
                     DisplayModeCard(
                         title = "Dark Mode",
@@ -152,7 +233,8 @@ fun AppearanceScreen(
                         isDarkPreview = true,
                         iconTint = Color(0xFF94A3B8),
                         modifier = Modifier.weight(1f),
-                        onClick = { ThemeManager.saveDarkThemeState(context, true) }
+                        enabled = !isLoadingPreferences && !isSavingDarkMode,
+                        onClick = { updateDarkMode(true) }
                     )
                 }
             }
@@ -323,7 +405,8 @@ fun AppearanceScreen(
                         }
                         Switch(
                             checked = dynamicAccents,
-                            onCheckedChange = { dynamicAccents = it },
+                            onCheckedChange = { updateDynamicAccents(it) },
+                            enabled = !isLoadingPreferences && !isSavingDynamicAccents,
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,
                                 checkedTrackColor = Primary,
@@ -393,12 +476,13 @@ private fun DisplayModeCard(
     isDarkPreview: Boolean,
     iconTint: Color,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick),
+            .clickable(enabled = enabled, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Surface(

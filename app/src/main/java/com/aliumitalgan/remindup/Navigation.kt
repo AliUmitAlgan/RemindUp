@@ -1,5 +1,6 @@
 package com.aliumitalgan.remindup
 
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
@@ -22,6 +23,8 @@ import com.aliumitalgan.remindup.screens.NotificationsScreen
 import com.aliumitalgan.remindup.screens.PersonalInformationScreen
 import com.aliumitalgan.remindup.screens.SecurityScreen
 import com.aliumitalgan.remindup.screens.AppearanceScreen
+import com.aliumitalgan.remindup.screens.ChangePasswordScreen
+import com.aliumitalgan.remindup.screens.GoalCelebrationScreen
 import com.aliumitalgan.remindup.screens.SettingsScreenContent
 import com.aliumitalgan.remindup.screens.SocialScreen
 import com.aliumitalgan.remindup.screens.SplashScreen
@@ -50,7 +53,13 @@ sealed class Screen(val route: String) {
     object PersonalInfo : Screen("personalInfo")
     object Notifications : Screen("notifications")
     object Security : Screen("security")
+    object ChangePassword : Screen("changePassword")
     object Appearance : Screen("appearance")
+    object GoalCelebration : Screen("goalCelebration?goalId={goalId}&goalTitle={goalTitle}&bonusXp={bonusXp}") {
+        fun createRoute(goalId: String, goalTitle: String, bonusXp: Int): String {
+            return "goalCelebration?goalId=${Uri.encode(goalId)}&goalTitle=${Uri.encode(goalTitle)}&bonusXp=$bonusXp"
+        }
+    }
     object EditCategory : Screen("editCategory/{categoryId}") {
         fun createRoute(categoryId: String): String = "editCategory/$categoryId"
     }
@@ -258,13 +267,53 @@ fun AppNavigation(
                 onNavigateToHome = { navController.navigate(Screen.Home.route) },
                 onNavigateToGoals = { navController.navigate(Screen.Goals.route) },
                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
-                onNavigateToSocial = { navController.navigate(Screen.Social.route) }
+                onNavigateToSocial = { navController.navigate(Screen.Social.route) },
+                onNavigateToChangePassword = { navController.navigate(Screen.ChangePassword.route) }
             )
         }
 
         composable(Screen.Appearance.route) {
             AppearanceScreen(
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.ChangePassword.route) {
+            ChangePasswordScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onPasswordUpdated = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Screen.GoalCelebration.route,
+            arguments = listOf(
+                navArgument("goalId") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("goalTitle") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("bonusXp") {
+                    type = NavType.IntType
+                    defaultValue = 25
+                }
+            )
+        ) { backStackEntry ->
+            val goalTitle = backStackEntry.arguments?.getString("goalTitle").orEmpty()
+            val bonusXp = backStackEntry.arguments?.getInt("bonusXp") ?: 25
+
+            GoalCelebrationScreen(
+                goalTitle = goalTitle.ifBlank { "Goal" },
+                bonusXp = bonusXp,
+                onAwesome = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Home.route) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                }
             )
         }
 

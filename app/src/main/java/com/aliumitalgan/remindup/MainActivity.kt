@@ -2,6 +2,7 @@ package com.aliumitalgan.remindup
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
@@ -31,77 +32,61 @@ import com.aliumitalgan.remindup.core.di.AppContainer
 import com.aliumitalgan.remindup.core.di.LocalAppContainer
 import com.aliumitalgan.remindup.ui.theme.RemindUpTheme
 import com.aliumitalgan.remindup.utils.LanguageManager
+import com.aliumitalgan.remindup.utils.NotificationNavigationState
 import com.aliumitalgan.remindup.utils.NotificationUtils
 import com.aliumitalgan.remindup.utils.ThemeManager
 import java.util.Locale
 
-// Composition Local for language changes
 val LocalLanguage = compositionLocalOf { mutableStateOf(LanguageManager.LANGUAGE_TURKISH) }
 
 class MainActivity : ComponentActivity() {
-    private val TAG = "MainActivity"
+    private val tag = "MainActivity"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.d(TAG, "onCreate started")
+        Log.d(tag, "onCreate started")
 
-        // Bildirim kanalını oluştur
         NotificationUtils.createNotificationChannels(this)
-
-        // Uygulama başlatıldığında bildirim durumunu yükle
         NotificationUtils.loadNotificationState(this)
-
-        // Uygulama başlangıcında otomatik bildirimleri engelleme
         NotificationUtils.resetAppLaunchState()
-
-        // Tema durumunu yükle
-        ThemeManager.loadDarkThemeState(this)
-
-        // Dil ayarlarını yükle - güncel dilde çalışması için yapılandırılmış
+        ThemeManager.loadThemeState(this)
         LanguageManager.loadSavedLanguage(this)
-        Log.d(TAG, "Current language after load: ${LanguageManager.currentLanguage.value}")
+        NotificationNavigationState.updateFromIntent(intent)
 
-        // Android 13+ için bildirim izni iste
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
-                PackageManager.PERMISSION_GRANTED) {
-                if (Build.VERSION.SDK_INT >= 33) {
-                    requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
-                }
+            val granted = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
             }
         }
 
         setContent {
-            // Dil durumunu dinle ve CompositionLocalProvider ile sağla
             val currentLanguage by LanguageManager.currentLanguage
             val languageState = remember { mutableStateOf(currentLanguage) }
             val appContainer = remember { AppContainer(applicationContext) }
-            Log.d(TAG, "SetContent - Current language: $currentLanguage")
-
-            // Tema durumunu doğrudan al
             val isDarkTheme by ThemeManager.isDarkTheme
+            val dynamicAccentsEnabled by ThemeManager.dynamicAccentsEnabled
 
-            // Dil değişikliğini dinle ve state'i güncelle
             LaunchedEffect(currentLanguage) {
-                Log.d(TAG, "Language changed in MainActivity: $currentLanguage")
                 languageState.value = currentLanguage
             }
 
-            // CompositionLocalProvider ile dil durumunu tüm child composable'lara ilet
             CompositionLocalProvider(
                 LocalLanguage provides languageState,
                 LocalAppContainer provides appContainer
             ) {
-                // Dil değişikliğinde UI'ı yeniden oluşturmak için key kullan
                 key(currentLanguage) {
                     RemindUpTheme(
-                        darkTheme = isDarkTheme
+                        darkTheme = isDarkTheme,
+                        dynamicColor = dynamicAccentsEnabled
                     ) {
                         Surface(
                             modifier = Modifier.fillMaxSize(),
                             color = MaterialTheme.colorScheme.background
                         ) {
-                            // Burada artık FirebaseUser'ı geçmiyoruz, her zaman login ekranından başlayacak
                             RemindUpApp()
                         }
                     }
@@ -110,52 +95,41 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Dil ayarlarının uygulama genelinde tutarlı olmasını sağlayan ek fonksiyon
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        NotificationNavigationState.updateFromIntent(intent)
+    }
+
     override fun attachBaseContext(newBase: Context) {
-        // Kaydedilmiş dil ayarını al
         val sharedPrefs = newBase.getSharedPreferences("language_prefs", Context.MODE_PRIVATE)
         val languageCode = sharedPrefs.getString("language_code", "tr") ?: "tr"
-        Log.d(TAG, "attachBaseContext - Language from prefs: $languageCode")
 
-        // Dile göre yeni bir context oluştur
-        val locale = when(languageCode) {
+        val locale = when (languageCode) {
             "en" -> Locale.ENGLISH
             else -> Locale("tr")
         }
 
-        // Locale'i ayarla
         Locale.setDefault(locale)
-        Log.d(TAG, "Default Locale set to: ${locale.language}")
 
-        // Yeni configuration oluştur
         val config = Configuration(newBase.resources.configuration)
         config.setLocale(locale)
-        Log.d(TAG, "Configuration locale set to: ${locale.language}")
 
-        // Context oluştur ve parent'a gönder
         val context = newBase.createConfigurationContext(config)
         super.attachBaseContext(context)
-        Log.d(TAG, "Super.attachBaseContext called with proper locale")
     }
-
 }
 
 @Composable
 fun RemindUpApp() {
     val navController = rememberNavController()
     val context = LocalContext.current
-    val TAG = "RemindUpApp"
+    val goalCelebrationPayload by NotificationNavigationState.goalCelebrationPayload
 
-    // Dil durumunu dinle
-    val currentLanguage by LanguageManager.currentLanguage
-    Log.d(TAG, "RemindUpApp - Current language: $currentLanguage")
-
-    // Bildirim izni kontrolü
     var hasNotificationPermission by remember {
         mutableStateOf(NotificationUtils.checkNotificationPermission(context))
     }
 
-    // Bildirim izni isteme launcher'ı
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -165,23 +139,27 @@ fun RemindUpApp() {
         }
     }
 
-    // Android 13+ için bildirim izni kontrolü
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission) {
             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
-    // Dil değiştiğinde log
-    LaunchedEffect(currentLanguage) {
-        Log.d(TAG, "Language changed in RemindUpApp: $currentLanguage")
+    LaunchedEffect(goalCelebrationPayload) {
+        val payload = goalCelebrationPayload ?: return@LaunchedEffect
+        navController.navigate(
+            Screen.GoalCelebration.createRoute(
+                goalId = payload.goalId,
+                goalTitle = payload.goalTitle,
+                bonusXp = payload.bonusXp
+            )
+        )
+        NotificationNavigationState.consumeGoalCelebrationPayload()
     }
-
-    val startDestination = Screen.Splash.route
 
     AppNavigation(
         navController = navController,
-        startDestination = startDestination,
+        startDestination = Screen.Splash.route,
         modifier = Modifier.fillMaxSize()
     )
 }

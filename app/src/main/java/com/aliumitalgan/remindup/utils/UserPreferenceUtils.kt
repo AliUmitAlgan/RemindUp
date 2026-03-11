@@ -19,6 +19,11 @@ data class SecurityPreferences(
     val biometricEnabled: Boolean = false
 )
 
+data class AppearancePreferences(
+    val darkModeEnabled: Boolean? = null,
+    val dynamicAccentsEnabled: Boolean? = null
+)
+
 object UserPreferenceUtils {
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
@@ -27,13 +32,60 @@ object UserPreferenceUtils {
         return auth.currentUser?.uid ?: throw IllegalStateException("User not authenticated")
     }
 
-    suspend fun getNotificationPreferences(): Result<NotificationPreferences> = runCatching {
-        val snapshot = firestore.collection("user_preferences")
-            .document(requireUserId())
+    private fun userDocument() = firestore.collection("users")
+        .document(requireUserId())
+
+    private fun legacyPreferencesDocument() = firestore.collection("user_preferences")
+        .document(requireUserId())
+
+    private suspend fun readCurrentSection(section: String): Map<*, *> {
+        val snapshot = userDocument()
             .get()
             .await()
 
-        val notifications = snapshot.get("notifications") as? Map<*, *> ?: emptyMap<Any, Any>()
+        val preferences = snapshot.get("preferences") as? Map<*, *> ?: emptyMap<Any, Any>()
+        val nestedSection = preferences[section] as? Map<*, *>
+        if (nestedSection != null) {
+            return nestedSection
+        }
+
+        return snapshot.get(section) as? Map<*, *> ?: emptyMap<Any, Any>()
+    }
+
+    private suspend fun readLegacySection(section: String): Map<*, *> {
+        val snapshot = legacyPreferencesDocument()
+            .get()
+            .await()
+
+        return snapshot.get(section) as? Map<*, *> ?: emptyMap<Any, Any>()
+    }
+
+    private suspend fun readSection(section: String): Map<*, *> {
+        val current = runCatching { readCurrentSection(section) }
+            .getOrDefault(emptyMap<Any, Any>())
+
+        if (current.isNotEmpty()) {
+            return current
+        }
+
+        return runCatching { readLegacySection(section) }
+            .getOrDefault(emptyMap<Any, Any>())
+    }
+
+    private suspend fun writeSectionField(section: String, field: String, value: Boolean) {
+        userDocument()
+            .set(
+                mapOf(
+                    "preferences" to mapOf(section to mapOf(field to value)),
+                    "preferencesUpdatedAt" to FieldValue.serverTimestamp()
+                ),
+                SetOptions.merge()
+            )
+            .await()
+    }
+
+    suspend fun getNotificationPreferences(): Result<NotificationPreferences> = runCatching {
+        val notifications = readSection("notifications")
 
         NotificationPreferences(
             dailyReminders = notifications["dailyReminders"] as? Boolean ?: true,
@@ -45,25 +97,11 @@ object UserPreferenceUtils {
     }
 
     suspend fun updateNotificationPreference(field: String, value: Boolean): Result<Unit> = runCatching {
-        firestore.collection("user_preferences")
-            .document(requireUserId())
-            .set(
-                mapOf(
-                    "notifications" to mapOf(field to value),
-                    "updatedAt" to FieldValue.serverTimestamp()
-                ),
-                SetOptions.merge()
-            )
-            .await()
+        writeSectionField("notifications", field, value)
     }
 
     suspend fun getSecurityPreferences(): Result<SecurityPreferences> = runCatching {
-        val snapshot = firestore.collection("user_preferences")
-            .document(requireUserId())
-            .get()
-            .await()
-
-        val security = snapshot.get("security") as? Map<*, *> ?: emptyMap<Any, Any>()
+        val security = readSection("security")
 
         SecurityPreferences(
             twoFactorEnabled = security["twoFactorEnabled"] as? Boolean ?: true,
@@ -72,15 +110,19 @@ object UserPreferenceUtils {
     }
 
     suspend fun updateSecurityPreference(field: String, value: Boolean): Result<Unit> = runCatching {
-        firestore.collection("user_preferences")
-            .document(requireUserId())
-            .set(
-                mapOf(
-                    "security" to mapOf(field to value),
-                    "updatedAt" to FieldValue.serverTimestamp()
-                ),
-                SetOptions.merge()
-            )
-            .await()
+        writeSectionField("security", field, value)
+    }
+
+    suspend fun getAppearancePreferences(): Result<AppearancePreferences> = runCatching {
+        val appearance = readSection("appearance")
+
+        AppearancePreferences(
+            darkModeEnabled = appearance["darkModeEnabled"] as? Boolean,
+            dynamicAccentsEnabled = appearance["dynamicAccentsEnabled"] as? Boolean
+        )
+    }
+
+    suspend fun updateAppearancePreference(field: String, value: Boolean): Result<Unit> = runCatching {
+        writeSectionField("appearance", field, value)
     }
 }

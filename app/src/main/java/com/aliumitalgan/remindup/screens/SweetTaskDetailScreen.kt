@@ -58,6 +58,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -71,7 +72,11 @@ import com.aliumitalgan.remindup.components.mainBottomNavItems
 import com.aliumitalgan.remindup.core.di.LocalAppContainer
 import com.aliumitalgan.remindup.core.di.RemindUpViewModelFactory
 import com.aliumitalgan.remindup.presentation.goals.GoalsViewModel
+import com.aliumitalgan.remindup.ui.theme.appCardColor
+import com.aliumitalgan.remindup.ui.theme.appTextPrimary
+import com.aliumitalgan.remindup.ui.theme.appTextSecondary
 import com.aliumitalgan.remindup.ui.theme.themedColor
+import com.aliumitalgan.remindup.utils.NotificationUtils
 import com.aliumitalgan.remindup.utils.SubGoal
 import com.aliumitalgan.remindup.utils.SubGoalUtils
 import java.util.UUID
@@ -82,10 +87,20 @@ private val TaskBg: Color
 private val PrimaryOrange = Color(0xFFEC5B13)
 private val SoftText: Color
     get() = themedColor(Color(0xFF5A4A42), Color(0xFFE5E7EB))
-private val LightCard = Color(0xFFFFFFFF)
-private val Peach = Color(0xFFFFEDDF)
-private val Mint = Color(0xFFE0F2F1)
-private val Lavender = Color(0xFFF3E8FF)
+private val LightCard: Color
+    get() = appCardColor
+private val Peach: Color
+    get() = themedColor(Color(0xFFFFEDDF), Color(0xFF2A3548))
+private val Mint: Color
+    get() = themedColor(Color(0xFFE0F2F1), Color(0xFF1E3A36))
+private val Lavender: Color
+    get() = themedColor(Color(0xFFF3E8FF), Color(0xFF2A233B))
+private val TaskMutedText: Color
+    get() = themedColor(Color(0xFF9AA6B2), Color(0xFF94A3B8))
+private val TaskInputBg: Color
+    get() = themedColor(Color(0xFFF1F4F8), Color(0xFF222C3B))
+private val TaskSoftBorder: Color
+    get() = themedColor(Color(0xFFFFE6D7), Color(0xFF3B475A))
 
 @Composable
 fun SweetTaskDetailScreen(
@@ -101,6 +116,7 @@ fun SweetTaskDetailScreen(
     )
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     val goalEntry = uiState.goals.firstOrNull { it.first == goalId }
     val goalName = goalEntry?.second?.title?.ifBlank { "Goal" } ?: "Goal"
     val scope = rememberCoroutineScope()
@@ -122,11 +138,7 @@ fun SweetTaskDetailScreen(
     val remainingTasks = (totalTasks - completedTasks).coerceAtLeast(0)
     val isScreenLoading = uiState.isLoading || (goalEntry == null && uiState.goals.isEmpty()) || isTasksLoading
 
-    LaunchedEffect(goalId) {
-        viewModel.loadGoals()
-    }
-
-    LaunchedEffect(goalEntry?.first, uiState.isLoading) {
+    LaunchedEffect(goalEntry?.first) {
         if (goalEntry == null) {
             if (!uiState.isLoading) {
                 tasks = emptyList()
@@ -137,6 +149,17 @@ fun SweetTaskDetailScreen(
         isTasksLoading = true
         tasks = SubGoalUtils.getSubGoalsForParent(goalId).getOrDefault(emptyList())
         isTasksLoading = false
+    }
+
+    LaunchedEffect(uiState.celebrationEvent) {
+        val event = uiState.celebrationEvent ?: return@LaunchedEffect
+        NotificationUtils.showGoalAheadOfScheduleNotification(
+            context = context,
+            goalId = event.goalId,
+            goalTitle = event.goalTitle,
+            bonusXp = event.bonusXp
+        )
+        viewModel.consumeCelebrationEvent()
     }
 
     Scaffold(
@@ -209,7 +232,7 @@ fun SweetTaskDetailScreen(
                     ) {
                         Text(
                             text = "Sub-tasks",
-                            color = Color(0xFF1E293B),
+                            color = appTextPrimary,
                             fontWeight = FontWeight.Bold,
                             fontSize = 28.sp,
                             modifier = Modifier.weight(1f)
@@ -220,7 +243,7 @@ fun SweetTaskDetailScreen(
                         ) {
                             Text(
                                 text = "Remaining: $remainingTasks",
-                                color = Color(0xFF2D8D7B),
+                                color = themedColor(Color(0xFF2D8D7B), Color(0xFF99F6E4)),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 11.sp,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
@@ -238,7 +261,7 @@ fun SweetTaskDetailScreen(
                         ) {
                             Text(
                                 text = "No sub-tasks yet.",
-                                color = Color(0xFF9AA6B2),
+                                color = TaskMutedText,
                                 modifier = Modifier.padding(14.dp)
                             )
                         }
@@ -365,7 +388,7 @@ private fun AddSubTaskBottomSheet(
                     .width(44.dp)
                     .height(5.dp)
                     .clip(RoundedCornerShape(999.dp))
-                    .background(Color(0xFFDCE2EA))
+                    .background(themedColor(Color(0xFFDCE2EA), Color(0xFF475569)))
             )
         }
     ) {
@@ -383,14 +406,14 @@ private fun AddSubTaskBottomSheet(
             ) {
                 Text(
                     text = "Add New Sub-Task",
-                    color = Color(0xFF1F2937),
+                    color = appTextPrimary,
                     fontWeight = FontWeight.Bold,
                     fontSize = 24.sp,
                     modifier = Modifier.weight(1f)
                 )
                 Surface(
                     onClick = onDismiss,
-                    color = Color(0xFFF1F4F8),
+                    color = TaskInputBg,
                     shape = CircleShape,
                     modifier = Modifier.size(30.dp)
                 ) {
@@ -398,7 +421,7 @@ private fun AddSubTaskBottomSheet(
                         Icon(
                             imageVector = Icons.Filled.Close,
                             contentDescription = "Close",
-                            tint = Color(0xFFA4B0C2),
+                            tint = TaskMutedText,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -409,7 +432,7 @@ private fun AddSubTaskBottomSheet(
 
             Text(
                 text = "SUB-TASK TITLE",
-                color = Color(0xFF9AA6B2),
+                color = TaskMutedText,
                 fontWeight = FontWeight.Bold,
                 fontSize = 11.sp,
                 letterSpacing = 0.8.sp
@@ -424,7 +447,7 @@ private fun AddSubTaskBottomSheet(
                 placeholder = {
                     Text(
                         text = "Do 10 sun salutations",
-                        color = Color(0xFF94A3B8),
+                        color = themedColor(Color(0xFF94A3B8), Color(0xFF7C8EA3)),
                         fontSize = 16.sp
                     )
                 },
@@ -432,14 +455,14 @@ private fun AddSubTaskBottomSheet(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { if (canSave) onSave() }),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xFFF1F4F8),
-                    unfocusedContainerColor = Color(0xFFF1F4F8),
-                    disabledContainerColor = Color(0xFFF1F4F8),
+                    focusedContainerColor = TaskInputBg,
+                    unfocusedContainerColor = TaskInputBg,
+                    disabledContainerColor = TaskInputBg,
                     focusedBorderColor = Color.Transparent,
                     unfocusedBorderColor = Color.Transparent,
                     disabledBorderColor = Color.Transparent,
-                    focusedTextColor = Color(0xFF1F2937),
-                    unfocusedTextColor = Color(0xFF1F2937)
+                    focusedTextColor = appTextPrimary,
+                    unfocusedTextColor = appTextPrimary
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -534,7 +557,7 @@ private fun HeaderRow(
     ) {
         Text(
             text = title,
-            color = Color(0xFF1F2937),
+            color = appTextPrimary,
             fontWeight = FontWeight.Bold,
             fontSize = 19.sp,
             modifier = Modifier.padding(horizontal = 56.dp),
@@ -550,7 +573,7 @@ private fun HeaderRow(
                 onClick = onBack,
                 color = LightCard,
                 shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, Color(0xFFFFE6D7))
+                border = BorderStroke(1.dp, TaskSoftBorder)
             ) {
                 Box(
                     modifier = Modifier.size(36.dp),
@@ -612,7 +635,7 @@ private fun ProgressCard(
                 )
                 Text(
                     text = "$progress%",
-                    color = Color(0xFF1F2937),
+                    color = appTextPrimary,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
                 )
@@ -621,13 +644,13 @@ private fun ProgressCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Daily Goal",
-                    color = Color(0xFF1F2937),
+                    color = appTextPrimary,
                     fontWeight = FontWeight.Bold,
                     fontSize = 24.sp
                 )
                 Text(
                     text = "You've completed $completedTasks out of $totalTasks tasks today. Keep going!",
-                    color = Color(0xFF77839B),
+                    color = appTextSecondary,
                     fontSize = 13.sp
                 )
             }
@@ -653,14 +676,14 @@ private fun MantraCard() {
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "DAILY MANTRA",
-                    color = Color(0xFF9333EA),
+                    color = themedColor(Color(0xFF9333EA), Color(0xFFD8B4FE)),
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp
                 )
             }
             Text(
                 text = "\"The success of your day is defined by the peace you find in your morning.\"",
-                color = Color(0xFF6B21A8),
+                color = themedColor(Color(0xFF6B21A8), Color(0xFFE9D5FF)),
                 fontStyle = FontStyle.Italic,
                 fontSize = 14.sp
             )
@@ -676,7 +699,11 @@ private fun TaskItem(
     Surface(
         color = LightCard,
         shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, if (task.completed) Color(0xFFF1F4F8) else Color(0xFFFFD6BF)),
+        border = BorderStroke(
+            1.dp,
+            if (task.completed) themedColor(Color(0xFFF1F4F8), Color(0xFF2A3548))
+            else themedColor(Color(0xFFFFD6BF), Color(0xFF4A352A))
+        ),
         shadowElevation = 1.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -707,7 +734,7 @@ private fun TaskItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = task.title.ifBlank { "Untitled Sub-task" },
-                    color = if (task.completed) Color(0xFF9AA6B2) else Color(0xFF1F2937),
+                    color = if (task.completed) TaskMutedText else appTextPrimary,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
                     textDecoration = if (task.completed) TextDecoration.LineThrough else TextDecoration.None,
@@ -718,13 +745,13 @@ private fun TaskItem(
                     Icon(
                         imageVector = Icons.Filled.AccessTime,
                         contentDescription = null,
-                        tint = Color(0xFF9AA6B2),
+                        tint = TaskMutedText,
                         modifier = Modifier.size(13.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = estimateDuration(task.title),
-                        color = Color(0xFF9AA6B2),
+                        color = TaskMutedText,
                         fontSize = 12.sp
                     )
                 }
@@ -734,7 +761,7 @@ private fun TaskItem(
                 Icon(
                     imageVector = Icons.Filled.DragIndicator,
                     contentDescription = null,
-                    tint = Color(0xFFD0D7E2)
+                    tint = themedColor(Color(0xFFD0D7E2), Color(0xFF64748B))
                 )
             }
         }

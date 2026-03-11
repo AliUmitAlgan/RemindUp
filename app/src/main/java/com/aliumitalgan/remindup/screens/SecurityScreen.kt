@@ -77,6 +77,7 @@ fun SecurityScreen(
     onNavigateToGoals: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onNavigateToSocial: () -> Unit = {},
+    onNavigateToChangePassword: () -> Unit = {},
     viewModel: SecurityViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -289,6 +290,7 @@ fun SecurityScreen(
                         icon = Icons.Filled.LockReset,
                         title = "Change Password",
                         subtitle = "Last updated 3 months ago",
+                        onClick = onNavigateToChangePassword,
                         trailing = {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -417,12 +419,15 @@ private fun SecuritySettingRow(
     icon: ImageVector,
     title: String,
     subtitle: String,
+    onClick: (() -> Unit)? = null,
     trailing: @Composable () -> Unit
 ) {
     Surface(
+        onClick = { onClick?.invoke() },
+        enabled = onClick != null,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = Color.White
+        color = themedColor(Color.White, Color(0xFF1A2230))
     ) {
         Row(
             modifier = Modifier
@@ -434,7 +439,7 @@ private fun SecuritySettingRow(
                 modifier = Modifier
                     .size(42.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFFFF0E8)),
+                    .background(themedColor(Color(0xFFFFF0E8), Color(0xFF2A3548))),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -454,7 +459,7 @@ private fun SecuritySettingRow(
                 )
                 Text(
                     text = subtitle,
-                    color = Color(0xFF9AA3B0),
+                    color = themedColor(Color(0xFF9AA3B0), Color(0xFF9AA6B2)),
                     fontSize = 12.sp
                 )
             }

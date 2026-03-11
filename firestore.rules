@@ -53,6 +53,10 @@ service cloud.firestore {
       }
     }
 
+    match /user_preferences/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
     match /app_config/{configId} {
       allow read: if signedIn();
       allow write: if false;

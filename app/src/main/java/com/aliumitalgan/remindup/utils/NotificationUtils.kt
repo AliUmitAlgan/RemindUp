@@ -45,6 +45,11 @@ object NotificationUtils {
     private const val CHANNEL_ID = "remindup_channel"
     private const val CHANNEL_ID_IMPORTANT = "remindup_important_channel"
     private const val TAG = "NotificationUtils"
+    const val EXTRA_NAV_TARGET = "extra_nav_target"
+    const val EXTRA_GOAL_ID = "extra_goal_id"
+    const val EXTRA_GOAL_TITLE = "extra_goal_title"
+    const val EXTRA_BONUS_XP = "extra_bonus_xp"
+    const val NAV_TARGET_GOAL_CELEBRATION = "goal_celebration"
 
     // Uygulama başlatma sayacı
     private var isAppJustLaunched = true
@@ -59,6 +64,68 @@ object NotificationUtils {
             kotlinx.coroutines.delay(5000)
             isAppJustLaunched = false
             Log.d(TAG, "App launch state reset. Normal notification behavior enabled.")
+        }
+    }
+
+    fun showGoalAheadOfScheduleNotification(
+        context: Context,
+        goalId: String,
+        goalTitle: String,
+        bonusXp: Int = 25
+    ) {
+        if (!_notificationsEnabled.value) {
+            Log.d(TAG, "Notifications disabled, skipping goal celebration notification")
+            return
+        }
+
+        if (!checkNotificationPermission(context)) {
+            Log.d(TAG, "No notification permission, skipping goal celebration notification")
+            return
+        }
+
+        val celebrationIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_NAV_TARGET, NAV_TARGET_GOAL_CELEBRATION)
+            putExtra(EXTRA_GOAL_ID, goalId)
+            putExtra(EXTRA_GOAL_TITLE, goalTitle)
+            putExtra(EXTRA_BONUS_XP, bonusXp)
+        }
+
+        val requestCode = (((goalId.hashCode().toLong() * 31L) + bonusXp.toLong()) and 0x7fffffff).toInt()
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            requestCode,
+            celebrationIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val message = "You finished \"$goalTitle\" before deadline. +$bonusXp Bonus XP."
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID_IMPORTANT)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("Wow! Ahead of Schedule!")
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setColor(Color.parseColor("#FF9E64"))
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+
+        try {
+            with(NotificationManagerCompat.from(context)) {
+                if (ActivityCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.POST_NOTIFICATIONS
+                    ) == PackageManager.PERMISSION_GRANTED
+                ) {
+                    notify(requestCode, builder.build())
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error showing goal celebration notification", e)
         }
     }
 
@@ -436,3 +503,4 @@ object NotificationUtils {
         }
     }
 }
+

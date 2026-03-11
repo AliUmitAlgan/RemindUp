@@ -2,6 +2,8 @@ package com.aliumitalgan.remindup.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.Source
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -36,7 +38,7 @@ class SocialRepository(
         }
 
         try {
-            val userDoc = firestore.collection("users").document(userId).get().await()
+            val userDoc = firestore.collection("users").document(userId).get(Source.SERVER).await()
             val friendIds = (userDoc.get("friendIds") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
 
             val allUserIds = if (friendIds.isEmpty()) {
@@ -51,8 +53,8 @@ class SocialRepository(
 
             allUserIds.forEach { uid ->
                 try {
-                    val statsDoc = firestore.collection("user_stats").document(uid).get().await()
-                    val userDocRef = firestore.collection("users").document(uid).get().await()
+                    val statsDoc = firestore.collection("user_stats").document(uid).get(Source.SERVER).await()
+                    val userDocRef = firestore.collection("users").document(uid).get(Source.SERVER).await()
                     val name = statsDoc.getString("displayName")
                         ?: userDocRef.getString("name")
                         ?: userDocRef.getString("email")?.substringBefore("@")
@@ -94,6 +96,13 @@ class SocialRepository(
                     )
                 )
             )
+        } catch (e: FirebaseFirestoreException) {
+            val error = if (e.code == FirebaseFirestoreException.Code.UNAVAILABLE) {
+                Exception("Friends section requires an internet connection.")
+            } else {
+                e
+            }
+            trySend(Result.failure(error))
         } catch (e: Exception) {
             trySend(Result.failure(e))
         }
