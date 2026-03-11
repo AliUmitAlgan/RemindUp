@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -194,6 +195,8 @@ fun GoalsScreenContent(
     val dateLabelFormatter = remember { DateTimeFormatter.ofPattern("dd MMM yyyy") }
     val displayTimeFormatter = remember { DateTimeFormatter.ofPattern("hh:mm a") }
     val storageTimeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+    val listState = rememberLazyListState()
+    val filterScrollState = rememberScrollState()
 
     val navItems = mainBottomNavItems()
     val visibleGoals by remember(goals, selectedFilter, searchQuery) {
@@ -245,6 +248,7 @@ fun GoalsScreenContent(
             }
         } else {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
@@ -255,8 +259,8 @@ fun GoalsScreenContent(
                     Surface(
                         color = GoalsHeaderSurface,
                         shape = RoundedCornerShape(28.dp),
-                        tonalElevation = 2.dp,
-                        shadowElevation = 6.dp,
+                        tonalElevation = 0.dp,
+                        shadowElevation = 0.dp,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
@@ -355,7 +359,7 @@ fun GoalsScreenContent(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
+                                    .horizontalScroll(filterScrollState),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 goalFilterOptions.forEach { filter ->
@@ -640,6 +644,7 @@ private fun GoalOverviewCard(
     val subtitle = remember(category, goal.reminderTime) { subtitleFor(category, goal.reminderTime) }
     val progressLabel = remember(category) { progressLabelFor(category) }
     val progressValue = remember(category, goal.progress) { progressValueFor(category, goal.progress) }
+    val borderColor = themedColor(Color(0xFFE6EAF0), Color(0xFF253143))
     val accent = when (category) {
         "Health" -> AccentOrange
         "Learning" -> AccentPurple
@@ -660,8 +665,9 @@ private fun GoalOverviewCard(
     Surface(
         color = GoalsCardSurface,
         shape = RoundedCornerShape(24.dp),
-        tonalElevation = 1.dp,
-        shadowElevation = 1.dp,
+        border = BorderStroke(1.dp, borderColor),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick
     ) {
@@ -715,24 +721,26 @@ private fun GoalOverviewCard(
                             tint = themedColor(Color(0xFF94A3B8), Color(0xFFAEB6C5))
                         )
                     }
-                    DropdownMenu(
-                        expanded = isMenuExpanded,
-                        onDismissRequest = { isMenuExpanded = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Delete Goal") },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Filled.Delete,
-                                    contentDescription = null,
-                                    tint = AccentOrange
-                                )
-                            },
-                            onClick = {
-                                isMenuExpanded = false
-                                onDeleteClick()
-                            }
-                        )
+                    if (isMenuExpanded) {
+                        DropdownMenu(
+                            expanded = true,
+                            onDismissRequest = { isMenuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Delete Goal") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Filled.Delete,
+                                        contentDescription = null,
+                                        tint = AccentOrange
+                                    )
+                                },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    onDeleteClick()
+                                }
+                            )
+                        }
                     }
                 }
             }

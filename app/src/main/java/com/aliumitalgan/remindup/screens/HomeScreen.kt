@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -345,6 +346,15 @@ private fun QuickTaskCard(
     bg: Color,
     icon: ImageVector
 ) {
+    val isLightCard = bg.luminance() > 0.55f
+    val titleColor = if (isLightCard) Color(0xFF20233F) else Color(0xFFE5E7EB)
+    val subtitleColor = if (isLightCard) Color(0xFF5F6484) else Color(0xFFC9D0DB)
+    val iconContainerColor = if (isLightCard) {
+        Color.White.copy(alpha = 0.88f)
+    } else {
+        Color.Black.copy(alpha = 0.24f)
+    }
+
     Surface(
         modifier = modifier,
         color = bg,
@@ -355,7 +365,7 @@ private fun QuickTaskCard(
                 modifier = Modifier
                     .size(28.dp)
                     .clip(CircleShape)
-                    .background(themedColor(Color.White.copy(alpha = 0.9f), Color(0xFF2A3442))),
+                    .background(iconContainerColor),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(icon, contentDescription = null, tint = AccentOrange, modifier = Modifier.size(16.dp))
@@ -363,13 +373,13 @@ private fun QuickTaskCard(
             Text(
                 text = title,
                 fontWeight = FontWeight.ExtraBold,
-                color = themedColor(Color(0xFF20233F), Color(0xFFE5E7EB)),
+                color = titleColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = subtitle,
-                color = themedColor(Color(0xFF6D7191), Color(0xFFAEB6C5)),
+                color = subtitleColor,
                 fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
