@@ -138,22 +138,22 @@ val Typography = Typography(
 // Modern şekiller ve köşe yuvarlaklıkları
 val Shapes = Shapes(
     small = androidx.compose.material3.Shapes().small.copy(
-        topStart = androidx.compose.foundation.shape.CornerSize(8.dp),
-        topEnd = androidx.compose.foundation.shape.CornerSize(8.dp),
-        bottomStart = androidx.compose.foundation.shape.CornerSize(8.dp),
-        bottomEnd = androidx.compose.foundation.shape.CornerSize(8.dp)
+        topStart = androidx.compose.foundation.shape.CornerSize(SweetBubblyThemeTokens.BubbleCorner),
+        topEnd = androidx.compose.foundation.shape.CornerSize(SweetBubblyThemeTokens.BubbleCorner),
+        bottomStart = androidx.compose.foundation.shape.CornerSize(SweetBubblyThemeTokens.BubbleCorner),
+        bottomEnd = androidx.compose.foundation.shape.CornerSize(SweetBubblyThemeTokens.BubbleCorner)
     ),
     medium = androidx.compose.material3.Shapes().medium.copy(
-        topStart = androidx.compose.foundation.shape.CornerSize(16.dp),
-        topEnd = androidx.compose.foundation.shape.CornerSize(16.dp),
-        bottomStart = androidx.compose.foundation.shape.CornerSize(16.dp),
-        bottomEnd = androidx.compose.foundation.shape.CornerSize(16.dp)
+        topStart = androidx.compose.foundation.shape.CornerSize(SweetBubblyThemeTokens.BubbleCorner),
+        topEnd = androidx.compose.foundation.shape.CornerSize(SweetBubblyThemeTokens.BubbleCorner),
+        bottomStart = androidx.compose.foundation.shape.CornerSize(SweetBubblyThemeTokens.BubbleCorner),
+        bottomEnd = androidx.compose.foundation.shape.CornerSize(SweetBubblyThemeTokens.BubbleCorner)
     ),
     large = androidx.compose.material3.Shapes().large.copy(
-        topStart = androidx.compose.foundation.shape.CornerSize(24.dp),
-        topEnd = androidx.compose.foundation.shape.CornerSize(24.dp),
-        bottomStart = androidx.compose.foundation.shape.CornerSize(24.dp),
-        bottomEnd = androidx.compose.foundation.shape.CornerSize(24.dp)
+        topStart = androidx.compose.foundation.shape.CornerSize(SweetBubblyThemeTokens.BubbleCorner),
+        topEnd = androidx.compose.foundation.shape.CornerSize(SweetBubblyThemeTokens.BubbleCorner),
+        bottomStart = androidx.compose.foundation.shape.CornerSize(SweetBubblyThemeTokens.BubbleCorner),
+        bottomEnd = androidx.compose.foundation.shape.CornerSize(SweetBubblyThemeTokens.BubbleCorner)
     )
 )
 
