@@ -31,7 +31,6 @@ import com.aliumitalgan.remindup.screens.SettingsScreenContent
 import com.aliumitalgan.remindup.screens.SocialScreen
 import com.aliumitalgan.remindup.screens.SplashScreen
 import com.aliumitalgan.remindup.screens.SweetTaskDetailScreen
-import com.aliumitalgan.remindup.ui.assistant.AiAssistantScreen
 import com.aliumitalgan.remindup.ui.premium.PremiumScreen
 
 sealed class Screen(val route: String) {
@@ -47,10 +46,8 @@ sealed class Screen(val route: String) {
     object SweetTaskDetail : Screen("sweetTaskDetail/{goalId}") {
         fun createRoute(goalId: String): String = "sweetTaskDetail/$goalId"
     }
-    object Reminders : Screen("reminders")
     object Settings : Screen("settings")
     object Social : Screen("social")
-    object Assistant : Screen("assistant")
     object Premium : Screen("premium")
     object PersonalInfo : Screen("personalInfo")
     object Notifications : Screen("notifications")
@@ -169,11 +166,8 @@ fun AppNavigation(
         composable(Screen.Home.route) {
             HomeScreenContent(
                 onNavigateToGoals = { navigateToTopLevel(Screen.Goals.route) },
-                onNavigateToReminders = { navigateToTopLevel(Screen.Reminders.route) },
                 onNavigateToProgress = { navigateToTopLevel(Screen.Analytic.route) },
-                onNavigateToSettings = { navigateToTopLevel(Screen.Settings.route) },
-                onNavigateToAssistant = { navController.navigate(Screen.Assistant.route) },
-                onNavigateToSocial = { navigateToTopLevel(Screen.Social.route) }
+                onNavigateToSettings = { navigateToTopLevel(Screen.Settings.route) }
             )
         }
 
@@ -183,7 +177,6 @@ fun AppNavigation(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToHome = { navigateToTopLevel(Screen.Home.route) },
                 onNavigateToSettings = { navigateToTopLevel(Screen.Settings.route) },
-                onNavigateToReminders = { navigateToTopLevel(Screen.Reminders.route) },
                 onNavigateToSocial = { navigateToTopLevel(Screen.Social.route) },
                 onNavigateToEditCategory = { categoryId ->
                     navController.navigate(Screen.EditCategory.createRoute(categoryId))
@@ -199,7 +192,6 @@ fun AppNavigation(
                 onNavigateToGoals = { navigateToTopLevel(Screen.Goals.route) },
                 onNavigateToHome = { navigateToTopLevel(Screen.Home.route) },
                 onNavigateToSettings = { navigateToTopLevel(Screen.Settings.route) },
-                onNavigateToReminders = { navigateToTopLevel(Screen.Reminders.route) },
                 onNavigateToSocial = { navigateToTopLevel(Screen.Social.route) },
                 onNavigateBack = { navController.popBackStack() }
             )
@@ -218,16 +210,6 @@ fun AppNavigation(
                 onNavigateToSettings = { navigateToTopLevel(Screen.Settings.route) },
                 onNavigateToProgress = { navigateToTopLevel(Screen.Analytic.route) },
                 onNavigateToSocial = { navigateToTopLevel(Screen.Social.route) }
-            )
-        }
-
-        composable(Screen.Reminders.route) {
-            com.aliumitalgan.remindup.ui.reminders.RemindersScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToHome = { navigateToTopLevel(Screen.Home.route) },
-                onNavigateToSettings = { navigateToTopLevel(Screen.Settings.route) },
-                onNavigateToGoals = { navigateToTopLevel(Screen.Goals.route) },
-                onNavigateToProgress = { navigateToTopLevel(Screen.Analytic.route) }
             )
         }
 
@@ -251,7 +233,6 @@ fun AppNavigation(
                 },
                 onNavigateToHome = { navigateToTopLevel(Screen.Home.route) },
                 onNavigateToGoals = { navigateToTopLevel(Screen.Goals.route) },
-                onNavigateToReminders = { navigateToTopLevel(Screen.Reminders.route) },
                 onNavigateToProgress = { navigateToTopLevel(Screen.Analytic.route) },
                 onNavigateToPremium = { navController.navigate(Screen.Premium.route) },
                 onNavigateToSocial = { navigateToTopLevel(Screen.Social.route) },
@@ -352,13 +333,6 @@ fun AppNavigation(
                 onNavigateToHome = { navigateToTopLevel(Screen.Home.route) },
                 onNavigateToGoals = { navigateToTopLevel(Screen.Goals.route) },
                 onNavigateToSettings = { navigateToTopLevel(Screen.Settings.route) }
-            )
-        }
-
-        composable(Screen.Assistant.route) {
-            AiAssistantScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToPremium = { navController.navigate(Screen.Premium.route) }
             )
         }
 

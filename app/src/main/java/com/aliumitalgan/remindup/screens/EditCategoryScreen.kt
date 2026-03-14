@@ -39,6 +39,9 @@ import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.Work
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -142,7 +145,9 @@ fun EditCategoryScreen(
     var smartRemindersEnabled by remember { mutableStateOf(true) }
     var showAllIcons by remember { mutableStateOf(false) }
     val isSaving = viewState.isSaving
+    val isDeleting = viewState.isDeleting
     val saveError = viewState.error
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     val navItems = mainBottomNavItems()
     val visibleIconOptions = if (showAllIcons) {
         categoryIcons.mapIndexed { index, icon -> index to icon }
@@ -216,7 +221,7 @@ fun EditCategoryScreen(
                     fontSize = 18.sp
                 )
                 TextButton(
-                    enabled = !isSaving && categoryName.isNotBlank(),
+                    enabled = !isSaving && !isDeleting && categoryName.isNotBlank(),
                     onClick = {
                         val trimmedName = categoryName.trim()
                         if (trimmedName.isBlank()) {
@@ -499,8 +504,70 @@ fun EditCategoryScreen(
                 }
             }
 
+            if (normalizedCategoryId != null) {
+                Button(
+                    onClick = { showDeleteConfirm = true },
+                    enabled = !isSaving && !isDeleting,
+                    shape = RoundedCornerShape(999.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFE53935),
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 18.dp)
+                        .height(52.dp)
+                ) {
+                    Text(
+                        text = if (isDeleting) "Deleting..." else "Delete Category",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(30.dp))
         }
+    }
+
+    if (showDeleteConfirm && normalizedCategoryId != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = {
+                Text(
+                    text = "Delete category?",
+                    fontWeight = FontWeight.Bold,
+                    color = Deep
+                )
+            },
+            text = {
+                Text(
+                    text = "This action is safe but irreversible. Related goals may lose this category label.",
+                    color = themedColor(Color(0xFF64748B), Color(0xFFAEB6C5))
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteConfirm = false
+                        viewModel.deleteCategory(normalizedCategoryId) {
+                            onSave()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFE53935),
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(999.dp)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel", color = Deep)
+                }
+            }
+        )
     }
 }
 

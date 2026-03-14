@@ -4,8 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
@@ -21,7 +19,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -77,12 +74,6 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -95,13 +86,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
@@ -115,7 +104,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aliumitalgan.remindup.components.BottomNavigationBar
-import com.aliumitalgan.remindup.components.DeleteCategoryDialog
 import com.aliumitalgan.remindup.components.DeleteGoalDialog
 import com.aliumitalgan.remindup.components.EmptyGoalsView
 import com.aliumitalgan.remindup.components.NoGoalsFoundView
@@ -139,7 +127,6 @@ import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
-import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 
 private val GoalsBackground: Color
@@ -258,8 +245,6 @@ fun GoalsScreenContent(
     var isSearchVisible by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var pendingDeleteGoalId by remember { mutableStateOf<String?>(null) }
-    var isCategoryDeleteMode by remember { mutableStateOf(false) }
-    var pendingDeleteCategory by remember { mutableStateOf<GoalCategory?>(null) }
     var showDatePickerPopup by remember { mutableStateOf(false) }
     var showTimePickerPopup by remember { mutableStateOf(false) }
     val dateLabelFormatter = remember { DateTimeFormatter.ofPattern("dd MMM yyyy") }
@@ -281,15 +266,6 @@ fun GoalsScreenContent(
                     accent = Color(0xFF718096)
                 )
             )
-            add(
-                GoalFilterOption(
-                    key = GOALS_FILTER_NEW_CATEGORY,
-                    label = "New Category",
-                    icon = Icons.Filled.Add,
-                    accent = AccentOrange,
-                    isAddAction = true
-                )
-            )
             categories.forEach { category ->
                 add(
                     GoalFilterOption(
@@ -300,6 +276,15 @@ fun GoalsScreenContent(
                     )
                 )
             }
+            add(
+                GoalFilterOption(
+                    key = GOALS_FILTER_NEW_CATEGORY,
+                    label = "New Category",
+                    icon = Icons.Filled.Add,
+                    accent = AccentOrange,
+                    isAddAction = true
+                )
+            )
         }
     }
     val visibleGoals by remember(goals, selectedFilterId, searchQuery, categoriesById) {
@@ -322,6 +307,7 @@ fun GoalsScreenContent(
     val selectedFilterName = categoriesById[selectedFilterId]?.name?.ifBlank { "Category" } ?: "All"
     val headerTitle = if (selectedFilterId == GOALS_FILTER_ALL) "All Goals" else "$selectedFilterName Goals"
     val addGoalLabel = if (selectedFilterId == GOALS_FILTER_ALL) "Add New Goal" else "Add $selectedFilterName Goal"
+    val selectedCategoryForSettings = categoriesById[selectedFilterId]
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -339,12 +325,6 @@ fun GoalsScreenContent(
         if (selectedCategoryIdInput.isNotBlank() && categories.none { it.id == selectedCategoryIdInput }) {
             selectedCategoryIdInput = categories.firstOrNull()?.id.orEmpty()
         }
-        if (isCategoryDeleteMode && categories.isEmpty()) {
-            isCategoryDeleteMode = false
-        }
-        pendingDeleteCategory = pendingDeleteCategory?.takeIf { pending ->
-            categories.any { it.id == pending.id }
-        }
     }
 
     LaunchedEffect(isSearchVisible) {
@@ -360,10 +340,6 @@ fun GoalsScreenContent(
         searchQuery = ""
         isSearchVisible = false
         keyboardController?.hide()
-    }
-
-    BackHandler(enabled = isCategoryDeleteMode) {
-        isCategoryDeleteMode = false
     }
 
     Scaffold(
@@ -441,6 +417,16 @@ fun GoalsScreenContent(
                                         onClick = onNavigateBack
                                     )
                                     Spacer(modifier = Modifier.weight(1f))
+                                    if (selectedCategoryForSettings != null) {
+                                        HeaderCircleButton(
+                                            icon = Icons.Filled.MoreHoriz,
+                                            contentDescription = "Category settings",
+                                            onClick = {
+                                                onNavigateToEditCategory(selectedCategoryForSettings.id)
+                                            }
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                    }
                                     HeaderCircleButton(
                                         icon = Icons.Filled.Search,
                                         contentDescription = "Search goals",
@@ -510,30 +496,10 @@ fun GoalsScreenContent(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 filterOptions.forEach { filter ->
-                                    val isCustomCategory = !filter.isAddAction && filter.key != GOALS_FILTER_ALL
                                     GoalFilterChip(
                                         option = filter,
                                         selected = !filter.isAddAction && selectedFilterId == filter.key,
-                                        showDeleteAction = isCategoryDeleteMode && isCustomCategory,
-                                        onLongClick = if (isCustomCategory) {
-                                            { isCategoryDeleteMode = true }
-                                        } else {
-                                            null
-                                        },
-                                        onDeleteClick = if (isCustomCategory) {
-                                            {
-                                                pendingDeleteCategory = categoriesById[filter.key]
-                                            }
-                                        } else {
-                                            null
-                                        },
                                         onClick = {
-                                            if (isCategoryDeleteMode && isCustomCategory) {
-                                                return@GoalFilterChip
-                                            }
-                                            if (isCategoryDeleteMode) {
-                                                isCategoryDeleteMode = false
-                                            }
                                             if (filter.isAddAction) {
                                                 onNavigateToEditCategory(null)
                                             } else {
@@ -549,16 +515,7 @@ fun GoalsScreenContent(
 
                 if (goals.isEmpty()) {
                     item {
-                        EmptyGoalsView(
-                            onCreateGoal = {
-                                selectedCategoryIdInput = defaultCategoryForFilter(
-                                    selectedFilterId = selectedFilterId,
-                                    categories = categories,
-                                    fallback = selectedCategoryIdInput
-                                )
-                                showAddDialog = true
-                            }
-                        )
+                        EmptyGoalsView()
                     }
                 } else if (visibleGoals.isEmpty()) {
                     item {
@@ -585,18 +542,20 @@ fun GoalsScreenContent(
                     }
                 }
 
-                item {
-                    AddGoalInlineButton(
-                        label = addGoalLabel,
-                        onClick = {
-                            selectedCategoryIdInput = defaultCategoryForFilter(
-                                selectedFilterId = selectedFilterId,
-                                categories = categories,
-                                fallback = selectedCategoryIdInput
-                            )
-                            showAddDialog = true
-                        }
-                    )
+                if (goals.isNotEmpty()) {
+                    item {
+                        AddGoalInlineButton(
+                            label = addGoalLabel,
+                            onClick = {
+                                selectedCategoryIdInput = defaultCategoryForFilter(
+                                    selectedFilterId = selectedFilterId,
+                                    categories = categories,
+                                    fallback = selectedCategoryIdInput
+                                )
+                                showAddDialog = true
+                            }
+                        )
+                    }
                 }
 
                 item {
@@ -739,24 +698,6 @@ fun GoalsScreenContent(
         )
     }
 
-    pendingDeleteCategory?.let { category ->
-        DeleteCategoryDialog(
-            categoryName = category.name.ifBlank { "Category" },
-            onDismiss = { pendingDeleteCategory = null },
-            onConfirmDelete = {
-                viewModel.deleteCategory(category.id)
-                if (selectedCategoryIdInput == category.id) {
-                    selectedCategoryIdInput = categories
-                        .filterNot { it.id == category.id }
-                        .firstOrNull()
-                        ?.id
-                        .orEmpty()
-                }
-                pendingDeleteCategory = null
-                isCategoryDeleteMode = false
-            }
-        )
-    }
 }
 
 @Composable
@@ -783,48 +724,12 @@ private fun HeaderCircleButton(
 }
 
 @Composable
-@OptIn(ExperimentalFoundationApi::class)
 private fun GoalFilterChip(
     option: GoalFilterOption,
     selected: Boolean,
-    onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null,
-    showDeleteAction: Boolean = false,
-    onDeleteClick: (() -> Unit)? = null
+    onClick: () -> Unit
 ) {
     val isActionChip = option.isAddAction
-    val interactionSource = remember { MutableInteractionSource() }
-    val wiggleDuration = remember(option.key) {
-        170 + (option.key.hashCode().absoluteValue % 4) * 12
-    }
-    val wiggleRotation = if (showDeleteAction) {
-        val rotationTransition = rememberInfiniteTransition(label = "goalFilterWiggleRotation")
-        rotationTransition.animateFloat(
-            initialValue = -1.8f,
-            targetValue = 1.8f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = wiggleDuration, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "goalFilterWiggleRotationValue"
-        ).value
-    } else {
-        0f
-    }
-    val wiggleShift = if (showDeleteAction) {
-        val offsetTransition = rememberInfiniteTransition(label = "goalFilterWiggleOffset")
-        offsetTransition.animateFloat(
-            initialValue = -0.7f,
-            targetValue = 0.7f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = wiggleDuration + 38, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "goalFilterWiggleOffsetValue"
-        ).value
-    } else {
-        0f
-    }
     val selectedContentColor = if (option.accent.luminance() > 0.6f) {
         themedColor(Color(0xFF1F2937), Color(0xFF111827))
     } else {
@@ -839,16 +744,7 @@ private fun GoalFilterChip(
     }
     Box(
         modifier = Modifier
-            .graphicsLayer {
-                rotationZ = wiggleRotation
-                translationX = wiggleShift
-            }
-            .combinedClickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick,
-                onLongClick = onLongClick
-            )
+            .clickable(onClick = onClick)
     ) {
         Surface(
             shape = RoundedCornerShape(999.dp),
@@ -898,30 +794,6 @@ private fun GoalFilterChip(
                     fontSize = 13.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-
-        if (showDeleteAction && onDeleteClick != null) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(x = 6.dp, y = (-6).dp)
-                    .size(18.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFE53935))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onDeleteClick
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = "Delete category",
-                    tint = Color.White,
-                    modifier = Modifier.size(11.dp)
                 )
             }
         }

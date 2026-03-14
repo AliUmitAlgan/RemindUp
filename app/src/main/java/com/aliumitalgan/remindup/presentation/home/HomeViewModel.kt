@@ -2,60 +2,83 @@ package com.aliumitalgan.remindup.presentation.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.aliumitalgan.remindup.domain.model.Goal
-import com.aliumitalgan.remindup.domain.model.ReminderRecord
+import com.aliumitalgan.remindup.domain.model.planner.DailyTask
+import com.aliumitalgan.remindup.domain.model.planner.EnergyLevel
 import com.aliumitalgan.remindup.domain.repository.AuthRepository
-import com.aliumitalgan.remindup.domain.repository.ReminderRepository
-import com.aliumitalgan.remindup.domain.usecase.goal.GetUserGoalsUseCase
+import com.aliumitalgan.remindup.domain.usecase.planner.ObserveTodayDailyTasksUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 data class HomeUiState(
-    val goals: List<Pair<String, Goal>> = emptyList(),
-    val reminders: List<ReminderRecord> = emptyList(),
-    val isLoading: Boolean = false,
-    val error: String? = null,
-    val userName: String = "Maya"
+    val userName: String = "Ali",
+    val energyLevel: EnergyLevel = EnergyLevel.NORMAL,
+    val todayTasks: List<DailyTask> = emptyList(),
+    val isLoading: Boolean = true,
+    val error: String? = null
 )
 
 class HomeViewModel(
-    private val getUserGoalsUseCase: GetUserGoalsUseCase,
-    private val reminderRepository: ReminderRepository,
+    private val observeTodayDailyTasksUseCase: ObserveTodayDailyTasksUseCase,
     private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+    private val selectedEnergy = MutableStateFlow(EnergyLevel.NORMAL)
 
     init {
-        loadData()
+        observeTodayTasks()
+        loadUserName()
     }
 
-    fun loadData() {
+    private fun observeTodayTasks() {
+        viewModelScope.launch {
+            selectedEnergy.flatMapLatest { energy ->
+                observeTodayDailyTasksUseCase(
+                    date = LocalDate.now(),
+                    energyLevel = energy
+                )
+            }.collect { tasks ->
+                _uiState.update {
+                    it.copy(
+                        energyLevel = selectedEnergy.value,
+                        todayTasks = tasks,
+                        isLoading = false,
+                        error = null
+                    )
+                }
+            }
+        }
+    }
+
+    private fun loadUserName() {
         viewModelScope.launch(Dispatchers.IO) {
-            _uiState.update { it.copy(isLoading = true, error = null) }
             val user = authRepository.getCurrentUser()
             val userName = user?.name?.substringBefore(" ")?.ifBlank { null }
                 ?: user?.email?.substringBefore("@")
-                ?: "Maya"
-            val goalsResult = getUserGoalsUseCase()
-            val remindersResult = reminderRepository.getUserReminders()
+                ?: "Ali"
 
             _uiState.update {
                 it.copy(
-                    goals = goalsResult.getOrDefault(emptyList()),
-                    reminders = remindersResult.getOrDefault(emptyList()),
-                    isLoading = false,
-                    userName = userName,
-                    error = goalsResult.exceptionOrNull()?.message ?: remindersResult.exceptionOrNull()?.message
+                    userName = userName
                 )
             }
         }
     }
 
-    fun refresh() = loadData()
+    fun selectEnergy(level: EnergyLevel) {
+        selectedEnergy.value = level
+        _uiState.update { it.copy(energyLevel = level, isLoading = true) }
+    }
+
+    fun refresh() {
+        _uiState.update { it.copy(isLoading = true) }
+        selectedEnergy.value = selectedEnergy.value
+    }
 }

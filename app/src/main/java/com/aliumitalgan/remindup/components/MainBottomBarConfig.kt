@@ -14,13 +14,22 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.runtime.Composable
 import com.aliumitalgan.remindup.screens.BottomNavItem
 
+@Suppress("unused")
+private fun friendsBottomNavItem(): BottomNavItem {
+    return BottomNavItem(
+        "FRIENDS",
+        Icons.Filled.People,
+        Icons.Outlined.People,
+        "social"
+    )
+}
+
 @Composable
 fun mainBottomNavItems(): List<BottomNavItem> {
     return listOf(
         BottomNavItem("HOME", Icons.Filled.Home, Icons.Outlined.Home, "home"),
         BottomNavItem("GOALS", Icons.Filled.CheckCircle, Icons.Outlined.CheckCircle, "goals"),
-        BottomNavItem("FRIENDS", Icons.Filled.People, Icons.Outlined.People, "social"),
-        BottomNavItem("ANALYTIC", Icons.Filled.EventNote, Icons.Outlined.EventNote, "analytic"),
+        BottomNavItem("ANALYTICS", Icons.Filled.EventNote, Icons.Outlined.EventNote, "analytic"),
         BottomNavItem("PROFILE", Icons.Filled.Person, Icons.Outlined.Person, "settings")
     )
 }

@@ -37,11 +37,17 @@ import com.aliumitalgan.remindup.presentation.home.HomeViewModel
 import com.aliumitalgan.remindup.presentation.settings.SettingsViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class AppContainer(
     context: Context
 ) {
     private val appContext = context.applicationContext
+    private val plannerLocalModule by lazy { PlannerLocalModule(appContext) }
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
@@ -85,6 +91,13 @@ class AppContainer(
     val addReminderUseCase by lazy { AddReminderUseCase(reminderRepository) }
     val updateReminderUseCase by lazy { UpdateReminderUseCase(reminderRepository) }
     val deleteReminderUseCase by lazy { DeleteReminderUseCase(reminderRepository) }
+    val observeTodayDailyTasksUseCase by lazy { plannerLocalModule.observeTodayDailyTasksUseCase }
+
+    init {
+        appScope.launch {
+            plannerLocalModule.seedTemplatesIfNeeded()
+        }
+    }
 
     fun appContext(): Context = appContext
 }
@@ -113,11 +126,11 @@ class RemindUpViewModelFactory(
             ) as T
             modelClass.isAssignableFrom(EditCategoryViewModel::class.java) -> EditCategoryViewModel(
                 container.getGoalCategoryByIdUseCase,
-                container.saveGoalCategoryUseCase
+                container.saveGoalCategoryUseCase,
+                container.deleteGoalCategoryUseCase
             ) as T
             modelClass.isAssignableFrom(HomeViewModel::class.java) -> HomeViewModel(
-                container.getUserGoalsUseCase,
-                container.reminderRepository,
+                container.observeTodayDailyTasksUseCase,
                 container.authRepository
             ) as T
             modelClass.isAssignableFrom(SettingsViewModel::class.java) -> SettingsViewModel(
